@@ -24,17 +24,20 @@ def Sleep_print(Wait_time):
     print("WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
 
 
-def Scroll_print(length):
+def Scroll_print(Hwnd, length):
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
     for i in range(abs(length)):
         pyautogui.scroll(int(length / abs(length)))
         time.sleep(0.01)
     print("Move- mmmmm 滚轮滚动{Length}".format(Length=length))
 
 
-def Esc_print():
+def Esc_print(Hwnd):
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
     pydirectinput.press("esc")
     time.sleep(0.1)
     print("QUIT- ccccc 按Esc退出")
+    Itface_Quit(Hwnd)
 
 
 def Find_windows(title):
@@ -279,14 +282,11 @@ def Itface_Quit(Hwnd):
     :param Hwnd:    窗口句柄
     :return: None
     """
-    time.sleep(3)
+    time.sleep(0.5)
     # 注：此处退出界面条件可以极为苛刻 一般识别取值为0.006
-    Range = Find_in_screen("./pic/Main/Tuichuyouxi.png", 0.01, 0)
-    if Range:
+    if Find_in_screen("./pic/Main/Tuichuyouxi.png", 0.01, 0):
         print("检测到退出界面")
-        Range = Find_in_screen("./pic/Main/Quxiaotuichu.png", 0.05, 0)
-        Click(None, Range, 1)
-        print("取消退出")
+        Find_Click_windows(Hwnd, "./pic/Main/Quxiaotuichu.png", 0.03, "取消退出", "取消退出失败")
     else:
         print("未检测到退出界面")
 
@@ -308,10 +308,10 @@ def Itface_Host(Hwnd):
             print("检测到进入庭院")
             return 1
             break
-        Wait += 2
+        Wait += 1
         time.sleep(1)
 
-        if Wait >= 10:
+        if Wait >= 3:
             # 按esc尝试回到主界面
             pydirectinput.press("esc")
             print("未检测到进入庭院 尝试esc")
@@ -423,11 +423,11 @@ def Itface_explore(Hwnd):
     Find = Find_Click_windows(Hwnd, "./pic/Main/Xuanshangqianwang.png", 0.05, "进入探索地图界面", "未进入探索地图界面")
 
     time.sleep(1)
-    Esc_print()
+    Esc_print(Hwnd)
     time.sleep(1)
 
     if Find_in_windows(Hwnd, "./pic/Digui/Diguitubiao.png", 0.05, 0):
         print("检测到地鬼入口 已进入探索界面")
     else:
         print("未检测到地鬼入口 似乎未进入探索界面")
-        Esc_print()
+        Esc_print(Hwnd)

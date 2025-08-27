@@ -97,7 +97,7 @@ def Diyuguiwang(current_state, Hwnd):
                     else:
                         print("STEP- vvvvv 似乎已经无挑战次数 跳转结束")
                         Sleep_print(1)
-                        Esc_print()
+                        Esc_print(Hwnd)
                         Sleep_print(1)
                         current_state = "结束"
                 else:
@@ -143,7 +143,7 @@ def Diyuguiwang(current_state, Hwnd):
                         if Find:
                             flag_digui += 1
                             Sleep_print(1)
-                            Esc_print()
+                            Esc_print(Hwnd)
                             print("STEP- vvvvv 跳转地鬼界面")
                             current_state = "地鬼界面"
                         else:
@@ -163,9 +163,9 @@ def Diyuguiwang(current_state, Hwnd):
                     print("似乎已无地域鬼王讨伐次数 任务结束")
                     # 任务结束
                     Sleep_print(2)
-                    Esc_print()
+                    Esc_print(Hwnd)
                     Sleep_print(2)
-                    Esc_print()
+                    Esc_print(Hwnd)
                     Sleep_print(2)
                     Itface_Host(Hwnd)
                     return 1

@@ -116,7 +116,7 @@ def Jiejieyangcheng(current_state, Hwnd):
 
             case "结束":
                 Sleep_print(1)
-                Esc_print()
+                Esc_print(Hwnd)
                 Sleep_print(2)
                 for i in range(5):
                     Find = Find_Click_windows(Hwnd, "./pic/Sis/Tuichu.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
@@ -125,13 +125,13 @@ def Jiejieyangcheng(current_state, Hwnd):
                         break
                     else:
                         Sleep_print(3)
-                        Esc_print()
+                        Esc_print(Hwnd)
                 Itface_Host(Hwnd)
                 return 1
 
             case "异常退出":
                 Sleep_print(1)
-                Esc_print()
+                Esc_print(Hwnd)
                 Sleep_print(2)
                 for i in range(5):
                     Find = Find_Click_windows(Hwnd, "./pic/Sis/Tuichu.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
@@ -141,7 +141,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                     else:
                         Sleep_print(3)
                         if i > 3:
-                            Esc_print()
+                            Esc_print(Hwnd)
                 Itface_Host(Hwnd)
                 return 0
 
@@ -158,14 +158,14 @@ def Work_Salary(Hwnd):
 
             if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
                 print("领取体力工资成功")
-                Esc_print()
+                Esc_print(Hwnd)
                 Sleep_print(1)
 
     if Find_Click_windows(Hwnd, "./pic/Sis/Tiligongzi.png", 0.05, "领取体力工资", "未检测到体力工资"):
 
         if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
             print("领取体力工资成功")
-            Esc_print()
+            Esc_print(Hwnd)
             Sleep_print(1)
 
     Sleep_print(1)
@@ -180,7 +180,7 @@ def Jiyangjiangli(Hwnd):
         if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
             print("寄养奖励领取成功")
             Sleep_print(1)
-            Esc_print()
+            Esc_print(Hwnd)
             Sleep_print(1)
         else:
             print("寄养奖励领取失败")
@@ -197,14 +197,14 @@ def Tilishihe(Hwnd):
         Sleep_print(1)
         if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
             print("体力食盒领取成功")
-            Esc_print()
+            Esc_print(Hwnd)
             Sleep_print(1)
-            Esc_print()
+            Esc_print(Hwnd)
             Sleep_print(1)
             return 1
         else:
             print("体力食盒领取失败")
-            Esc_print()
+            Esc_print(Hwnd)
             Sleep_print(1)
             return 0
 
@@ -213,7 +213,7 @@ def Jinyanjiuhu(Hwnd):
     # 提取函数
     def Tiqu(Range):
         if Range:
-            Esc_print()
+            Esc_print(Hwnd)
             Sleep_print(1)
             print("经验酒壶提取上限")
             return 0
@@ -270,7 +270,7 @@ def Jiejieka(Hwnd):
     for i in range(1):
         if not Find_in_windows(Hwnd, "./pic/Sis/Jiejiekacao.png", 0.05, 0):
             print("结界卡未耗尽")
-            Esc_print()
+            Esc_print(Hwnd)
             Sleep_print(0.5)
             return 1
         else:
@@ -296,7 +296,7 @@ def Jiejieka(Hwnd):
                 if Find_in_windows(Hwnd, "./pic/Sis/Yaoqing.png", 0.05, 0):
                     print("结界卡激活成功")
                     Sleep_print(1)
-                    Esc_print()
+                    Esc_print(Hwnd)
                     Sleep_print(0.5)
                     return 1
                 else:
@@ -353,7 +353,7 @@ def Yucheng(current_state, Hwnd):
                             x = (Range[0][0] + Range[1][0]) // 2 + rect[0]
                             y = (Range[0][1] + Range[1][1]) // 2 + rect[1]
                             pyautogui.moveTo(x, y)
-                            Scroll_print(-5)
+                            Scroll_print(Hwnd, -5)
                         else:
                             break
                 else:
@@ -379,7 +379,7 @@ def Yucheng(current_state, Hwnd):
                     if Finish:
                         print("STEP- vvvvv 结束育成")
                         Sleep_print(1)
-                        Esc_print()
+                        Esc_print(Hwnd)
                         Sleep_print(1)
                         return 1
                     else:
@@ -389,7 +389,7 @@ def Yucheng(current_state, Hwnd):
                 else:
                     print("STEP- vvvvv 结束育成")
                     Sleep_print(1)
-                    Esc_print()
+                    Esc_print(Hwnd)
                     Sleep_print(1)
                     return 1
 
@@ -459,7 +459,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                             return 0
                         else:
                             print("未到寄养列表末尾")
-                            Scroll_print(-5)
+                            Scroll_print(Hwnd, -5)
 
                 if Find:
                     print("STEP- vvvvv 跳转寄养结界")
@@ -473,9 +473,9 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
             case "寄养结界":
                 Find = Find_Click_windows(Hwnd, "./pic/Sis/youjiyangwei.png", 0.05, "有寄养位", "结界已被占用")
                 if not Find:
-                    Esc_print()
+                    Esc_print(Hwnd)
                     Sleep_print(0.5)
-                    Esc_print()
+                    Esc_print(Hwnd)
                     Sleep_print(2)
                     return Jiyang("结界界面", Hwnd, Jiejieka_Model_path, string)
                 else:
@@ -492,11 +492,11 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                             x = (Find[0][0] + Find[1][0]) // 2 + rect[0]
                             y = (Find[0][1] + Find[1][1]) // 2 + rect[1]
                             pyautogui.moveTo(x, y)
-                            Scroll_print(-5)
+                            Scroll_print(Hwnd, -5)
                         else:
                             Find_Click_windows(Hwnd, "./pic/Sis/Queding.png", 0.05, "点击确定", "点击确定异常")
-                            Esc_print()
+                            Esc_print(Hwnd)
                             Sleep_print(2)
-                            Esc_print()
+                            Esc_print(Hwnd)
                             Sleep_print(2)
                             return Jiyang("结界界面", Hwnd, Jiejieka_Model_path, string)
