@@ -64,13 +64,13 @@ def Diyuguiwang(current_state, Hwnd):
             case "地鬼界面":
                 Sleep_print(1)
                 if flag_digui <= 3:
-                    Find = Find_Click_windows(Hwnd, "./pic/Digui/Shaixuan.png", 0.05, "点击筛选", "未检测到筛选图标")
+                    Find = Find_Click_windows(Hwnd, "./pic/Digui/Shaixuan.png", 0.05, "点击筛选", "未检测到筛选图标 似乎已经在筛选中")
                     if Find:
                         print("STEP- vvvvv 跳转筛选界面")
                         current_state = "筛选界面"
                     else:
-                        print("STEP- vvvvv 跳转异常退出界面")
-                        current_state = "异常退出"
+                        print("STEP- vvvvv 跳转筛选界面")
+                        current_state = "筛选界面"
                 else:
                     print("STEP- vvvvv 跳转结束状态")
                     current_state = "结束"
