@@ -142,7 +142,7 @@ def Diyuguiwang(current_state, Hwnd):
                         Find = Find_Click_windows(Hwnd, "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
                         if Find:
                             flag_digui += 1
-                            Sleep_print(1)
+                            Sleep_print(2)
                             Esc_print(Hwnd)
                             print("STEP- vvvvv 跳转地鬼界面")
                             current_state = "地鬼界面"
