@@ -36,6 +36,7 @@ def meirifengmo(Hwnd):
         if flag:
             if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
                 print("逢魔奖励领取成功")
+                Sleep_print(1)
                 ctypes.windll.user32.SetForegroundWindow(Hwnd)
                 pydirectinput.press("esc")
                 print("QUIT- ccccc 按Esc退出")
