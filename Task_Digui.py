@@ -162,8 +162,7 @@ def Diyuguiwang(current_state, Hwnd):
                 else:
                     print("似乎已无地域鬼王讨伐次数 任务结束")
                     # 任务结束
-                    Sleep_print(2)
-                    Esc_print(Hwnd)
+                    Find_Click_windows(Hwnd, "./pic/Main/Tuichu.png", 0.05, "点击退出地鬼界面", "未检测到退出图标")
                     Sleep_print(2)
                     Esc_print(Hwnd)
                     Sleep_print(2)
