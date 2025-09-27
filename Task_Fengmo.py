@@ -36,7 +36,7 @@ def meirifengmo(Hwnd):
         if flag:
             if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
                 print("逢魔奖励领取成功")
-                Sleep_print(1)
+                Sleep_print(2)
                 ctypes.windll.user32.SetForegroundWindow(Hwnd)
                 pydirectinput.press("esc")
                 print("QUIT- ccccc 按Esc退出")
@@ -96,6 +96,7 @@ def fengmoboss(Hwnd):
                     Find_Click_windows(Hwnd, "./pic/Fengmo/Jijietioazhan.png", 0.05, "点击集结挑战", "未检测到集结挑战")
                 else:
                     Find_Click_windows(Hwnd, "./pic/Fengmo/Jijietioazhan1.png", 0.05, "点击集结挑战", "未检测到集结挑战")
+                Sleep_print(3)
                 if Find_in_windows(Hwnd, "./pic/Fengmo/Zhengrongyushe.png", 0.05, 0):
                     print("已经进入备战场景")
                     found_battle_scene = True
