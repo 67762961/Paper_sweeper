@@ -18,7 +18,8 @@ def MainTask_Digui(Hwnd, Account):
     print("TASK- +++++ 开始讨伐地域鬼王 ++++++++++++++++++++++++++++++++")
 
     # 读取上次地鬼执行时间
-    Times_diyuguiwang = check_lasttime(Account, "Times_diyuguiwang")
+    print("TIME- ----- 读取上次地域鬼王完成时间")
+    Times_diyuguiwang = check_lasttime(Account, "地域鬼王")
     current_time = datetime.now()
 
     # 判断跳过条件
@@ -33,10 +34,10 @@ def MainTask_Digui(Hwnd, Account):
             # 更新配置 写入当前时间
             config = read_config("./config/Last_times.json")
             Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-            config[Account]["Times_diyuguiwang"] = Now
+            config[Account]["地域鬼王"] = Now
+            write_config("./config/Last_times.json", config)
             print("TIME- ----- 本次地域鬼王完成时间")
             print(f"TIME- ----- {Now}")
-            write_config("./config/Last_times.json", config)
             print("TASK- ----- 地域鬼王任务完成 --------------------------------")
         else:
             print("EROR- ***** 地域鬼王任务失败 ********************************")

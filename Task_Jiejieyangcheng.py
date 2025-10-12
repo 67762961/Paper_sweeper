@@ -15,7 +15,7 @@ def MainTask_Jiejieyangcheng(Hwnd, Account):
     print("TASK- +++++ 开始结界养成任务 ++++++++++++++++++++++++++++++++")
 
     # 读取上次结界任务时间
-    Times_jiejieyangcheng = check_lasttime(Account, "Times_jiejieyangcheng")
+    Times_jiejieyangcheng = check_lasttime(Account, "结界养成")
     current_time = datetime.now()
 
     # 判断跳过条件
@@ -29,7 +29,7 @@ def MainTask_Jiejieyangcheng(Hwnd, Account):
             # 更新配置 写入当前时间
             config = read_config("./config/Last_times.json")
             Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-            config[Account]["Times_jiejieyangcheng"] = Now
+            config[Account]["结界养成"] = Now
             print("TIME- ----- 本次结界养成完成时间")
             print(f"TIME- ----- {Now}")
             write_config("./config/Last_times.json", config)

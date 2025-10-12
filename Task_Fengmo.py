@@ -4,9 +4,54 @@ import pydirectinput
 import ctypes
 import win32gui
 import config
-from Lib import Sleep_print
 from datetime import datetime, timedelta, time
-from Lib import Find_in_windows, Find_Click_windows, Click, Itface_Host, Itface_guild, Itface_daily, read_config, write_config
+from Lib import Find_in_windows, Find_Click_windows, Click, Itface_Host, Itface_guild, Itface_daily, read_config, write_config, Sleep_print, check_lasttime
+
+
+def MainTask_Fengmo(Hwnd, Account):
+    """
+    有关逢魔之时相关任务
+    :param Hwnd:    窗口句柄
+    :param Account: 账号
+    """
+    print("TASK- +++++ 开始逢魔之时任务 ++++++++++++++++++++++++++++++++")
+
+    # 读取上次封魔之时执行时间
+    print("TIME- ----- 读取上次封魔之时完成时间")
+    Times_fengmozhishi = check_lasttime(Account, "逢魔之时")
+    current_time = datetime.now()
+
+    # 开启条件
+    flag_fengmo = time(17, 0) <= current_time.time() <= time(22, 0)
+    if (Times_fengmozhishi.date() != current_time.date()) & flag_fengmo:
+
+        # 开始逢魔任务
+        print("INFO- ----- 前往逢魔界面")
+        Itface_daily(Hwnd)
+
+        Range = Find_Click_windows(Hwnd, "./pic/Fengmo/Fengmotubiao.png", 0.05, "点击逢魔图标", "未检测到逢魔图标")
+        if not Range:
+            print("EROR- XXXXX 逢魔之时任务失败 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+            return 0
+        else:
+            if Find_Click_windows(Hwnd, "./pic/Main/Qianwang.png", 0.05, "点击前往", "未检测到前往图标"):
+                Sleep_print(3)
+                # 先点封魔再打boss
+                meirifengmo(Hwnd)
+                for i in range(3):
+                    if fengmoboss(Hwnd):
+                        # 更新配置，写入当前时间
+                        config = read_config("./config/Last_times.json")
+                        Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                        config[Account]["逢魔之时"] = Now
+                        write_config("./config/Last_times.json", config)
+                        print("TIME- ----- 本次逢魔之时完成时间")
+                        print(f"TIME- ----- {Now}")
+                        break
+                ######################################################################################################################
+                # 此处进入了打boss场景 应添加后续战斗完成的处理
+    else:
+        print("SKIP- ----- 跳过逢魔之时")
 
 
 def meirifengmo(Hwnd):
@@ -114,58 +159,3 @@ def fengmoboss(Hwnd):
             flag_Ji = False
 
     return 0
-
-
-def MainTask_Fengmo(Hwnd, Account):
-    """
-    有关逢魔之时相关任务
-    :param Hwnd:    窗口句柄
-    :param Account: 账号
-    """
-    print("TASK- +++++ 开始逢魔之时任务 ++++++++++++++++++++++++++++++++")
-
-    # 读取上次封魔之时执行时间
-    config = read_config("./config/Last_times.json")
-    Times_fengmozhishi_str = config[Account].get("Times_fengmozhishi", None)
-    Times_fengmozhishi = datetime.fromisoformat(Times_fengmozhishi_str) if Times_fengmozhishi_str else None
-    current_time = datetime.now()
-    if Times_fengmozhishi is not None:
-        print(f"TIME- ----- 上次逢魔之时时间:")
-        print(f"TIME- ----- {Times_fengmozhishi.strftime('%Y-%m-%d %H:%M:%S')}")
-    else:
-        print("TIME- ----- 没有记录上次逢魔之时时间")
-        one_week_ago = current_time - timedelta(weeks=1)
-        config[Account]["Times_fengmozhishi"] = one_week_ago.isoformat()
-        write_config("./config/Last_times.json", config)
-
-    # 开启条件
-    flag_fengmo = time(17, 0) <= current_time.time() <= time(22, 0)
-    if (Times_fengmozhishi.date() != current_time.date()) & flag_fengmo:
-
-        # 开始逢魔任务
-        print("INFO- ----- 前往逢魔界面")
-        Itface_daily(Hwnd)
-
-        Range = Find_Click_windows(Hwnd, "./pic/Fengmo/Fengmotubiao.png", 0.05, "点击逢魔图标", "未检测到逢魔图标")
-        if not Range:
-            print("EROR- XXXXX 逢魔之时任务失败 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
-            return 0
-        else:
-            if Find_Click_windows(Hwnd, "./pic/Main/Qianwang.png", 0.05, "点击前往", "未检测到前往图标"):
-                Sleep_print(3)
-                # 先点封魔再打boss
-                meirifengmo(Hwnd)
-                for i in range(3):
-                    if fengmoboss(Hwnd):
-                        # 更新配置，写入当前时间
-                        config = read_config("./config/Last_times.json")
-                        Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                        config[Account]["Times_fengmozhishi"] = Now
-                        print("TIME- ----- 本次逢魔之时完成时间")
-                        print(f"TIME- ----- {Now}")
-                        write_config("./config/Last_times.json", config)
-                        break
-                ######################################################################################################################
-                # 此处进入了打boss场景 应添加后续战斗完成的处理
-    else:
-        print("SKIP- ----- 跳过逢魔之时")

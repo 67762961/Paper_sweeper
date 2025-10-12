@@ -245,26 +245,69 @@ def read_config(FILE_PATH):
     读取配置文件
     """
     if os.path.exists(FILE_PATH):
-        with open(FILE_PATH, "r") as file:
+        with open(FILE_PATH, "r", encoding="utf-8") as file:
             return json.load(file)
-    return {}
+    else:
+        return {}
 
 
 def write_config(FILE_PATH, data):
     """
     将配置写入 JSON 文件
     """
-    with open(FILE_PATH, "w") as file:
+    with open(FILE_PATH, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4)
 
 
 def check_lasttime(Account, Times_name):
     """
-    检测上次运行的时间
+    检测上次运行的时间，如果文件或配置不存在则自动创建
     """
-    config = read_config("./config/Last_times.json")
+    file_path = "./config/Last_times.json"
+
+    # 确保配置目录存在[4,11](@ref)
+    config_dir = os.path.dirname(file_path)
+    if config_dir and not os.path.exists(config_dir):
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+            print(f"创建配置目录: {config_dir}")
+        except OSError as e:
+            print(f"无法创建目录 {config_dir}: {e}")
+            return datetime(2000, 1, 1, 0, 0)
+
+    # 检查文件是否存在，不存在则创建[1,9](@ref)
+    if not os.path.exists(file_path):
+        print(f"配置文件不存在，创建新文件: {file_path}")
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=4)
+            config = {}
+        except Exception as e:
+            print(f"创建配置文件失败: {e}")
+            return datetime(2000, 1, 1, 0, 0)
+    else:
+        # 文件存在，正常读取
+        try:
+            with open(file_path, "r", encoding="utf-8") as file:
+                content = file.read().strip()
+                if not content:  # 处理空文件情况
+                    config = {}
+                else:
+                    config = json.loads(content)
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"配置文件格式错误，将重置: {e}")
+            config = {}
+        except Exception as e:
+            print(f"读取配置文件失败: {e}")
+            return datetime(2000, 1, 1, 0, 0)
+
+    # 确保Account键存在
+    if Account not in config:
+        config[Account] = {}
+
     Times_need_str = config[Account].get(Times_name, None)
     Times_need = datetime.fromisoformat(Times_need_str) if Times_need_str else None
+
     if Times_need is not None:
         print(f"TIME- ----- {Times_need.strftime('%Y-%m-%d %H:%M:%S')}")
         return Times_need
@@ -272,7 +315,14 @@ def check_lasttime(Account, Times_name):
         print("TIME- ----- 没有记录上次时间 已重置初始化值")
         Initial_time = datetime(2000, 1, 1, 0, 0)
         config[Account][Times_name] = Initial_time.isoformat()
-        write_config("./config/Last_times.json", config)
+
+        # 安全写入配置[11](@ref)
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"保存配置失败: {e}")
+
         return Initial_time
 
 
