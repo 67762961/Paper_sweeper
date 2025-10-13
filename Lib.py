@@ -256,7 +256,7 @@ def write_config(FILE_PATH, data):
     将配置写入 JSON 文件
     """
     with open(FILE_PATH, "w", encoding="utf-8") as file:
-        json.dump(data, file, indent=4)
+        json.dump(data, file, ensure_ascii=False, indent=4)
 
 
 def check_lasttime(Account, Times_name):
