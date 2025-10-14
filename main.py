@@ -1,4 +1,3 @@
-import Lib
 import time
 import ctypes
 import win32api
@@ -12,11 +11,12 @@ import config
 import os
 import subprocess
 import datetime
+from Lib import Find_windows, read_config, write_config
 from contextlib import redirect_stdout
 from Task_LogIn import LogIn
 from Task_SignIn import MainTask_Signin
 from Task_Fengmo import MainTask_Fengmo
-from Task_Digui import MainTask_Digui
+from Task_Digui import Task_Digui
 from Task_SisFoster import MainTask_Sisfoster
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
 
@@ -51,7 +51,7 @@ def Init():
 
     # 首先获取游戏窗口句柄列表
     try:
-        hwnds = Lib.Find_windows("阴阳师-网易游戏")
+        hwnds = Find_windows("阴阳师-网易游戏")
         if len(hwnds) == 2:
             print("INIT- ----- 已捕获到两个窗口 --------------------------------")
         else:
@@ -63,7 +63,7 @@ def Init():
                     # 等待进程启动
                     process1.wait()
                     process2.wait()
-                    hwnds = Lib.Find_windows("阴阳师-网易游戏")
+                    hwnds = Find_windows("阴阳师-网易游戏")
                     if len(hwnds) == 2:
                         print("INIT- ----- 启动并捕获阴阳师 --------------------------------")
                         break
@@ -74,7 +74,7 @@ def Init():
                         process2 = subprocess.Popen([config.exe_path], start_new_session=True)
                         process1.wait()
                         process2.wait()
-                        hwnds = Lib.Find_windows("阴阳师-网易游戏")
+                        hwnds = Find_windows("阴阳师-网易游戏")
                         wait += 1
                         time.sleep(5)
                         if len(hwnds) == 2:
@@ -93,9 +93,18 @@ def Init():
 
 def Init_MuMu():
     global hwnds
-    hwnds_1 = Lib.Find_windows("阴阳师-主账号")
-    hwnds_2 = Lib.Find_windows("阴阳师-副账号")
-    hwnds = [hwnds_1[0], hwnds_2[0]]
+    hwnds = []
+    config = read_config("./config/Last_times.json")
+    headers = list(config.keys())
+
+    for header in headers:
+        hwnd = Find_windows(header)
+        print(hwnd)
+        hwnds.append(hwnd)
+        config[header]["HWND"] = hwnd
+
+    write_config("./config/Last_times.json", config)
+    print(hwnds)
     return hwnds
 
 
@@ -225,12 +234,12 @@ def Diyu_guiwang():
         print()
         print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         ctypes.windll.user32.SetForegroundWindow(hwnds[0])
-        MainTask_Digui(hwnds[0], "master")
+        Task_Digui(hwnds[0], "master")
 
         print()
         print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         ctypes.windll.user32.SetForegroundWindow(hwnds[1])
-        MainTask_Digui(hwnds[1], "slaves")
+        Task_Digui(hwnds[1], "slaves")
 
         break
 
