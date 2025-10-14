@@ -55,7 +55,7 @@ def Find_windows(title):
 
     hwnds = []
     win32gui.EnumWindows(callback, hwnds)
-    return hwnds
+    return hwnds[0] if hwnds else None
 
 
 def Find_in_windows(Hwnd, Model_path, Threshold, Flag_show):
