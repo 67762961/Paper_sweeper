@@ -16,7 +16,7 @@ from contextlib import redirect_stdout
 from Task_LogIn import LogIn
 from Task_SignIn import MainTask_Signin
 from Task_Fengmo import MainTask_Fengmo
-from Task_Digui import Task_Digui
+from Task_Digui import Task_Digui, MainTask_Digui
 from Task_SisFoster import MainTask_Sisfoster
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
 
@@ -101,7 +101,6 @@ def Init_MuMu():
         hwnd = Find_windows(header)
         print(hwnd)
         hwnds.append(hwnd)
-        config[header]["HWND"] = hwnd
 
     write_config("./config/Last_times.json", config)
     print(hwnds)
@@ -267,7 +266,7 @@ def Full_operation():
             # Main_Login_2()
             Sign_In()
             Jiejie_yangcheng()
-            Diyu_guiwang()
+            MainTask_Digui()
             Fengmo_zhishi()
             print("MAIN- ~~~~ 完整运行流程结束 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 

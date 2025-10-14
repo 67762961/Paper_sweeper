@@ -4,12 +4,35 @@ import pydirectinput
 import ctypes
 import win32gui
 import config
-from Lib import Sleep_print
 from datetime import datetime, timedelta, time
-from Lib import Find_in_windows, Find_Click_windows, Click, Itface_Host, Itface_guild, Itface_explore, read_config, write_config, check_lasttime, Esc_print
+from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, Itface_explore, read_config, write_config, check_lasttime, Esc_print, Sleep_print
 
 
-def MainTask_Digui(Hwnd, Account):
+def MainTask_Digui():
+    """
+    地域鬼王主任务
+    """
+    print(" ")
+    current_time = datetime.now()
+    if time(12, 0) <= current_time.time() <= time(23, 50):
+        print("TASK- ----- 当前时间在12:00-23:50之间 可以执行地域鬼王任务")
+        config_data = read_config("./config/Last_times.json")
+        headers = list(config_data.keys())
+        for Account in headers:
+            print("TIME- ----- 读取上次账号", Account, "完成地域鬼王任务时间")
+            Times_diyuguiwang = check_lasttime(Account, "地域鬼王")
+            current_time = datetime.now()
+            Times_diyuguiwang.date() == current_time.date()
+            if Times_diyuguiwang.date() != current_time.date():
+                Hwnd = Find_windows(Account)
+                Task_Digui(Hwnd, Account)
+            else:
+                print("SKIP- ----- 今日已完成地域鬼王任务 跳过")
+    else:
+        print("SKIP- ----- 当前时间不在12:00-23:50之间 跳过地域鬼王任务")
+
+
+def Task_Digui(Hwnd, Account):
     """
     有关地鬼相关任务
     :param Hwnd:    窗口句柄
@@ -17,30 +40,18 @@ def MainTask_Digui(Hwnd, Account):
     """
     print("TASK- +++++ 开始讨伐地域鬼王 ++++++++++++++++++++++++++++++++")
 
-    # 读取上次地鬼执行时间
-    print("TIME- ----- 读取上次地域鬼王完成时间")
-    Times_diyuguiwang = check_lasttime(Account, "地域鬼王")
-    current_time = datetime.now()
-
-    # 判断跳过条件
-    # 当日未执行过 且现在时间在12点到23:50之间
-    if Times_diyuguiwang.date() == current_time.date() or (not (time(12, 0) <= current_time.time() <= time(23, 50))):
-        print("SKIP- ----- 跳过地鬼任务")
-    else:
-        # 开始地鬼任务
-        print("INFO- ----- 前往地鬼界面")
-        Itface_explore(Hwnd)
-        if Diyuguiwang("探索界面", Hwnd):
-            # 更新配置 写入当前时间
-            config = read_config("./config/Last_times.json")
-            Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-            config[Account]["地域鬼王"] = Now
-            write_config("./config/Last_times.json", config)
-            print("TIME- ----- 本次地域鬼王完成时间")
-            print(f"TIME- ----- {Now}")
-            print("TASK- ----- 地域鬼王任务完成 --------------------------------")
-        else:
-            print("EROR- ***** 地域鬼王任务失败 ********************************")
+    # 开始地鬼任务
+    print("INFO- ----- 前往地鬼界面")
+    Itface_explore(Hwnd)
+    if Diyuguiwang("探索界面", Hwnd):
+        # 更新配置 写入当前时间
+        config = read_config("./config/Last_times.json")
+        Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        config[Account]["地域鬼王"] = Now
+        write_config("./config/Last_times.json", config)
+        print("TIME- ----- 本次地域鬼王完成时间")
+        print(f"TIME- ----- {Now}")
+        print("TASK- ----- 地域鬼王任务完成 --------------------------------")
 
 
 def Diyuguiwang(current_state, Hwnd):
@@ -88,8 +99,9 @@ def Diyuguiwang(current_state, Hwnd):
                         Find = Find_Click_windows(Hwnd, "./pic/Digui/3rd.png", 0.05, "点击第三个", "似乎无法挑战第三热门鬼王")
 
                 Sleep_print(1)
-                if Find_in_windows(Hwnd, "./pic/Digui/Zuixin.png", 0.01, 0):
-                    print("检测到最新栏 似乎无法挑战热门")
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Digui/Zuixin.png", 0.01, 0)
+                if Range:
+                    print("INFO-", Matchs, "检测到最新栏 似乎无法挑战热门")
                     Find_Click_windows(Hwnd, "./pic/Digui/Zuixin.png", 0.01, "点击最新", "点击最新失败")
                     Find = Find_Click_windows(Hwnd, "./pic/Digui/Zuixintiaozhan.png", 0.03, "点击最新挑战", "未检测到最新挑战图标")
                     if Find:
@@ -102,7 +114,7 @@ def Diyuguiwang(current_state, Hwnd):
                         Sleep_print(1)
                         current_state = "结束"
                 else:
-                    print("未检测到最新栏 似乎可以挑战热门")
+                    print("INFO-", Matchs, "未检测到最新栏 似乎可以挑战热门")
                     if Find:
                         print("STEP- vvvvv 跳转挑战界面")
                         current_state = "挑战界面"
@@ -157,11 +169,12 @@ def Diyuguiwang(current_state, Hwnd):
 
             case "结束":
                 Find_Click_windows(Hwnd, "./pic/Digui/Jinritioazhan.png", 0.05, "点击今日挑战", "未检测到今日挑战图标")
-                if Find_in_windows(Hwnd, "./pic/Digui/Weixuanze.png", 0.05, 0):
-                    print("发现仍然有鬼王挑战次数 继续讨伐地域鬼王")
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Digui/Weixuanze.png", 0.05, 0)
+                if Range:
+                    print("INFO-", Matchs, "发现仍然有鬼王挑战次数 继续讨伐地域鬼王")
                     return Diyuguiwang("地鬼界面", Hwnd)
                 else:
-                    print("似乎已无地域鬼王讨伐次数 任务结束")
+                    print("INFO-", Matchs, "似乎已无地域鬼王讨伐次数 任务结束")
                     # 任务结束
                     Find_Click_windows(Hwnd, "./pic/Main/Tuichu.png", 0.05, "点击退出地鬼界面", "未检测到退出图标")
                     Sleep_print(2)
