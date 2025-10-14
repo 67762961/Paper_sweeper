@@ -58,7 +58,7 @@ def Find_windows(title):
     return hwnds[0] if hwnds else None
 
 
-def Find_in_windows(Hwnd, Model_path, Threshold, Flag_show):
+def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     """
     全屏截图 找到与模板匹配的图片区域
     :param Hwnd:            窗口句柄
@@ -131,13 +131,22 @@ def Find_in_windows(Hwnd, Model_path, Threshold, Flag_show):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    print("INFO-", f"{min_val:.3f}", end=" ")
+    # print("INFO-", f"{min_val:.3f}", end=" ")
+    return2 = f"{min_val:.3f}"
 
     # 过滤方差过大的匹配结果
     if min_val > Threshold:
-        return None
+        return1 = None
     else:
-        return Left_up, Right_down
+        return1 = [Left_up, Right_down]
+
+    return return1, return2
+
+
+def Find_in_windows(Hwnd, Model_path, Threshold, Flag_show):
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show)
+    print("INFO-", Matchs, end=" ")
+    return Range
 
 
 def Find_in_screen(Img_model_path, Threshold, Flag_show):
@@ -215,13 +224,13 @@ def Click(Hwnd, Loc, Wait):
 def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
     while not config.stop_thread:
         try:
-            Range = Find_in_windows(Hwnd, Model_path, Threshold, 0)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
             Click(Hwnd, Range, 1)
             # pyautogui.moveTo(10, 10)
-            print(message_F)
+            print("INFO-", Matchs, message_F)
             return 1
         except:
-            print(message_C)
+            print("INFO-", Matchs, message_C)
             # config.stop_thread = True
             return 0
 
