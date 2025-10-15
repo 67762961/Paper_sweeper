@@ -21,7 +21,7 @@ import json
 
 def Sleep_print(Wait_time):
     time.sleep(Wait_time)
-    print("WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
+    print("        WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
 
 
 def Scroll_print(Hwnd, length):
@@ -29,14 +29,14 @@ def Scroll_print(Hwnd, length):
     for i in range(abs(length)):
         pyautogui.scroll(int(length / abs(length)))
         time.sleep(0.01)
-    print("Move- mmmmm 滚轮滚动{Length}".format(Length=length))
+    print("        Move- mmmmm 滚轮滚动{Length}".format(Length=length))
 
 
 def Esc_print(Hwnd):
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     pydirectinput.press("esc")
     time.sleep(0.1)
-    print("QUIT- ccccc 按Esc退出")
+    print("        QUIT- ccccc 按Esc退出")
     Itface_Quit(Hwnd)
 
 
@@ -145,7 +145,7 @@ def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
 
 def Find_in_windows(Hwnd, Model_path, Threshold, Flag_show):
     Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show)
-    print("INFO-", Matchs, end=" ")
+    print("        INFO-", Matchs, end=" ")
     return Range
 
 
@@ -179,7 +179,7 @@ def Find_in_screen(Img_model_path, Threshold, Flag_show):
     Left_up = min_loc
     Right_down = (min_loc[0] + Img_model_width, min_loc[1] + Img_model_height)
 
-    print("INFO-", f"{min_val:.3f}", end=" ")
+    print("        INFO-", f"{min_val:.3f}", end=" ")
     if Flag_show:
         # 图像上绘制边框
         cv2.rectangle(Img, Left_up, Right_down, (0, 0, 255), 2)
@@ -227,10 +227,10 @@ def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
             Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
             Click(Hwnd, Range, 1)
             # pyautogui.moveTo(10, 10)
-            print("INFO-", Matchs, message_F)
+            print("        INFO-", Matchs, message_F)
             return 1
         except:
-            print("INFO-", Matchs, message_C)
+            print("        INFO-", Matchs, message_C)
             # config.stop_thread = True
             return 0
 
@@ -279,20 +279,20 @@ def check_lasttime(Account, Times_name):
     if config_dir and not os.path.exists(config_dir):
         try:
             os.makedirs(config_dir, exist_ok=True)
-            print(f"创建配置目录: {config_dir}")
+            print("创建配置目录: ", config_dir)
         except OSError as e:
-            print(f"无法创建目录 {config_dir}: {e}")
+            print("无法创建目录 ", config_dir, ":", e)
             return datetime(2000, 1, 1, 0, 0)
 
     # 检查文件是否存在，不存在则创建[1,9](@ref)
     if not os.path.exists(file_path):
-        print(f"配置文件不存在，创建新文件: {file_path}")
+        print("配置文件不存在，创建新文件: ", file_path)
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump({}, f, ensure_ascii=False, indent=4)
             config = {}
         except Exception as e:
-            print(f"创建配置文件失败: {e}")
+            print("创建配置文件失败: ", e)
             return datetime(2000, 1, 1, 0, 0)
     else:
         # 文件存在，正常读取
@@ -304,10 +304,10 @@ def check_lasttime(Account, Times_name):
                 else:
                     config = json.loads(content)
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"配置文件格式错误，将重置: {e}")
+            print("配置文件格式错误，将重置: ", e)
             config = {}
         except Exception as e:
-            print(f"读取配置文件失败: {e}")
+            print("读取配置文件失败: ", e)
             return datetime(2000, 1, 1, 0, 0)
 
     # 确保Account键存在
@@ -318,10 +318,10 @@ def check_lasttime(Account, Times_name):
     Times_need = datetime.fromisoformat(Times_need_str) if Times_need_str else None
 
     if Times_need is not None:
-        print(f"TIME- ----- {Times_need.strftime('%Y-%m-%d %H:%M:%S')}")
+        print("        TIME- ----- ", Times_need.strftime("%Y-%m-%d %H:%M:%S"))
         return Times_need
     else:
-        print("TIME- ----- 没有记录上次时间 已重置初始化值")
+        print("        TIME- ----- 没有记录上次时间 已重置初始化值")
         Initial_time = datetime(2000, 1, 1, 0, 0)
         config[Account][Times_name] = Initial_time.isoformat()
 
@@ -330,7 +330,7 @@ def check_lasttime(Account, Times_name):
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=4)
         except Exception as e:
-            print(f"保存配置失败: {e}")
+            print("保存配置失败: ", e)
 
         return Initial_time
 
