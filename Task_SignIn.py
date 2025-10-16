@@ -81,8 +81,8 @@ def Work_Mail(Hwnd, Account):
                 Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
                 config[Account]["邮件领取"] = Now
                 write_config("./config/Last_times.json", config)
-                print(f"TIME- ----- 本次邮件领取时间: ")
-                print(f"TIME- ----- {Now}")
+                print("TIME- ----- 本次邮件领取时间: ")
+                print("TIME- ----- ", Now)
 
                 pydirectinput.press("esc")
                 print("QUIT- ccccc 按Esc退出")
@@ -113,8 +113,8 @@ def Fudai(Hwnd, Account):
             Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
             config[Account]["福袋纸人"] = Now
             write_config("./config/Last_times.json", config)
-            print(f"TIME- ----- 本次邮件领取时间: ")
-            print(f"TIME- ----- {Now}")
+            print("TIME- ----- 本次邮件领取时间: ")
+            print("TIME- ----- ", Now)
 
             pydirectinput.press("esc")
             print("QUIT- ccccc 按Esc退出")
@@ -154,8 +154,8 @@ def Qiandao(Hwnd, Account):
                             Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
                             config[Account]["每日一签"] = Now
                             write_config("./config/Last_times.json", config)
-                            print(f"TIME- ----- 本次每日一签时间: ")
-                            print(f"TIME- ----- {Now}")
+                            print("TIME- ----- 本次每日一签时间: ")
+                            print("TIME- ----- ", Now)
 
                         else:
                             print("未检测到解签小纸人")
@@ -246,7 +246,7 @@ def mianfeilibao(Hwnd, Account):
                 config[Account]["免费礼包"] = Now
                 write_config("./config/Last_times.json", config)
                 print("TIME- ----- 本次免费礼包领取时间")
-                print(f"TIME- ----- {Now}")
+                print("TIME- ----- ", Now)
 
                 # 返回庭院
                 ctypes.windll.user32.SetForegroundWindow(Hwnd)
@@ -367,7 +367,7 @@ def youqingdain(Hwnd, Account):
                         Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
                         config[Account]["送友情点"] = Now
                         print("TIME- ----- 本次友情点任务时间")
-                        print(f"TIME- ----- {Now}")
+                        print("TIME- ----- ", Now)
                         write_config("./config/Last_times.json", config)
                         # 退至庭院
                         ctypes.windll.user32.SetForegroundWindow(Hwnd)

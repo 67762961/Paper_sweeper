@@ -46,7 +46,7 @@ def MainTask_Fengmo(Hwnd, Account):
                         config[Account]["逢魔之时"] = Now
                         write_config("./config/Last_times.json", config)
                         print("TIME- ----- 本次逢魔之时完成时间")
-                        print(f"TIME- ----- {Now}")
+                        print("TIME- ----- ", Now)
                         break
                 ######################################################################################################################
                 # 此处进入了打boss场景 应添加后续战斗完成的处理

@@ -2,9 +2,8 @@ import pyautogui
 import pydirectinput
 import ctypes
 import win32gui
-from Lib import Sleep_print
 from datetime import datetime, timedelta
-from Lib import Find_in_windows, Find_Click_windows, Click, Itface_Host, Itface_guild, Itface_explore, read_config, write_config, check_lasttime, Scroll_print, Esc_print
+from Lib import Find_in_windows, Find_Click_windows, Itface_Host, Itface_guild, Itface_explore, read_config, write_config, check_lasttime, Scroll_print, Esc_print, Sleep_print
 
 
 def MainTask_Jiejieyangcheng(Hwnd, Account):
@@ -31,7 +30,7 @@ def MainTask_Jiejieyangcheng(Hwnd, Account):
             Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
             config[Account]["结界养成"] = Now
             print("TIME- ----- 本次结界养成完成时间")
-            print(f"TIME- ----- {Now}")
+            print("TIME- ----- ", Now)
             write_config("./config/Last_times.json", config)
             print("TASK- ----- 结界养成任务完成 --------------------------------")
         else:
@@ -441,19 +440,14 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     y = (Range[0][1] + Range[1][1]) // 2 + rect[1]
                     pyautogui.moveTo(x, y)
 
-                    Find = Find_in_windows(Hwnd, Jiejieka_Model_path, 0.05, 0)
-                    if Find:
-                        Click(Hwnd, Find, 1)
-                        print("检测到", end="")
-                        print(string)
-                        Sleep_print(1)
-
+                    Str1 = ("检测到", string)
+                    Str2 = ("未检测到", string)
+                    Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
+                    if Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2):
                         if Find_Click_windows(Hwnd, "./pic/Sis/Jinrujiejie.png", 0.05, "点击进入结界", "点击进入结界异常"):
                             Sleep_print(2)
                             break
                     else:
-                        print("未检测到", end="")
-                        print(string)
                         if Find_in_windows(Hwnd, "./pic/Sis/Jiyangliebiaomowei.png", 0.001, 0):
                             print("已经到寄养列表末尾")
                             return 0

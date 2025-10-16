@@ -352,8 +352,8 @@ def MainTask_Sisfoster(Hwnd, Account):
     Times_jiejieyangcheng = datetime.fromisoformat(Times_jiejieyangcheng_str) if Times_jiejieyangcheng_str else None
     current_time = datetime.now()
     if Times_jiejieyangcheng is not None:
-        print(f"TIME- ----- 上次结界养成时间:")
-        print(f"TIME- ----- {Times_jiejieyangcheng.strftime('%Y-%m-%d %H:%M:%S')}")
+        print("TIME- ----- 上次结界养成时间:")
+        print("TIME- ----- ", Times_jiejieyangcheng.strftime("%Y-%m-%d %H:%M:%S"))
         time_diff = (current_time - Times_jiejieyangcheng).total_seconds() / 60 / 60
     else:
         print("TIME- ----- 没有记录上次结界养成时间")
@@ -375,8 +375,8 @@ def MainTask_Sisfoster(Hwnd, Account):
         if Work_Foster(Hwnd):
             Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
             config[Account]["Times_jiejieyangcheng"] = Now
-            print(f"TIME- ----- 本次结界养成时间:")
-            print(f"TIME- ----- {Now}")
+            print("TIME- ----- 本次结界养成时间:")
+            print("TIME- ----- ", Now)
             write_config("./config/Last_times.json", config)
             print("TASK- ----- 结界寄养任务完成 --------------------------------")
             Sleep_print(2)

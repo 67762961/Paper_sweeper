@@ -84,9 +84,9 @@ def Init():
                         print("EROR- XXXXX 启动双开程序失败 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
                         break
                 except Exception as e:
-                    print(f"启动进程或获取窗口句柄时发生异常: {e}")
+                    print("启动进程或获取窗口句柄时发生异常: ", e)
     except:
-        print(f"获取窗口句柄时发生异常: {e}")
+        print("获取窗口句柄时发生异常: ", e)
 
     return hwnds
 
