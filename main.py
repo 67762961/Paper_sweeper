@@ -99,11 +99,7 @@ def Init_MuMu():
 
     for header in headers:
         hwnd = Find_windows(header)
-        print(hwnd)
         hwnds.append(hwnd)
-
-    write_config("./config/Last_times.json", config)
-    print(hwnds)
     return hwnds
 
 
