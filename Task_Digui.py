@@ -30,7 +30,7 @@ def MainTask_Digui():
             else:
                 print("        SKIP- ----- 今日已完成地域鬼王任务 跳过")
     else:
-        print("        SKIP- ----- 当前时间不在12:00-23:50之间 跳过地域鬼王任务")
+        print("TASK- ----- 当前时间不在12:00-23:50之间 跳过地域鬼王任务")
 
 
 def Task_Digui(Hwnd, Account):
