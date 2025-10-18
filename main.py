@@ -16,9 +16,8 @@ from contextlib import redirect_stdout
 from Task_LogIn import LogIn
 from Task_SignIn import MainTask_Signin
 from Task_Fengmo import MainTask_Fengmo
-from Task_Digui import Task_Digui, MainTask_Digui
-from Task_SisFoster import MainTask_Sisfoster
-from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
+from Task_Digui import MainTask_Digui, Task_Digui
+from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng, Task_Jiejieyangcheng
 
 
 # 全局变量 窗口句柄列表
@@ -193,12 +192,12 @@ def Jiejie_yangcheng():
         print()
         print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         ctypes.windll.user32.SetForegroundWindow(hwnds[0])
-        MainTask_Jiejieyangcheng(hwnds[0], "master")
+        Task_Jiejieyangcheng(hwnds[0], "master")
 
         print()
         print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         ctypes.windll.user32.SetForegroundWindow(hwnds[1])
-        MainTask_Jiejieyangcheng(hwnds[1], "slaves")
+        Task_Jiejieyangcheng(hwnds[1], "slaves")
 
         break
 
@@ -261,7 +260,7 @@ def Full_operation():
             print("MAIN- ~~~~ 完整运行流程开始 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             # Main_Login_2()
             Sign_In()
-            Jiejie_yangcheng()
+            MainTask_Jiejieyangcheng()
             MainTask_Digui()
             Fengmo_zhishi()
             print("MAIN- ~~~~ 完整运行流程结束 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")

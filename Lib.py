@@ -29,7 +29,7 @@ def Scroll_print(Hwnd, length):
     for i in range(abs(length)):
         pyautogui.scroll(int(length / abs(length)))
         time.sleep(0.01)
-    print("        Move- mmmmm 滚轮滚动{Length}".format(Length=length))
+    print("        MOVE- mmmmm 滚轮滚动{Length}".format(Length=length))
 
 
 def Esc_print(Hwnd):
