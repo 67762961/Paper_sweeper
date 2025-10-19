@@ -246,7 +246,7 @@ def Jinyanjiuhu(Hwnd):
         # 不满经验酒壶情况
         if Find_Click_windows(Hwnd, "./pic/Sis/Jinyanjiuhu0.png", 0.05, "检测到有经验酒壶", "未检测到经验酒壶"):
             Find_Click_windows(Hwnd, "./pic/Sis/Tiqu.png", 0.05, "提取经验酒壶", "提取经验酒壶失败")
-            Range = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Tiqu.png", 0.05, 0)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Tiqu.png", 0.05, 0)
             return Tiqu(Range, Matchs)
         else:
             return 0
@@ -495,7 +495,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
 
                     for j in range(10):
                         if not Find_Click_windows(Hwnd, "./pic/Sis/Fengweidamo.png", 0.07, "放上去一个奉为达摩", "未检测到达摩素材"):
-                            Find = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
+                            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
                             print("        INFO-", Matchs, "进入翻页区域")
                             rect = win32gui.GetWindowRect(Hwnd)
                             x = (Find[0][0] + Find[1][0]) // 2 + rect[0]
