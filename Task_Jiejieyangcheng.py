@@ -22,7 +22,6 @@ def MainTask_Jiejieyangcheng():
         current_time = datetime.now()
         Times_jiejieyangcheng.date() == current_time.date()
         if abs(current_time - Times_jiejieyangcheng) >= timedelta(hours=6):
-            print("        SKIP- ----- 上次结界养成任务在六小时前 开始执行任务")
             Hwnd = Find_windows(Account)
             Task_Jiejieyangcheng(Hwnd, Account)
         else:
@@ -59,8 +58,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                 # 先进入阴阳寮界面
                 print("        INFO------ 尝试前往寮界面")
                 Itface_guild(Hwnd)
-                for Wait in range(10):
-
+                for Wait in range(3):
                     Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiejie.png", 0.05, 0)
                     if Find:
                         print("        INFO-", Matchs, "检测到结界入口 已经进入寮界面")
@@ -68,12 +66,18 @@ def Jiejieyangcheng(current_state, Hwnd):
                         current_state = "寮界面"
                         break
                     else:
-                        print("        未检测到结界入口")
+                        print("        INFO-", Matchs, "未检测到结界入口")
                         print("        WAIT- wwwww 等待进入寮界面 已等待 {waittime} 秒".format(waittime=Wait))
                         Sleep_print(1)
                 if not Find:
-                    print("        STEP- vvvvv 跳转异常退出界面")
-                    current_state = "异常退出"
+                    Find = Find_Click_windows(Hwnd, "./pic/Sis/Tuichu3.png", 0.05, "点击关闭弹窗", "未检测到弹窗")
+                    if Find:
+                        Sleep_print(1)
+                        print("        STEP- vvvvv 跳转寮界面")
+                        current_state = "寮界面"
+                    else:
+                        print("        STEP- vvvvv 跳转异常退出界面")
+                        current_state = "异常退出"
 
             case "寮界面":
                 Work_Salary(Hwnd)
@@ -83,13 +87,8 @@ def Jiejieyangcheng(current_state, Hwnd):
                     Sleep_print(3)
                     current_state = "结界界面"
                 else:
-                    Find = Find_Click_windows(Hwnd, "./pic/Sis/Tuichu3.png", 0.05, "点击关闭弹窗", "未检测到弹窗")
-                    if Find:
-                        Sleep_print(1)
-                        current_state = "结界界面"
-                    else:
-                        print("        STEP- vvvvv 跳转异常退出界面")
-                        current_state = "异常退出"
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
 
             case "结界界面":
                 # 领取寄养
