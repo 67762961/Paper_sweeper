@@ -15,7 +15,7 @@ from Lib import Find_windows, read_config, write_config
 from contextlib import redirect_stdout
 from Task_LogIn import LogIn
 from Task_SignIn import MainTask_Signin
-from Task_Fengmo import MainTask_Fengmo
+from Task_Fengmo import MainTask_Fengmo, Task_Fengmo
 from Task_Digui import MainTask_Digui, Task_Digui
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng, Task_Jiejieyangcheng
 
@@ -166,24 +166,6 @@ def Sign_In():
         break
 
 
-def Sis_Foster():
-    """
-    结界收菜种菜
-    """
-    while not config.stop_thread:
-        print()
-        print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        ctypes.windll.user32.SetForegroundWindow(hwnds[0])
-        MainTask_Sisfoster(hwnds[0], "master")
-
-        print()
-        print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        ctypes.windll.user32.SetForegroundWindow(hwnds[1])
-        MainTask_Sisfoster(hwnds[1], "slaves")
-
-        break
-
-
 def Jiejie_yangcheng():
     """
     结界收菜种菜
@@ -210,12 +192,12 @@ def Fengmo_zhishi():
         print()
         print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         ctypes.windll.user32.SetForegroundWindow(hwnds[0])
-        MainTask_Fengmo(hwnds[0], "master")
+        Task_Fengmo(hwnds[0], "master")
 
         print()
         print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         ctypes.windll.user32.SetForegroundWindow(hwnds[1])
-        MainTask_Fengmo(hwnds[1], "slaves")
+        Task_Fengmo(hwnds[1], "slaves")
 
         break
 
@@ -262,7 +244,7 @@ def Full_operation():
             Sign_In()
             MainTask_Jiejieyangcheng()
             MainTask_Digui()
-            Fengmo_zhishi()
+            MainTask_Fengmo()
             print("MAIN- ~~~~ 完整运行流程结束 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
         finally:

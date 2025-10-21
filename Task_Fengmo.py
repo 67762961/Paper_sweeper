@@ -5,96 +5,104 @@ import ctypes
 import win32gui
 import config
 from datetime import datetime, timedelta, time
-from Lib import Find_in_windows, Find_Click_windows, Click, Itface_Host, Itface_guild, Itface_daily, read_config, write_config, Sleep_print, check_lasttime
+from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, Itface_explore, Itface_daily, read_config, write_config, check_lasttime, Esc_print, Sleep_print
 
 
-def MainTask_Fengmo(Hwnd, Account):
+def MainTask_Fengmo():
+    """
+    逢魔之时主任务
+    """
+    print("        ")
+    current_time = datetime.now()
+    if time(17, 0) <= current_time.time() <= time(21, 50):
+        print("TASK- ----- 当前时间在17:00-21:50之间 开始执行逢魔之时任务")
+        config_data = read_config("./config/Last_times.json")
+        headers = list(config_data.keys())
+        for Account in headers:
+            print("    切换到 ", Account, " 账号")
+            print("        TIME- ----- 读取上次账号", Account, "完成逢魔之时任务时间")
+            Times_fengmozhishi = check_lasttime(Account, "逢魔之时")
+            current_time = datetime.now()
+            Times_fengmozhishi.date() == current_time.date()
+            if Times_fengmozhishi.date() != current_time.date():
+                Hwnd = Find_windows(Account)
+                Task_Fengmo(Hwnd, Account)
+            else:
+                print("        SKIP- ----- 今日已完成逢魔之时任务 跳过")
+    else:
+        print("TASK- ----- 当前时间不在17:00-21:50之间 跳过逢魔之时任务")
+
+
+def Task_Fengmo(Hwnd, Account):
     """
     有关逢魔之时相关任务
     :param Hwnd:    窗口句柄
     :param Account: 账号
     """
-    print("TASK- +++++ 开始逢魔之时任务 ++++++++++++++++++++++++++++++++")
-
-    # 读取上次封魔之时执行时间
-    print("TIME- ----- 读取上次封魔之时完成时间")
-    Times_fengmozhishi = check_lasttime(Account, "逢魔之时")
-    current_time = datetime.now()
-
-    # 开启条件
-    flag_fengmo = time(17, 0) <= current_time.time() <= time(22, 0)
-    if (Times_fengmozhishi.date() != current_time.date()) & flag_fengmo:
-
-        # 开始逢魔任务
-        print("INFO- ----- 前往逢魔界面")
-        Itface_daily(Hwnd)
-
-        Range = Find_Click_windows(Hwnd, "./pic/Fengmo/Fengmotubiao.png", 0.05, "点击逢魔图标", "未检测到逢魔图标")
-        if not Range:
-            print("EROR- XXXXX 逢魔之时任务失败 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
-            return 0
-        else:
-            if Find_Click_windows(Hwnd, "./pic/Main/Qianwang.png", 0.05, "点击前往", "未检测到前往图标"):
-                Sleep_print(3)
-                # 先点封魔再打boss
-                meirifengmo(Hwnd)
-                for i in range(3):
-                    if fengmoboss(Hwnd):
-                        # 更新配置，写入当前时间
-                        config = read_config("./config/Last_times.json")
-                        Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                        config[Account]["逢魔之时"] = Now
-                        write_config("./config/Last_times.json", config)
-                        print("TIME- ----- 本次逢魔之时完成时间")
-                        print("TIME- ----- ", Now)
-                        break
-                ######################################################################################################################
-                # 此处进入了打boss场景 应添加后续战斗完成的处理
-    else:
-        print("SKIP- ----- 跳过逢魔之时")
+    print("        TASK- +++++ 开始逢魔之时任务 ++++++++++++++++++++++++++++++++")
+    print("        INFO- ----- 前往逢魔界面")
+    Itface_daily(Hwnd)
+    Range = Find_Click_windows(Hwnd, "./pic/Fengmo/Fengmotubiao.png", 0.05, "点击逢魔图标", "未检测到逢魔图标")
+    Range = Find_Click_windows(Hwnd, "./pic/Main/Qianwang.png", 0.05, "点击前往", "未检测到前往图标")
+    if Range:
+        Sleep_print(3)
+        # 先点封魔再打boss
+        meirifengmo(Hwnd)
+        if fengmoboss(Hwnd):
+            # 更新配置，写入当前时间
+            config = read_config("./config/Last_times.json")
+            Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            config[Account]["逢魔之时"] = Now
+            write_config("./config/Last_times.json", config)
+            print("        TIME- ----- 本次逢魔之时完成时间")
+            print("        TIME- ----- ", Now)
+            print("        TASK- ----- 结界逢魔之时任务完成 --------------------------------")
+        ######################################################################################################################
+        # 此处进入了打boss场景 应添加后续战斗完成的处理
 
 
 def meirifengmo(Hwnd):
     for i in range(3):
-        Find = Find_in_windows(Hwnd, "./pic/Fengmo/Dingwei.png", 0.06, 0)
+        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Fengmo/Dingwei.png", 0.06, 0)
         if Find:
-            print("已进入逢魔地图界面")
+            print("        INFO-", Matchs, "已进入逢魔地图界面")
             break
         else:
-            print("未进入逢魔地图界面 等待10s")
+            print("        INFO-", Matchs, "未进入逢魔地图界面 等待10s")
             Sleep_print(10)
 
     # 点四下逢魔
     while True:
-        Range = Find_in_windows(Hwnd, "./pic/Fengmo/Fengmocishu.png", 0.03, 0)
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Fengmo/Fengmocishu.png", 0.03, 0)
         if Range:
-            print("还有逢魔次数")
+            print("        INFO-", Matchs, "还有逢魔次数")
             Find_Click_windows(Hwnd, "./pic/Fengmo/Xianshifengmo.png", 0.07, "点击现世逢魔", "未检测到现世逢魔图标")
             Sleep_print(2.5)
         else:
-            print("逢魔次数耗尽")
+            print("        INFO-", Matchs, "逢魔次数耗尽")
             break
 
     # 领取逢魔奖励
     for i in range(3):
         flag = Find_Click_windows(Hwnd, "./pic/Fengmo/Fengmojiangli.png", 0.05, "点击逢魔奖励", "未检测到现世逢魔奖励")
         if flag:
-            if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
-                print("逢魔奖励领取成功")
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+            if Range:
+                print("        INFO-", Matchs, "逢魔奖励领取成功")
                 Sleep_print(2)
                 ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                pydirectinput.press("esc")
-                print("QUIT- ccccc 按Esc退出")
+                Esc_print(Hwnd)
                 break
             else:
-                print("逢魔奖励领取失败")
+                print("        INFO-", Matchs, "逢魔奖励领取失败")
         else:
             for j in range(10):
-                if Find_in_windows(Hwnd, "./pic/Fengmo/Fengmojiangliyilingqu.png", 0.05, 0):
-                    print("逢魔奖励已经被领取")
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Fengmo/Fengmojiangliyilingqu.png", 0.05, 0)
+                if Range:
+                    print("        INFO-", Matchs, "逢魔奖励已经被领取")
                     break
                 else:
-                    print("逢魔奖励未正确领取")
+                    print("        INFO-", Matchs, "逢魔奖励未正确领取")
                     Sleep_print(0.5)
             break
 
@@ -142,15 +150,15 @@ def fengmoboss(Hwnd):
                 else:
                     Find_Click_windows(Hwnd, "./pic/Fengmo/Jijietioazhan1.png", 0.05, "点击集结挑战", "未检测到集结挑战")
                 Sleep_print(3)
-                if Find_in_windows(Hwnd, "./pic/Fengmo/Zhengrongyushe.png", 0.05, 0):
-                    print("已经进入备战场景")
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Fengmo/Zhengrongyushe.png", 0.05, 0)
+                if Range:
+                    print("        INFO-", Matchs, "已经进入备战场景")
                     found_battle_scene = True
                     return 1
                 else:
-                    print("未进入备战场景")
+                    print("        INFO-", Matchs, "未进入备战场景")
                     ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                    pydirectinput.press("esc")
-                    print("QUIT- ccccc 按Esc退出")
+                    Esc_print(Hwnd)
                     Sleep_print(0.5)
                     p = 0
 
