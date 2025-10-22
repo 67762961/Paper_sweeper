@@ -133,10 +133,12 @@ def Diyuguiwang(current_state, Hwnd):
 
             case "预设阵容界面":
                 for i in range(1):
+                    Sleep_print(1)
                     if not Find_Click_windows(Hwnd, "./pic/Team/Yushedenglong.png", 0.05, "点击预设", "未检测预设图标"):
-                        print("        STEP- vvvvv 跳转异常退出界面")
-                        current_state = "异常退出"
-                        break
+                        if not Find_Click_windows(Hwnd, "./pic/Team/Yushedenglong1.png", 0.05, "再次尝试点击预设", "依旧未检测预设图标"):
+                            print("        STEP- vvvvv 跳转异常退出界面")
+                            current_state = "异常退出"
+                            break
 
                     Find_Click_windows(Hwnd, "./pic/Team/Richangbianzu.png", 0.05, "点击日常编组", "似乎已经在日常编组中")
 
@@ -157,6 +159,8 @@ def Diyuguiwang(current_state, Hwnd):
                 for Wait in range(10):
                     Find = Find_Click_windows(Hwnd, "./pic/Digui/Zhunbei.png", 0.07, "点击准备", "未检测到准备图标")
                     if Find:
+                        Sleep_print(1)
+                        Find_Click_windows(Hwnd, "./pic/Digui/Zhunbei.png", 0.07, "再次点击准备", "未检测到准备图标")
                         print("        STEP- vvvvv 跳转战斗阶段")
                         current_state = "战斗阶段"
                         break
