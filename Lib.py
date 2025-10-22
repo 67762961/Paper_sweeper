@@ -476,14 +476,14 @@ def Itface_explore(Hwnd):
     Itface_Host(Hwnd)
     Find = Find_Click_windows(Hwnd, "./pic/Main/Feng.png", 0.05, "进入悬赏封印界面", "未进入悬赏封印界面")
     if not Find:
-        Find_Click_windows(Hwnd, "./pic/Main/Feng.png", 0.05, "进入悬赏封印界面", "未进入悬赏封印界面")
+        Find_Click_windows(Hwnd, "./pic/Main/Feng1.png", 0.05, "进入悬赏封印界面", "未进入悬赏封印界面")
 
-    Find = Find_Click_windows(Hwnd, "./pic/Main/Xuanshangxing.png", 0.05, "点击悬赏星", "未检测到悬赏星")
-    Find = Find_Click_windows(Hwnd, "./pic/Main/Xuanshangqianwang.png", 0.05, "进入探索地图界面", "未进入探索地图界面")
+    Find_Click_windows(Hwnd, "./pic/Main/Xuanshangxing.png", 0.05, "点击悬赏星", "未检测到悬赏星")
+    Find_Click_windows(Hwnd, "./pic/Main/Xuanshangqianwang.png", 0.05, "进入探索地图界面", "未进入探索地图界面")
 
-    time.sleep(1)
+    Sleep_print(2)
     Esc_print(Hwnd)
-    time.sleep(1)
+    Sleep_print(1)
 
     if Find_in_windows(Hwnd, "./pic/Digui/Diguitubiao.png", 0.05, 0):
         print("检测到地鬼入口 已进入探索界面")

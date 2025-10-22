@@ -75,7 +75,6 @@ def Diyuguiwang(current_state, Hwnd):
                     current_state = "异常退出"
 
             case "地鬼界面":
-                Sleep_print(1)
                 if flag_digui <= 3:
                     Find = Find_Click_windows(Hwnd, "./pic/Digui/Shaixuan.png", 0.05, "点击筛选", "未检测到筛选图标 似乎已经在筛选中")
                     if Find:
@@ -124,17 +123,37 @@ def Diyuguiwang(current_state, Hwnd):
                         current_state = "异常退出"
 
             case "挑战界面":
-                Sleep_print(1)
                 Find = Find_Click_windows(Hwnd, "./pic/Digui/Tiaozhan.png", 0.05, "点击开始挑战", "未检测到挑战图标")
                 if Find:
-                    print("        STEP- vvvvv 跳转战斗准备阶段")
-                    current_state = "战斗准备阶段"
+                    print("        STEP- vvvvv 预设阵容界面")
+                    current_state = "预设阵容界面"
                 else:
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
 
+            case "预设阵容界面":
+                for i in range(1):
+                    if not Find_Click_windows(Hwnd, "./pic/Team/Yushedenglong.png", 0.05, "点击预设", "未检测预设图标"):
+                        print("        STEP- vvvvv 跳转异常退出界面")
+                        current_state = "异常退出"
+                        break
+
+                    Find_Click_windows(Hwnd, "./pic/Team/Richangbianzu.png", 0.05, "点击日常编组", "似乎已经在日常编组中")
+
+                    if not Find_Click_windows(Hwnd, "./pic/Team/Jiejiedui.png", 0.05, "点击结界队", "未检测到结界队图标"):
+                        print("        STEP- vvvvv 跳转异常退出界面")
+                        current_state = "异常退出"
+                        break
+
+                    if Find_Click_windows(Hwnd, "./pic/Team/Chuzhan.png", 0.05, "点击出战", "未检测到出战图标"):
+                        print("        STEP- vvvvv 跳转战斗准备阶段")
+                        current_state = "战斗准备阶段"
+
+                    else:
+                        print("        STEP- vvvvv 跳转异常退出界面")
+                        current_state = "异常退出"
+
             case "战斗准备阶段":
-                Sleep_print(1)
                 for Wait in range(10):
                     Find = Find_Click_windows(Hwnd, "./pic/Digui/Zhunbei.png", 0.07, "点击准备", "未检测到准备图标")
                     if Find:
