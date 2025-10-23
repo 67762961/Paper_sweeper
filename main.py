@@ -14,7 +14,7 @@ import datetime
 from Lib import Find_windows, read_config, write_config
 from contextlib import redirect_stdout
 from Task_LogIn import LogIn
-from Task_SignIn import MainTask_Signin
+from Task_SignIn import MainTask_Signin, MainTask_Mail
 from Task_Fengmo import MainTask_Fengmo, Task_Fengmo
 from Task_Digui import MainTask_Digui, Task_Digui
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng, Task_Jiejieyangcheng
@@ -55,18 +55,18 @@ def Sign_In():
     """
     邮箱奖励与庭院收菜
     """
-    while not config.stop_thread:
-        print()
-        print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        ctypes.windll.user32.SetForegroundWindow(hwnds[0])
-        MainTask_Signin(hwnds[0], "master")
 
-        print()
-        print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        ctypes.windll.user32.SetForegroundWindow(hwnds[1])
-        MainTask_Signin(hwnds[1], "slaves")
+    MainTask_Mail()
 
-        break
+    print()
+    print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+    ctypes.windll.user32.SetForegroundWindow(hwnds[0])
+    MainTask_Signin(hwnds[0], "master")
+
+    print()
+    print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+    ctypes.windll.user32.SetForegroundWindow(hwnds[1])
+    MainTask_Signin(hwnds[1], "slaves")
 
 
 def Full_operation():
@@ -87,13 +87,13 @@ def Full_operation():
         sys.stdout = Tee(original_stdout, log_file)  # 重定向
 
         try:
-            print()
+            print("        ")
             print("MAIN- ~~~~ 完整运行流程开始 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            # Main_Login_2()
             Sign_In()
             MainTask_Jiejieyangcheng()
             MainTask_Digui()
             MainTask_Fengmo()
+            print("        ")
             print("MAIN- ~~~~ 完整运行流程结束 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
         finally:

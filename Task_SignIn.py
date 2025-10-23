@@ -4,7 +4,28 @@ import ctypes
 import win32gui
 from datetime import datetime, timedelta
 from Lib import Sleep_print
-from Lib import Find_in_windows, Find_Click_windows, Click, Itface_Host, read_config, write_config, Itface_scroll, check_lasttime
+from Lib import Find_in_windows_Matchs, Find_Click_windows, Click, Itface_Host, read_config, write_config, Itface_scroll, check_lasttime
+
+
+def MainTask_Mail():
+    """
+    邮件主任务
+    """
+    print("        ")
+    current_time = datetime.now()
+    print("TASK- ----- 开始执行邮件任务")
+    config_data = read_config("./config/Last_times.json")
+    headers = list(config_data.keys())
+    for Account in headers:
+        print("    切换到 ", Account, " 账号")
+        print("        TIME- ----- 读取上次账号", Account, "完成邮件时间")
+        Times_youjian = check_lasttime(Account, "邮件领取")
+        current_time = datetime.now()
+        if abs(current_time - Times_youjian) >= timedelta(hours=6):
+            Hwnd = Find_windows(Account)
+            Work_Mail(Hwnd, Account)
+        else:
+            print("        SKIP- ----- 邮件查看时间间隔未满六小时 跳过")
 
 
 def Work_Mail(Hwnd, Account):
@@ -13,84 +34,70 @@ def Work_Mail(Hwnd, Account):
     :param Hwnd:    窗口句柄
     :return:        1为正常 0为异常
     """
-    # 读取上次邮件领取时间
-    print("TIME- ----- 读取上次邮件领取时间")
-    Times_youjian = check_lasttime(Account, "邮件领取")
-    current_time = datetime.now()
 
-    # 未在3小时内打开过邮箱 则进入领取一次
-    if abs(current_time - Times_youjian) >= timedelta(hours=3):
-        Find_Click_windows(Hwnd, "./pic/Mail/Youjian.png", 0.05, "点击邮件", "未识别到邮件入口")
-        # 检测邮箱界面
-        if Find_in_windows(Hwnd, "./pic/Mail/Youxiang.png", 0.1, 0):
-            print("检测到进入邮箱")
+    Find_Click_windows(Hwnd, "./pic/Mail/Youjian.png", 0.05, "点击邮件", "未识别到邮件入口")
+
+    # 检测邮箱界面
+    if not Find_Click_windows(Hwnd, "./pic/Mail/Youxiang.png", 0.1, "检测到进入邮箱", "进入邮箱异常"):
+        return 0
+
+    # 检测是否有奖励未领取
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Mail/Quanbulingqu.png", 0.05, 0)
+
+    # 没有奖励未领取 检测消息邮件 然后返回
+    if not Range:
+        print("        INFO-", Matchs, "没有奖励未领取")
+        # 检测消息邮件
+        while 1:
+            if not Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "发现消息邮件", "未发现消息邮件"):
+                break
+
+        Esc_print(Hwnd)
+        Sleep_print(0.5)
+        return 1
+
+    # 有奖励未领取
+    else:
+        print("        INFO-", Matchs, "有奖励未领取")
+        # 点击全部领取
+        Click(Hwnd, Range, 1)
+
+        # 检测全部领取界面
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Mail/Quanbulingqujiemian.png", 0.05, 0)
+        if Range:
+            print("        INFO-", Matchs, "检测到进入领取界面")
         else:
-            print("进入邮箱异常")
+            print("        INFO-", Matchs, "未正常领取")
             Sleep_print(0.5)
             return 0
 
-        # 检测是否有奖励未领取
-        Range = Find_in_windows(Hwnd, "./pic/Mail/Quanbulingqu.png", 0.05, 0)
+        # 点击确定
+        Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未正常领取确认")
 
-        # 没有奖励未领取 检测消息邮件 然后返回
-        if not Range:
-            print("没有奖励未领取")
+        # 检测领取
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        if Range:
+            print("        INFO-", Matchs, "领取成功")
+            # 按下esc退出
+            Esc_print(Hwnd)
+            Sleep_print(0.5)
             # 检测消息邮件
             while 1:
-                if not Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "发现消息邮件", "未发现消息邮件"):
+                if not Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "点击消息邮件", "未发现消息邮件"):
                     break
 
-            ctypes.windll.user32.SetForegroundWindow(Hwnd)
-            pydirectinput.press("esc")
-            print("QUIT- ccccc 按Esc退出")
-            Sleep_print(0.5)
+            Esc_print(Hwnd)
+
+            # 更新配置 写入当前时间
+
+            config = read_config("./config/Last_times.json")
+            Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            config[Account]["邮件领取"] = Now
+            write_config("./config/Last_times.json", config)
+            print("        TIME- ----- 本次邮件领取时间")
+            print("        TIME- ----- ", Now)
+            print("        TASK- ----- 地域邮件领取完成 --------------------------------")
             return 1
-
-        # 有奖励未领取
-        else:
-            print("有奖励未领取")
-            # 点击全部领取
-            Click(Hwnd, Range, 1)
-
-            # 检测全部领取界面
-            if Find_in_windows(Hwnd, "./pic/Mail/Quanbulingqujiemian.png", 0.05, 0):
-                print("检测到进入领取界面")
-            else:
-                print("error 未正常领取")
-                Sleep_print(0.5)
-                return 0
-
-            # 点击确定
-            Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未正常领取确认")
-
-            # 检测领取
-            if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
-                print("领取成功")
-                # 按下esc退出
-                ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                pydirectinput.press("esc")
-                print("QUIT- ccccc 按Esc退出")
-                Sleep_print(0.5)
-                # 检测消息邮件
-                while 1:
-                    if not Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "点击消息邮件", "未发现消息邮件"):
-                        break
-
-                # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.json")
-                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                config[Account]["邮件领取"] = Now
-                write_config("./config/Last_times.json", config)
-                print("TIME- ----- 本次邮件领取时间: ")
-                print("TIME- ----- ", Now)
-
-                pydirectinput.press("esc")
-                print("QUIT- ccccc 按Esc退出")
-                Sleep_print(0.5)
-                return 1
-    else:
-        print("SKIP- ----- 跳过领取邮箱")
-        return 1
 
 
 def Fudai(Hwnd, Account):
@@ -106,7 +113,7 @@ def Fudai(Hwnd, Account):
     if Times_fudai.date() != current_time.date():
         if Find_Click_windows(Hwnd, "./pic/Sign/Fudaixiaozhiren.png", 0.05, "检测到福袋小纸人", "未检测到福袋小纸人"):
             # 点击福袋小人后检测领取状态
-            Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+            Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
             print("福袋领取成功")
             # 更新配置 写入当前时间
             config = read_config("./config/Last_times.json")
@@ -145,7 +152,7 @@ def Qiandao(Hwnd, Account):
                 if Find_Click_windows(Hwnd, "./pic/Sign/Meiriyiqian.png", 0.05, "每日一签", "签到异常"):
                     for i in range(2):
                         Sleep_print(0.5)
-                        Range = Find_in_windows(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
+                        Range = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
                         if Range:
                             print("检测到解签小纸人，每日一签成功")
 
@@ -183,7 +190,7 @@ def zhirenjiangli(Hwnd):
     """
     # 检测体力小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/Tilixiaozhire.png", 0.07, "检测到体力小纸人", "未检测到体力小纸人"):
-        Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         print("体力领取成功")
         ctypes.windll.user32.SetForegroundWindow(Hwnd)
         pydirectinput.press("esc")
@@ -192,7 +199,7 @@ def zhirenjiangli(Hwnd):
 
     # 检测勾玉小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/Gouyuxiaozhiren.png", 0.07, "检测到勾玉小纸人", "未检测到勾玉小纸人"):
-        Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         print("勾玉领取成功")
         ctypes.windll.user32.SetForegroundWindow(Hwnd)
         pydirectinput.press("esc")
@@ -201,7 +208,7 @@ def zhirenjiangli(Hwnd):
 
     # 检测buff小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/BUFFxiaozhiren.png", 0.07, "检测到BUFF小纸人", "未检测到BUFF小纸人"):
-        Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         print("BUFF领取成功")
         ctypes.windll.user32.SetForegroundWindow(Hwnd)
         pydirectinput.press("esc")
@@ -234,7 +241,7 @@ def mianfeilibao(Hwnd, Account):
 
             if Find_Click_windows(Hwnd, "./pic/Sign/Mianfei.png", 0.05, "领取免费礼包", "未检测到免费礼包"):
                 # 检测领取状态
-                Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+                Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
                 print("免费礼包领取成功")
                 ctypes.windll.user32.SetForegroundWindow(Hwnd)
                 pydirectinput.press("esc")
@@ -321,7 +328,7 @@ def youqingdain(Hwnd, Account):
                 case "祝福界面":
                     Find_Click_windows(Hwnd, "./pic/Sign/Zhufu.png", 0.05, "祝福", "未检测到祝福")
                     Sleep_print(1)
-                    if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
+                    if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
                         print("一键祝福成功")
                         flag_jiwen = 1
                         ctypes.windll.user32.SetForegroundWindow(Hwnd)
@@ -338,7 +345,7 @@ def youqingdain(Hwnd, Account):
                         pydirectinput.press("esc")
                         print("QUIT- ccccc 按Esc退出")
                         Sleep_print(0.5)
-                        Find = Find_in_windows(Hwnd, "./pic/Sign/Jiwen.png", 0.05, 0)
+                        Find = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jiwen.png", 0.05, 0)
                         if not Find:
                             print("退出吉闻界面异常")
                             ctypes.windll.user32.SetForegroundWindow(Hwnd)
@@ -350,7 +357,7 @@ def youqingdain(Hwnd, Account):
                     current_state = "好友界面"
                 case "友情点界面":
                     Find = Find_Click_windows(Hwnd, "./pic/Sign/Yijianshouqu.png", 0.05, "一键收取", "未检测到一键收取")
-                    if Find_in_windows(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
+                    if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
                         print("一键收取成功")
                         flag_youqingdian = 1
                         ctypes.windll.user32.SetForegroundWindow(Hwnd)
@@ -417,14 +424,6 @@ def MainTask_Signin(Hwnd, Account):
 
     # 检测是否位于庭院主界面
     Itface_Host(Hwnd)
-
-    # 开始领取邮件奖励
-    print("TASK- +++++ 开始领取邮件奖励 ++++++++++++++++++++++++++++++++")
-    Sleep_print(0.5)
-    if Work_Mail(Hwnd, Account):
-        print("TASK- ----- 邮件奖励领取成功 --------------------------------")
-    else:
-        print("EROR- XXXXX 邮件奖励领取失败 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
 
     # 开始每日签到以及福袋领取
     print("TASK- +++++ 开始领取签到奖励 ++++++++++++++++++++++++++++++++")
