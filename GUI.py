@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from qt_material import apply_stylesheet
 from PyQt6.QtCore import QThread, pyqtSignal
-from main import Full_operation, Init, Init_MuMu
+from main import Full_operation, Init_MuMu
 import ctypes
 import config
 
