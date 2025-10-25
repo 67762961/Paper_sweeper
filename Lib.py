@@ -122,9 +122,13 @@ def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     Left_up = min_loc
     Right_down = (min_loc[0] + Img_model_width, min_loc[1] + Img_model_height)
 
+    click_Left_up = (int(min_loc[0] + Img_model_width / 4), int(min_loc[1] + Img_model_height / 4))
+    click_Right_down = (int(min_loc[0] + 3 * Img_model_width / 4), int(min_loc[1] + 3 * Img_model_height / 4))
+
     if Flag_show:
         # 在图像上绘制边框，并显示截取窗口部分的图像
         cv2.rectangle(Img, Left_up, Right_down, (0, 0, 255), 2)
+        cv2.rectangle(Img, click_Left_up, click_Right_down, (0, 255, 0), 2)
 
         # 显示标记后的图像
         cv2.imshow("Output", Img)
