@@ -20,7 +20,6 @@ def MainTask_Jiejieyangcheng():
         print("        TIME- ----- 读取上次账号", Account, "完成结界养成任务时间")
         Times_jiejieyangcheng = check_lasttime(Account, "结界养成")
         current_time = datetime.now()
-        Times_jiejieyangcheng.date() == current_time.date()
         if abs(current_time - Times_jiejieyangcheng) >= timedelta(hours=6):
             Hwnd = Find_windows(Account)
             Task_Jiejieyangcheng(Hwnd, Account)

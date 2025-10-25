@@ -23,7 +23,6 @@ def MainTask_Fengmo():
             print("        TIME- ----- 读取上次账号", Account, "完成逢魔之时任务时间")
             Times_fengmozhishi = check_lasttime(Account, "逢魔之时")
             current_time = datetime.now()
-            Times_fengmozhishi.date() == current_time.date()
             if Times_fengmozhishi.date() != current_time.date():
                 Hwnd = Find_windows(Account)
                 Task_Fengmo(Hwnd, Account)

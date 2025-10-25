@@ -23,7 +23,6 @@ def MainTask_Digui():
             print("        TIME- ----- 读取上次账号", Account, "完成地域鬼王任务时间")
             Times_diyuguiwang = check_lasttime(Account, "地域鬼王")
             current_time = datetime.now()
-            Times_diyuguiwang.date() == current_time.date()
             if Times_diyuguiwang.date() != current_time.date():
                 Hwnd = Find_windows(Account)
                 Task_Digui(Hwnd, Account)

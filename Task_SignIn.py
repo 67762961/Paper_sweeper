@@ -3,8 +3,7 @@ import pydirectinput
 import ctypes
 import win32gui
 from datetime import datetime, timedelta
-from Lib import Sleep_print
-from Lib import Find_in_windows_Matchs, Find_Click_windows, Click, Itface_Host, read_config, write_config, Itface_scroll, check_lasttime
+from Lib import Find_in_windows_Matchs, Find_windows, Find_Click_windows, Click, Itface_Host, read_config, write_config, Itface_scroll, check_lasttime, Sleep_print, Esc_print
 
 
 def MainTask_Mail():
@@ -53,7 +52,7 @@ def Work_Mail(Hwnd, Account):
                 break
 
         Esc_print(Hwnd)
-        Sleep_print(0.5)
+        Sleep_print(1)
         return 1
 
     # 有奖励未领取
@@ -68,19 +67,19 @@ def Work_Mail(Hwnd, Account):
             print("        INFO-", Matchs, "检测到进入领取界面")
         else:
             print("        INFO-", Matchs, "未正常领取")
-            Sleep_print(0.5)
+            Sleep_print(1)
             return 0
 
         # 点击确定
         Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未正常领取确认")
-
+        Sleep_print(1)
         # 检测领取
         Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         if Range:
             print("        INFO-", Matchs, "领取成功")
             # 按下esc退出
             Esc_print(Hwnd)
-            Sleep_print(0.5)
+            Sleep_print(1)
             # 检测消息邮件
             while 1:
                 if not Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "点击消息邮件", "未发现消息邮件"):
