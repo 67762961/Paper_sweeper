@@ -33,6 +33,7 @@ def Work_Mail(Hwnd, Account):
     :param Hwnd:    窗口句柄
     :return:        1为正常 0为异常
     """
+    Itface_Host(Hwnd)
 
     Find_Click_windows(Hwnd, "./pic/Mail/Youjian.png", 0.05, "点击邮件", "未识别到邮件入口")
 
