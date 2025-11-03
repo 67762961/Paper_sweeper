@@ -39,6 +39,7 @@ def Work_Mail(Hwnd, Account):
 
     # 检测邮箱界面
     if not Find_Click_windows(Hwnd, "./pic/Mail/Youxiang.png", 0.1, "检测到进入邮箱", "进入邮箱异常"):
+        Itface_Host(Hwnd)
         return 0
 
     # 检测是否有奖励未领取
@@ -54,6 +55,7 @@ def Work_Mail(Hwnd, Account):
 
         Esc_print(Hwnd)
         Sleep_print(1)
+        Itface_Host(Hwnd)
         return 1
 
     # 有奖励未领取
@@ -69,6 +71,7 @@ def Work_Mail(Hwnd, Account):
         else:
             print("        INFO-", Matchs, "未正常领取")
             Sleep_print(1)
+            Itface_Host(Hwnd)
             return 0
 
         # 点击确定
@@ -96,7 +99,8 @@ def Work_Mail(Hwnd, Account):
             write_config("./config/Last_times.json", config)
             print("        TIME- ----- 本次邮件领取时间")
             print("        TIME- ----- ", Now)
-            print("        TASK- ----- 地域邮件领取完成 --------------------------------")
+            print("        TASK- ----- 邮件领取完成 --------------------------------")
+            Itface_Host(Hwnd)
             return 1
 
 
