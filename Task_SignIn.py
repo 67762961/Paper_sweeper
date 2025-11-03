@@ -104,88 +104,95 @@ def Work_Mail(Hwnd, Account):
             return 1
 
 
+def MainTask_QiandaoFudai():
+    """
+    签到福袋主任务
+    """
+    print("        ")
+    current_time = datetime.now()
+    print("TASK- ----- 开始签到福袋任务")
+    config_data = read_config("./config/Last_times.json")
+    headers = list(config_data.keys())
+
+    for Account in headers:
+        print("    切换到 ", Account, " 账号")
+        print("        TIME- ----- 读取上次账号", Account, "领取福袋时间")
+        Times_fudai = check_lasttime(Account, "福袋纸人")
+        current_time = datetime.now()
+        if Times_fudai.date() != current_time.date():
+            Hwnd = Find_windows(Account)
+            Fudai(Hwnd, Account)
+        else:
+            print("        SKIP- ----- 今天已经领取过福袋纸人 跳过")
+
+        Times_qiandao = check_lasttime(Account, "每日一签")
+        if Times_qiandao.date() != current_time.date():
+            Hwnd = Find_windows(Account)
+            Qiandao(Hwnd, Account)
+        else:
+            print("        SKIP- ----- 今天已经完成每日一签 跳过")
+
+
 def Fudai(Hwnd, Account):
     """
     每日福袋
     """
-    # 读取上次福袋领取时间
-    print("TIME- ----- 读取上次福袋领取时间")
-    Times_fudai = check_lasttime(Account, "福袋纸人")
-    current_time = datetime.now()
-
     # 检测福袋小纸人
-    if Times_fudai.date() != current_time.date():
-        if Find_Click_windows(Hwnd, "./pic/Sign/Fudaixiaozhiren.png", 0.05, "检测到福袋小纸人", "未检测到福袋小纸人"):
-            # 点击福袋小人后检测领取状态
-            Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
-            print("福袋领取成功")
+    if Find_Click_windows(Hwnd, "./pic/Sign/Fudaixiaozhiren.png", 0.05, "检测到福袋小纸人", "未检测到福袋小纸人"):
+        # 点击福袋小人后检测领取状态
+        Range, Match = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        if Range:
+            print("        INFO-", Matchs, "福袋领取成功")
+            Esc_print(Hwnd)
+            Sleep_print(0.5)
             # 更新配置 写入当前时间
             config = read_config("./config/Last_times.json")
             Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
             config[Account]["福袋纸人"] = Now
             write_config("./config/Last_times.json", config)
-            print("TIME- ----- 本次邮件领取时间: ")
-            print("TIME- ----- ", Now)
-
-            pydirectinput.press("esc")
-            print("QUIT- ccccc 按Esc退出")
-            Sleep_print(0.5)
+            print("        TIME- ----- 本次福袋小纸人领取时间: ")
+            print("        TIME- ----- ", Now)
+            print("        TASK- ----- 福袋小纸人领取成功 --------------------------------")
             return 1
         else:
+            print("        INFO-", Matchs, "福袋似乎未领取成功")
             return 0
     else:
-        print("SKIP- ----- 跳过领取福袋")
-        return 1
+        return 0
 
 
 def Qiandao(Hwnd, Account):
     """
     每日签到
     """
-    # 读取上次签到时间
-    print("TIME- ----- 读取上次每日一签时间")
-    Times_qiandao = check_lasttime(Account, "每日一签")
-    current_time = datetime.now()
-
-    if Times_qiandao.date() != current_time.date():
-        Wait = 0
-        while True:
-            # 检测签到小纸人
-            if Find_Click_windows(Hwnd, "./pic/Sign/Qiandaoxiaozhiren.png", 0.07, "检测到签到小纸人", "未检测到签到小纸人"):
-                # 点击签到小人后
-                if Find_Click_windows(Hwnd, "./pic/Sign/Meiriyiqian.png", 0.05, "每日一签", "签到异常"):
-                    for i in range(2):
-                        Sleep_print(0.5)
-                        Range = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
-                        if Range:
-                            print("检测到解签小纸人，每日一签成功")
-
-                            # 更新配置 写入当前时间
-                            config = read_config("./config/Last_times.json")
-                            Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                            config[Account]["每日一签"] = Now
-                            write_config("./config/Last_times.json", config)
-                            print("TIME- ----- 本次每日一签时间: ")
-                            print("TIME- ----- ", Now)
-
-                        else:
-                            print("未检测到解签小纸人")
-                            ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                            pydirectinput.press("esc")
-                            print("QUIT- ccccc 按Esc退出")
-                            Sleep_print(0.5)
-                    ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                    pydirectinput.press("esc")
-                    print("QUIT- ccccc 按Esc退出")
+    Wait = 0
+    for i in range(5):
+        # 检测签小纸人
+        if Find_Click_windows(Hwnd, "./pic/Sign/Qiandaoxiaozhiren.png", 0.07, "检测到签到小纸人", "未检测到签到小纸人"):
+            # 点击签到小人后
+            if Find_Click_windows(Hwnd, "./pic/Sign/Meiriyiqian.png", 0.05, "每日一签", "签到异常"):
+                for i in range(2):
                     Sleep_print(0.5)
-                    break
-            else:
-                Sleep_print(0.1)
-                Wait += 1
-                if Wait >= 5:
-                    break
-    else:
-        print("SKIP- ----- 跳过每日一签")
+                    Range, Match = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
+                    if Range:
+                        print("        INFO-", Matchs, "检测到解签小纸人 每日一签成功")
+                        # 更新配置 写入当前时间
+                        config = read_config("./config/Last_times.json")
+                        Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                        config[Account]["每日一签"] = Now
+                        write_config("./config/Last_times.json", config)
+                        print("        TIME- ----- 本次每日一签时间: ")
+                        print("        TIME- ----- ", Now)
+                        print("        TASK- ----- 每日一签成功 --------------------------------")
+                    else:
+                        print("        INFO-", Matchs, "未检测到解签小纸人")
+                        Esc_print(Hwnd)
+                        Sleep_print(0.5)
+                Esc_print(Hwnd)
+                Sleep_print(0.5)
+                break
+        else:
+            Sleep_print(0.1)
 
 
 def zhirenjiangli(Hwnd):
@@ -196,27 +203,24 @@ def zhirenjiangli(Hwnd):
     if Find_Click_windows(Hwnd, "./pic/Sign/Tilixiaozhire.png", 0.07, "检测到体力小纸人", "未检测到体力小纸人"):
         Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         print("体力领取成功")
-        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-        pydirectinput.press("esc")
-        print("QUIT- ccccc 按Esc退出")
+
+        Esc_print(Hwnd)
         Sleep_print(0.5)
 
     # 检测勾玉小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/Gouyuxiaozhiren.png", 0.07, "检测到勾玉小纸人", "未检测到勾玉小纸人"):
         Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         print("勾玉领取成功")
-        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-        pydirectinput.press("esc")
-        print("QUIT- ccccc 按Esc退出")
+
+        Esc_print(Hwnd)
         Sleep_print(0.5)
 
     # 检测buff小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/BUFFxiaozhiren.png", 0.07, "检测到BUFF小纸人", "未检测到BUFF小纸人"):
         Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         print("BUFF领取成功")
-        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-        pydirectinput.press("esc")
-        print("QUIT- ccccc 按Esc退出")
+
+        Esc_print(Hwnd)
         Sleep_print(0.5)
 
 
@@ -247,9 +251,7 @@ def mianfeilibao(Hwnd, Account):
                 # 检测领取状态
                 Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
                 print("免费礼包领取成功")
-                ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                pydirectinput.press("esc")
-                print("QUIT- ccccc 按Esc退出")
+                Esc_print(Hwnd)
                 Sleep_print(0.5)
                 # 更新配置，写入当前时间
                 config = read_config("./config/Last_times.json")
@@ -260,13 +262,9 @@ def mianfeilibao(Hwnd, Account):
                 print("TIME- ----- ", Now)
 
                 # 返回庭院
-                ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                pydirectinput.press("esc")
-                print("QUIT- ccccc 按Esc退出")
+                Esc_print(Hwnd)
                 Sleep_print(0.5)
-                ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                pydirectinput.press("esc")
-                print("QUIT- ccccc 按Esc退出")
+                Esc_print(Hwnd)
                 Sleep_print(0.5)
                 Itface_Host(Hwnd)
                 return 1
@@ -325,9 +323,7 @@ def youqingdain(Hwnd, Account):
                     else:
                         current_state = "好友界面"
                         flag_jiwen = 1
-                        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                        pydirectinput.press("esc")
-                        print("QUIT- ccccc 按Esc退出")
+                        Esc_print(Hwnd)
                         Sleep_print(0.5)
                 case "祝福界面":
                     Find_Click_windows(Hwnd, "./pic/Sign/Zhufu.png", 0.05, "祝福", "未检测到祝福")
@@ -335,26 +331,18 @@ def youqingdain(Hwnd, Account):
                     if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
                         print("一键祝福成功")
                         flag_jiwen = 1
-                        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                        pydirectinput.press("esc")
-                        print("QUIT- ccccc 按Esc退出")
+                        Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                        pydirectinput.press("esc")
-                        print("QUIT- ccccc 按Esc退出")
+                        Esc_print(Hwnd)
                         Sleep_print(0.5)
                     else:
                         print("一键祝福似乎未成功")
-                        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                        pydirectinput.press("esc")
-                        print("QUIT- ccccc 按Esc退出")
+                        Esc_print(Hwnd)
                         Sleep_print(0.5)
                         Find = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jiwen.png", 0.05, 0)
                         if not Find:
                             print("退出吉闻界面异常")
-                            ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                            pydirectinput.press("esc")
-                            print("QUIT- ccccc 按Esc退出")
+                            Esc_print(Hwnd)
                             Sleep_print(0.5)
                         else:
                             print("已正常退出吉闻界面")
@@ -364,9 +352,7 @@ def youqingdain(Hwnd, Account):
                     if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
                         print("一键收取成功")
                         flag_youqingdian = 1
-                        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                        pydirectinput.press("esc")
-                        print("QUIT- ccccc 按Esc退出")
+                        Esc_print(Hwnd)
                         Sleep_print(0.5)
                         current_state = "end"
                     else:
@@ -381,9 +367,7 @@ def youqingdain(Hwnd, Account):
                         print("TIME- ----- ", Now)
                         write_config("./config/Last_times.json", config)
                         # 退至庭院
-                        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                        pydirectinput.press("esc")
-                        print("QUIT- ccccc 按Esc退出")
+                        Esc_print(Hwnd)
                         Sleep_print(0.5)
                         Itface_Host(Hwnd)
                         return 1
@@ -397,17 +381,6 @@ def Work_Sign(Hwnd, Account):
     签到 福袋 纸人奖励
     @param Hwnd:    窗口句柄
     """
-    Itface_Host(Hwnd)
-
-    # 每日福袋
-    Fudai(Hwnd, Account)
-
-    # 每日一签
-    Qiandao(Hwnd, Account)
-    Itface_Host(Hwnd)
-
-    # 每日福袋(补)
-    Fudai(Hwnd, Account)
     Itface_Host(Hwnd)
 
     # 纸人奖励

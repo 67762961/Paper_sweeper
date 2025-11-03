@@ -14,7 +14,7 @@ import datetime
 from Lib import Find_windows, read_config, write_config
 from contextlib import redirect_stdout
 from Task_LogIn import LogIn
-from Task_SignIn import MainTask_Signin, MainTask_Mail
+from Task_SignIn import MainTask_Signin, MainTask_Mail, MainTask_QiandaoFudai
 from Task_Fengmo import MainTask_Fengmo, Task_Fengmo
 from Task_Digui import MainTask_Digui, Task_Digui
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng, Task_Jiejieyangcheng
@@ -57,6 +57,8 @@ def Sign_In():
     """
 
     MainTask_Mail()
+
+    MainTask_QiandaoFudai()
 
     print()
     print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
