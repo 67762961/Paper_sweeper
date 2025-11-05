@@ -388,7 +388,9 @@ def Work_Sign(Hwnd, Account):
     签到 福袋 纸人奖励
     @param Hwnd:    窗口句柄
     """
-    Itface_Host(Hwnd)
+    MainTask_Mail()
+
+    MainTask_QiandaoFudai()
 
     # 纸人奖励
     zhirenjiangli(Hwnd)

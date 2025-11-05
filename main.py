@@ -56,10 +56,6 @@ def Sign_In():
     邮箱奖励与庭院收菜
     """
 
-    MainTask_Mail()
-
-    MainTask_QiandaoFudai()
-
     print()
     print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
     ctypes.windll.user32.SetForegroundWindow(hwnds[0])
