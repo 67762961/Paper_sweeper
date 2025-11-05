@@ -14,10 +14,10 @@ import datetime
 from Lib import Find_windows, read_config, write_config
 from contextlib import redirect_stdout
 from Task_LogIn import LogIn
-from Task_SignIn import MainTask_Signin, MainTask_Mail, MainTask_QiandaoFudai
-from Task_Fengmo import MainTask_Fengmo, Task_Fengmo
-from Task_Digui import MainTask_Digui, Task_Digui
-from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng, Task_Jiejieyangcheng
+from Task_SignIn import MainTask_Signin
+from Task_Fengmo import MainTask_Fengmo
+from Task_Digui import MainTask_Digui
+from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
 
 
 # 全局变量 窗口句柄列表
