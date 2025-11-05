@@ -137,16 +137,18 @@ def Fudai(Hwnd, Account):
     """
     每日福袋
     """
+    Itface_Host(Hwnd)
     # 检测福袋小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/Fudaixiaozhiren.png", 0.05, "检测到福袋小纸人", "未检测到福袋小纸人"):
         # 点击福袋小人后检测领取状态
-        Range, Match = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         if Range:
             print("        INFO-", Matchs, "福袋领取成功")
             Esc_print(Hwnd)
             Sleep_print(0.5)
             # 更新配置 写入当前时间
             config = read_config("./config/Last_times.json")
+            current_time = datetime.now()
             Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
             config[Account]["福袋纸人"] = Now
             write_config("./config/Last_times.json", config)
@@ -165,6 +167,7 @@ def Qiandao(Hwnd, Account):
     """
     每日签到
     """
+    Itface_Host(Hwnd)
     Wait = 0
     for i in range(5):
         # 检测签小纸人
@@ -173,11 +176,15 @@ def Qiandao(Hwnd, Account):
             if Find_Click_windows(Hwnd, "./pic/Sign/Meiriyiqian.png", 0.05, "每日一签", "签到异常"):
                 for i in range(2):
                     Sleep_print(0.5)
-                    Range, Match = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
                     if Range:
                         print("        INFO-", Matchs, "检测到解签小纸人 每日一签成功")
+                        Esc_print(Hwnd)
+                        Sleep_print(0.5)
+                        break
                         # 更新配置 写入当前时间
                         config = read_config("./config/Last_times.json")
+                        current_time = datetime.now()
                         Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
                         config[Account]["每日一签"] = Now
                         write_config("./config/Last_times.json", config)
@@ -188,9 +195,9 @@ def Qiandao(Hwnd, Account):
                         print("        INFO-", Matchs, "未检测到解签小纸人")
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                Esc_print(Hwnd)
-                Sleep_print(0.5)
-                break
+                        Esc_print(Hwnd)
+                        Sleep_print(0.5)
+                        break
         else:
             Sleep_print(0.1)
 
