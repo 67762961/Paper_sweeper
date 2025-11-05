@@ -104,13 +104,13 @@ def Work_Mail(Hwnd, Account):
             return 1
 
 
-def MainTask_QiandaoFudai():
+def MainTask_Fudai():
     """
-    签到福袋主任务
+    福袋主任务
     """
     print("        ")
     current_time = datetime.now()
-    print("TASK- ----- 开始签到福袋任务")
+    print("TASK- ----- 开始福袋任务")
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
 
@@ -124,13 +124,6 @@ def MainTask_QiandaoFudai():
             Fudai(Hwnd, Account)
         else:
             print("        SKIP- ----- 今天已经领取过福袋纸人 跳过")
-
-        Times_qiandao = check_lasttime(Account, "每日一签")
-        if Times_qiandao.date() != current_time.date():
-            Hwnd = Find_windows(Account)
-            Qiandao(Hwnd, Account)
-        else:
-            print("        SKIP- ----- 今天已经完成每日一签 跳过")
 
 
 def Fudai(Hwnd, Account):
@@ -161,6 +154,28 @@ def Fudai(Hwnd, Account):
             return 0
     else:
         return 0
+
+
+def MainTask_Qiandao():
+    """
+    签到主任务
+    """
+    print("        ")
+    current_time = datetime.now()
+    print("TASK- ----- 开始签到任务")
+    config_data = read_config("./config/Last_times.json")
+    headers = list(config_data.keys())
+
+    for Account in headers:
+        print("    切换到 ", Account, " 账号")
+        print("        TIME- ----- 读取上次账号", Account, "领取福袋时间")
+        current_time = datetime.now()
+        Times_qiandao = check_lasttime(Account, "每日一签")
+        if Times_qiandao.date() != current_time.date():
+            Hwnd = Find_windows(Account)
+            Qiandao(Hwnd, Account)
+        else:
+            print("        SKIP- ----- 今天已经完成每日一签 跳过")
 
 
 def Qiandao(Hwnd, Account):
@@ -390,7 +405,9 @@ def Work_Sign(Hwnd, Account):
     """
     MainTask_Mail()
 
-    MainTask_QiandaoFudai()
+    MainTask_Qiandao()
+
+    MainTask_Fudai()
 
     # 纸人奖励
     zhirenjiangli(Hwnd)
