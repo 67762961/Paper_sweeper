@@ -196,7 +196,6 @@ def Qiandao(Hwnd, Account):
                         print("        INFO-", Matchs, "检测到解签小纸人 每日一签成功")
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        break
                         # 更新配置 写入当前时间
                         config = read_config("./config/Last_times.json")
                         current_time = datetime.now()
@@ -206,15 +205,17 @@ def Qiandao(Hwnd, Account):
                         print("        TIME- ----- 本次每日一签时间: ")
                         print("        TIME- ----- ", Now)
                         print("        TASK- ----- 每日一签成功 --------------------------------")
+                        return 1
                     else:
                         print("        INFO-", Matchs, "未检测到解签小纸人")
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        break
+                        return 0
         else:
             Sleep_print(0.1)
+    return 0
 
 
 def zhirenjiangli(Hwnd):
