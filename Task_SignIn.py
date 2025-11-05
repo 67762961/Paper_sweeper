@@ -215,6 +215,7 @@ def Qiandao(Hwnd, Account):
                         return 0
         else:
             Sleep_print(0.1)
+    print("        TASK- ----- 始终未检测到签到小纸人 任务失败 --------------------------------")
     return 0
 
 
