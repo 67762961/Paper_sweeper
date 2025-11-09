@@ -168,7 +168,7 @@ def MainTask_Qiandao():
 
     for Account in headers:
         print("    切换到 ", Account, " 账号")
-        print("        TIME- ----- 读取上次账号", Account, "领取福袋时间")
+        print("        TIME- ----- 读取上次账号", Account, "每日一签时间")
         current_time = datetime.now()
         Times_qiandao = check_lasttime(Account, "每日一签")
         if Times_qiandao.date() != current_time.date():
