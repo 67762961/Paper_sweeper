@@ -24,7 +24,7 @@ def MainTask_Mail():
             Hwnd = Find_windows(Account)
             Work_Mail(Hwnd, Account)
         else:
-            print("        SKIP- ----- 邮件查看时间间隔未满六小时 跳过")
+            print("        SKIP- ----- 邮件查看时间间隔未满六小时 跳过 --------------------------------")
 
 
 def Work_Mail(Hwnd, Account):
@@ -123,7 +123,7 @@ def MainTask_Fudai():
             Hwnd = Find_windows(Account)
             Fudai(Hwnd, Account)
         else:
-            print("        SKIP- ----- 今天已经领取过福袋纸人 跳过")
+            print("        SKIP- ----- 今天已经领取过福袋纸人 跳过 --------------------------------")
 
 
 def Fudai(Hwnd, Account):
@@ -175,7 +175,7 @@ def MainTask_Qiandao():
             Hwnd = Find_windows(Account)
             Qiandao(Hwnd, Account)
         else:
-            print("        SKIP- ----- 今天已经完成每日一签 跳过")
+            print("        SKIP- ----- 今天已经完成每日一签 跳过 --------------------------------")
 
 
 def Qiandao(Hwnd, Account):
@@ -219,33 +219,54 @@ def Qiandao(Hwnd, Account):
     return 0
 
 
+def MainTask_Zhiren():
+    """
+    纸人奖励主任务
+    """
+    print("        ")
+    current_time = datetime.now()
+    print("TASK- ----- 开始领取纸人奖励")
+    config_data = read_config("./config/Last_times.json")
+    headers = list(config_data.keys())
+
+    for Account in headers:
+        print("    切换到 ", Account, " 账号")
+        Hwnd = Find_windows(Account)
+        if zhirenjiangli(Hwnd):
+            Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print("        TIME- ----- ", Now)
+            print("        TASK- ----- 纸人奖励领取成功 --------------------------------")
+
+
 def zhirenjiangli(Hwnd):
     """
     体力小纸人 勾玉小纸人 buff小纸人
     """
     # 检测体力小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/Tilixiaozhire.png", 0.07, "检测到体力小纸人", "未检测到体力小纸人"):
-        Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
-        print("体力领取成功")
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        print("        INFO-", Matchs, "体力纸人领取成功")
 
         Esc_print(Hwnd)
         Sleep_print(0.5)
 
     # 检测勾玉小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/Gouyuxiaozhiren.png", 0.07, "检测到勾玉小纸人", "未检测到勾玉小纸人"):
-        Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
-        print("勾玉领取成功")
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        print("        INFO-", Matchs, "勾玉纸人领取成功")
 
         Esc_print(Hwnd)
         Sleep_print(0.5)
 
     # 检测buff小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/BUFFxiaozhiren.png", 0.07, "检测到BUFF小纸人", "未检测到BUFF小纸人"):
-        Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
-        print("BUFF领取成功")
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        print("        INFO-", Matchs, "BUFF纸人领取成功")
 
         Esc_print(Hwnd)
         Sleep_print(0.5)
+
+    return 1
 
 
 def mianfeilibao(Hwnd, Account):
@@ -411,8 +432,7 @@ def Work_Sign(Hwnd, Account):
 
     MainTask_Fudai()
 
-    # 纸人奖励
-    zhirenjiangli(Hwnd)
+    MainTask_Zhiren()
 
     # 商店免费礼包
     mianfeilibao(Hwnd, Account)
@@ -431,6 +451,4 @@ def MainTask_Signin(Hwnd, Account):
     Itface_Host(Hwnd)
 
     # 开始每日签到以及福袋领取
-    print("TASK- +++++ 开始领取签到奖励 ++++++++++++++++++++++++++++++++")
     Work_Sign(Hwnd, Account)
-    print("TASK- ----- 领取签到奖励成功 --------------------------------")
