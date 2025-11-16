@@ -22,7 +22,17 @@ def MainTask_Mail():
         current_time = datetime.now()
         if abs(current_time - Times_youjian) >= timedelta(hours=6):
             Hwnd = Find_windows(Account)
-            Work_Mail(Hwnd, Account)
+            if Work_Mail(Hwnd, Account):
+                # 更新配置 写入当前时间
+                config = read_config("./config/Last_times.json")
+                Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                config[Account]["邮件领取"] = Now
+                write_config("./config/Last_times.json", config)
+                print("        TIME- ----- 本次邮件领取时间")
+                print("        TIME- ----- ", Now)
+                print("        TASK- ----- 邮件领取完成 --------------------------------")
+            else:
+                print("        TASK- ----- 邮件领取任务执行过程中出现错误 中断任务 --------------------------------")
         else:
             print("        SKIP- ----- 邮件查看时间间隔未满六小时 跳过 --------------------------------")
 
@@ -90,16 +100,6 @@ def Work_Mail(Hwnd, Account):
                     break
 
             Esc_print(Hwnd)
-
-            # 更新配置 写入当前时间
-
-            config = read_config("./config/Last_times.json")
-            Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            config[Account]["邮件领取"] = Now
-            write_config("./config/Last_times.json", config)
-            print("        TIME- ----- 本次邮件领取时间")
-            print("        TIME- ----- ", Now)
-            print("        TASK- ----- 邮件领取完成 --------------------------------")
             Itface_Host(Hwnd)
             return 1
 
@@ -121,7 +121,18 @@ def MainTask_Fudai():
         current_time = datetime.now()
         if Times_fudai.date() != current_time.date():
             Hwnd = Find_windows(Account)
-            Fudai(Hwnd, Account)
+            if Fudai(Hwnd, Account):
+                # 更新配置 写入当前时间
+                config = read_config("./config/Last_times.json")
+                current_time = datetime.now()
+                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                config[Account]["福袋纸人"] = Now
+                write_config("./config/Last_times.json", config)
+                print("        TIME- ----- 本次福袋小纸人领取时间: ")
+                print("        TIME- ----- ", Now)
+                print("        TASK- ----- 福袋小纸人领取成功 --------------------------------")
+            else:
+                print("        TASK- ----- 福袋小纸人领取任务执行过程中出现错误 中断任务 --------------------------------")
         else:
             print("        SKIP- ----- 今天已经领取过福袋纸人 跳过 --------------------------------")
 
@@ -139,15 +150,6 @@ def Fudai(Hwnd, Account):
             print("        INFO-", Matchs, "福袋领取成功")
             Esc_print(Hwnd)
             Sleep_print(0.5)
-            # 更新配置 写入当前时间
-            config = read_config("./config/Last_times.json")
-            current_time = datetime.now()
-            Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-            config[Account]["福袋纸人"] = Now
-            write_config("./config/Last_times.json", config)
-            print("        TIME- ----- 本次福袋小纸人领取时间: ")
-            print("        TIME- ----- ", Now)
-            print("        TASK- ----- 福袋小纸人领取成功 --------------------------------")
             return 1
         else:
             print("        INFO-", Matchs, "福袋似乎未领取成功")
@@ -173,7 +175,18 @@ def MainTask_Qiandao():
         Times_qiandao = check_lasttime(Account, "每日一签")
         if Times_qiandao.date() != current_time.date():
             Hwnd = Find_windows(Account)
-            Qiandao(Hwnd, Account)
+            if Qiandao(Hwnd, Account):
+                # 更新配置 写入当前时间
+                config = read_config("./config/Last_times.json")
+                current_time = datetime.now()
+                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                config[Account]["每日一签"] = Now
+                write_config("./config/Last_times.json", config)
+                print("        TIME- ----- 本次每日一签时间: ")
+                print("        TIME- ----- ", Now)
+                print("        TASK- ----- 每日一签成功 --------------------------------")
+            else:
+                print("        TASK- ----- 每日一签任务执行过程中出现错误 中断任务 --------------------------------")
         else:
             print("        SKIP- ----- 今天已经完成每日一签 跳过 --------------------------------")
 
@@ -196,15 +209,6 @@ def Qiandao(Hwnd, Account):
                         print("        INFO-", Matchs, "检测到解签小纸人 每日一签成功")
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        # 更新配置 写入当前时间
-                        config = read_config("./config/Last_times.json")
-                        current_time = datetime.now()
-                        Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                        config[Account]["每日一签"] = Now
-                        write_config("./config/Last_times.json", config)
-                        print("        TIME- ----- 本次每日一签时间: ")
-                        print("        TIME- ----- ", Now)
-                        print("        TASK- ----- 每日一签成功 --------------------------------")
                         return 1
                     else:
                         print("        INFO-", Matchs, "未检测到解签小纸人")
@@ -215,7 +219,6 @@ def Qiandao(Hwnd, Account):
                         return 0
         else:
             Sleep_print(0.1)
-    print("        TASK- ----- 始终未检测到签到小纸人 任务失败 --------------------------------")
     return 0
 
 
@@ -236,6 +239,8 @@ def MainTask_Zhiren():
             Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print("        TIME- ----- ", Now)
             print("        TASK- ----- 纸人奖励领取成功 --------------------------------")
+        else:
+            print("        TASK- ----- 纸人奖励领取任务执行过程中出现错误 中断任务 --------------------------------")
 
 
 def zhirenjiangli(Hwnd):

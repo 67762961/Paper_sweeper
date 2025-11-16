@@ -25,11 +25,21 @@ def MainTask_Fengmo():
             current_time = datetime.now()
             if Times_fengmozhishi.date() != current_time.date():
                 Hwnd = Find_windows(Account)
-                Task_Fengmo(Hwnd, Account)
+                if Task_Fengmo(Hwnd, Account):
+                    # 更新配置，写入当前时间
+                    config = read_config("./config/Last_times.json")
+                    Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    config[Account]["逢魔之时"] = Now
+                    write_config("./config/Last_times.json", config)
+                    print("        TIME- ----- 本次逢魔之时完成时间")
+                    print("        TIME- ----- ", Now)
+                    print("        TASK- ----- 结界逢魔之时任务完成 --------------------------------")
+                else:
+                    print("        TASK- ----- 逢魔之时任务执行过程中出现错误 中断任务 --------------------------------")
             else:
-                print("        SKIP- ----- 今日已完成逢魔之时任务 跳过")
+                print("        SKIP- ----- 今日已完成逢魔之时任务 跳过 --------------------------------")
     else:
-        print("TASK- ----- 当前时间不在17:00-21:50之间 跳过逢魔之时任务")
+        print("TASK- ----- 当前时间不在17:00-21:50之间 跳过 --------------------------------")
 
 
 def Task_Fengmo(Hwnd, Account):
@@ -38,7 +48,6 @@ def Task_Fengmo(Hwnd, Account):
     :param Hwnd:    窗口句柄
     :param Account: 账号
     """
-    print("        TASK- +++++ 开始逢魔之时任务 ++++++++++++++++++++++++++++++++")
     print("        INFO- ----- 前往逢魔界面")
     Itface_daily(Hwnd)
     Range = Find_Click_windows(Hwnd, "./pic/Fengmo/Fengmotubiao.png", 0.05, "点击逢魔图标", "未检测到逢魔图标")
@@ -48,14 +57,7 @@ def Task_Fengmo(Hwnd, Account):
         # 先点封魔再打boss
         meirifengmo(Hwnd)
         if fengmoboss(Hwnd):
-            # 更新配置，写入当前时间
-            config = read_config("./config/Last_times.json")
-            Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            config[Account]["逢魔之时"] = Now
-            write_config("./config/Last_times.json", config)
-            print("        TIME- ----- 本次逢魔之时完成时间")
-            print("        TIME- ----- ", Now)
-            print("        TASK- ----- 结界逢魔之时任务完成 --------------------------------")
+            return 1
         ######################################################################################################################
         # 此处进入了打boss场景 应添加后续战斗完成的处理
 

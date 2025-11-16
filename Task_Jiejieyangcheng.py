@@ -22,29 +22,19 @@ def MainTask_Jiejieyangcheng():
         current_time = datetime.now()
         if abs(current_time - Times_jiejieyangcheng) >= timedelta(hours=6):
             Hwnd = Find_windows(Account)
-            Task_Jiejieyangcheng(Hwnd, Account)
+            if Jiejieyangcheng("庭院界面", Hwnd):
+                # 更新配置 写入当前时间
+                config = read_config("./config/Last_times.json")
+                Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                config[Account]["结界养成"] = Now
+                write_config("./config/Last_times.json", config)
+                print("        TIME- ----- 本次结界养成完成时间")
+                print("        TIME- ----- ", Now)
+                print("        TASK- ----- 结界养成任务完成 --------------------------------")
+            else:
+                print("        TASK- ----- 结界养成任务执行过程中出现错误 中断任务 --------------------------------")
         else:
-            print("        SKIP- ----- 结界养成任务时间间隔未满六小时 跳过")
-
-
-def Task_Jiejieyangcheng(Hwnd, Account):
-    """
-    有关结界相关任务
-    :param Hwnd:    窗口句柄
-    """
-    print("        TASK- +++++ 执行结界养成任务 ++++++++++++++++++++++++++++++++")
-
-    if Jiejieyangcheng("庭院界面", Hwnd):
-        # 更新配置 写入当前时间
-        config = read_config("./config/Last_times.json")
-        Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        config[Account]["结界养成"] = Now
-        write_config("./config/Last_times.json", config)
-        print("        TIME- ----- 本次结界养成完成时间")
-        print("        TIME- ----- ", Now)
-        print("        TASK- ----- 结界养成任务完成 --------------------------------")
-    else:
-        print("        EROR- ***** 结界养成任务失败 ********************************")
+            print("        SKIP- ----- 结界养成任务时间间隔未满六小时 跳过 --------------------------------")
 
 
 def Jiejieyangcheng(current_state, Hwnd):

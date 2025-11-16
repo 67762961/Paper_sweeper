@@ -25,39 +25,30 @@ def MainTask_Digui():
             current_time = datetime.now()
             if Times_diyuguiwang.date() != current_time.date():
                 Hwnd = Find_windows(Account)
-                Task_Digui(Hwnd, Account)
+                if Diyuguiwang("探索界面", Hwnd):
+                    # 更新配置 写入当前时间
+                    config = read_config("./config/Last_times.json")
+                    Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    config[Account]["地域鬼王"] = Now
+                    write_config("./config/Last_times.json", config)
+                    print("        TIME- ----- 本次地域鬼王完成时间")
+                    print("        TIME- ----- ", Now)
+                    print("        TASK- ----- 地域鬼王任务完成 --------------------------------")
+                else:
+                    print("        TASK- ----- 地域鬼王任务执行过程中出现错误 中断任务 --------------------------------")
             else:
-                print("        SKIP- ----- 今日已完成地域鬼王任务 跳过")
+                print("        SKIP- ----- 今日已完成地域鬼王任务 跳过 --------------------------------")
     else:
-        print("TASK- ----- 当前时间不在12:00-23:50之间 跳过地域鬼王任务")
-
-
-def Task_Digui(Hwnd, Account):
-    """
-    有关地鬼相关任务
-    :param Hwnd:    窗口句柄
-    :param Account: 账号
-    """
-    print("        TASK- +++++ 开始讨伐地域鬼王 ++++++++++++++++++++++++++++++++")
-
-    # 开始地鬼任务
-    print("        INFO- ----- 前往地鬼界面")
-    Itface_explore(Hwnd)
-    if Diyuguiwang("探索界面", Hwnd):
-        # 更新配置 写入当前时间
-        config = read_config("./config/Last_times.json")
-        Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        config[Account]["地域鬼王"] = Now
-        write_config("./config/Last_times.json", config)
-        print("        TIME- ----- 本次地域鬼王完成时间")
-        print("        TIME- ----- ", Now)
-        print("        TASK- ----- 地域鬼王任务完成 --------------------------------")
+        print("TASK- ----- 当前时间不在12:00-23:50之间 跳过 --------------------------------")
 
 
 def Diyuguiwang(current_state, Hwnd):
     """
     挑战地域鬼王
     """
+    print("        INFO- ----- 前往地鬼界面")
+    Itface_explore(Hwnd)
+
     # 地鬼计数器
     flag_digui = 1
     print("        STEP- vvvvv 从{First_state}开始".format(First_state=current_state))
