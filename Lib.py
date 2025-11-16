@@ -58,6 +58,15 @@ def Find_windows(title):
     return hwnds[0] if hwnds else None
 
 
+def cv_imread_chinese(file_path):
+    """读取包含中文路径的图片"""
+    # 使用numpy从二进制数据读取
+    with open(file_path, "rb") as f:
+        img_data = np.frombuffer(f.read(), dtype=np.uint8)
+    img = cv2.imdecode(img_data, cv2.IMREAD_COLOR)
+    return img
+
+
 def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     """
     全屏截图 找到与模板匹配的图片区域
@@ -103,7 +112,7 @@ def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     Img = cv2.resize(Img, (int(width / dpi_scale), int(height / dpi_scale)))
 
     # 加载图像模板 并读取宽高
-    Img_model = cv2.imread(Model_path)
+    Img_model = cv_imread_chinese(Model_path)
     if Img_model is None:
         raise ValueError(f"无法找到文件: {Img_model_path}")
     Img_model_height, Img_model_width = Img_model.shape[0:2]
@@ -168,7 +177,7 @@ def Find_in_screen(Img_model_path, Threshold, Flag_show):
     Img = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
 
     # 加载图像模板 并读取宽高
-    Img_model = cv2.imread(Img_model_path)
+    Img_model = cv_imread_chinese(Img_model_path)
     if Img_model is None:
         raise ValueError(f"无法找到文件: {Img_model_path}")
     Img_model_height, Img_model_width = Img_model.shape[0:2]
@@ -409,14 +418,14 @@ def Itface_scroll(Hwnd):
     Itface_Host(Hwnd)
 
     # 检测底部卷轴是否展开
-    Range = Find_in_windows(Hwnd, "./pic/Thr/Shishenlu.png", 0.05, 0)
+    Range = Find_in_windows(Hwnd, "./pic/Main/Shishenlu.png", 0.05, 0)
     if not Range:
         print("检测到卷轴尚未打开 点击打开卷轴")
         # 坐标法点击展开卷轴
         Range = ((1780, 970), (1910, 1120))
         Click(Hwnd, Range, 2)
 
-        Range = Find_in_windows(Hwnd, "./pic/Thr/Shishenlu.png", 0.05, 0)
+        Range = Find_in_windows(Hwnd, "./pic/Main/Shishenlu.png", 0.05, 0)
         if Range:
             print("检测到卷轴已经打开")
         else:
