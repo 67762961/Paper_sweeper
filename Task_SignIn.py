@@ -353,113 +353,128 @@ def mianfeilibao(Hwnd, Account):
     return 0
 
 
+def MainTask_youqingdain():
+    """
+    友情点主任务
+    """
+    print("        ")
+    current_time = datetime.now()
+    print("TASK- ----- 开始领取友情点以及吉闻祝福")
+    config_data = read_config("./config/Last_times.json")
+    headers = list(config_data.keys())
+
+    for Account in headers:
+        print("    切换到 ", Account, " 账号")
+        print("        TIME- ----- 读取上次账号", Account, "领取友情点以及吉闻祝福时间")
+        current_time = datetime.now()
+        Times_youqingdian = check_lasttime(Account, "送友情点")
+        if Times_youqingdian.date() != current_time.date():
+            Hwnd = Find_windows(Account)
+            if youqingdain(Hwnd, Account):
+                # 更新配置 写入当前时间
+                config = read_config("./config/Last_times.json")
+                current_time = datetime.now()
+                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                config[Account]["送友情点"] = Now
+                write_config("./config/Last_times.json", config)
+                print("        TIME- ----- 本次领取友情点以及吉闻祝福时间: ")
+                print("        TIME- ----- ", Now)
+                print("        TASK- ----- 友情点以及吉闻祝福领取成功 --------------------------------")
+            else:
+                print("        TASK- ----- 领取友情点以及吉闻祝福任务执行过程中出现错误 中断任务 --------------------------------")
+        else:
+            print("        SKIP- ----- 今天已经领取过友情点以及吉闻祝福 跳过 --------------------------------")
+
+
 def youqingdain(Hwnd, Account):
     """
     每日友情点以及吉闻祝福
     """
-    # 读取上次友情点时间
-    print("TIME- ----- 读取上次友情点时间")
-    Times_youqingdian = check_lasttime(Account, "送友情点")
-    current_time = datetime.now()
-
-    # 今日运行过则跳过
-    if Times_youqingdian.date() == current_time.date():
-        print("SKIP- ----- 跳过友情点任务")
-    # 运行友情点任务
-    else:
-        # 开卷轴
-        Itface_scroll(Hwnd)
-
-        current_state = "庭院"
-        flag_jiwen = 0
-        flag_youqingdian = 0
-        for i in range(10):
-            match current_state:
-                case "庭院":
-                    Find = Find_Click_windows(Hwnd, "./pic/Sign/Haoyou.png", 0.05, "进入好友界面", "未检测到好友界面")
-                    if Find:
-                        current_state = "好友界面"
-                        Sleep_print(2)
-                    else:
-                        current_state = "end"
-                case "好友界面":
-                    if not flag_jiwen:
-                        Find = Find_Click_windows(Hwnd, "./pic/Sign/Jiwen.png", 0.05, "进入吉闻界面", "未检测到吉闻界面")
-                        if Find:
-                            current_state = "吉闻界面"
-                        else:
-                            current_state = "好友界面"
-                    else:
-                        Find = Find_Click_windows(Hwnd, "./pic/Sign/Youqingdianqiehuan.png", 0.05, "进入友情点界面", "未检测到友情点界面")
-                        if Find:
-                            current_state = "友情点界面"
-                        else:
-                            current_state = "好友界面"
-                case "吉闻界面":
-                    Find = Find_Click_windows(Hwnd, "./pic/Sign/Yijianzhufu.png", 0.05, "一键祝福", "未检测到一键祝福")
-                    if Find:
-                        current_state = "祝福界面"
-                    else:
-                        current_state = "好友界面"
-                        flag_jiwen = 1
-                        Esc_print(Hwnd)
-                        Sleep_print(0.5)
-                case "祝福界面":
-                    Find_Click_windows(Hwnd, "./pic/Sign/Zhufu.png", 0.05, "祝福", "未检测到祝福")
-                    Sleep_print(1)
-                    if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
-                        print("一键祝福成功")
-                        flag_jiwen = 1
-                        Esc_print(Hwnd)
-                        Sleep_print(0.5)
-                        Esc_print(Hwnd)
-                        Sleep_print(0.5)
-                    else:
-                        print("一键祝福似乎未成功")
-                        Esc_print(Hwnd)
-                        Sleep_print(0.5)
-                        Find = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jiwen.png", 0.05, 0)
-                        if not Find:
-                            print("退出吉闻界面异常")
-                            Esc_print(Hwnd)
-                            Sleep_print(0.5)
-                        else:
-                            print("已正常退出吉闻界面")
+    Itface_Host(Hwnd)
+    # 开卷轴
+    Itface_scroll(Hwnd)
+    current_state = "庭院"
+    flag_jiwen = 0
+    flag_youqingdian = 0
+    for i in range(10):
+        match current_state:
+            case "庭院":
+                Find = Find_Click_windows(Hwnd, "./pic/Sign/Haoyou.png", 0.05, "进入好友界面", "未检测到好友界面")
+                if Find:
                     current_state = "好友界面"
-                case "友情点界面":
-                    Find = Find_Click_windows(Hwnd, "./pic/Sign/Yijianshouqu.png", 0.05, "一键收取", "未检测到一键收取")
-                    if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
-                        print("一键收取成功")
-                        flag_youqingdian = 1
-                        Esc_print(Hwnd)
-                        Sleep_print(0.5)
-                        current_state = "end"
+                    Sleep_print(2)
+                else:
+                    current_state = "end"
+            case "好友界面":
+                if not flag_jiwen:
+                    Find = Find_Click_windows(Hwnd, "./pic/Sign/Jiwen.png", 0.05, "进入吉闻界面", "未检测到吉闻界面")
+                    if Find:
+                        current_state = "吉闻界面"
                     else:
-                        print("一键收取似乎未成功")
-                case "end":
-                    if flag_youqingdian and flag_jiwen:
-                        # 更新配置，写入当前时间
-                        config = read_config("./config/Last_times.json")
-                        Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                        config[Account]["送友情点"] = Now
-                        print("TIME- ----- 本次友情点任务时间")
-                        print("TIME- ----- ", Now)
-                        write_config("./config/Last_times.json", config)
-                        # 退至庭院
+                        current_state = "好友界面"
+                else:
+                    Find = Find_Click_windows(Hwnd, "./pic/Sign/Youqingdianqiehuan.png", 0.05, "进入友情点界面", "未检测到友情点界面")
+                    if Find:
+                        current_state = "友情点界面"
+                    else:
+                        current_state = "好友界面"
+            case "吉闻界面":
+                Find = Find_Click_windows(Hwnd, "./pic/Sign/Yijianzhufu.png", 0.05, "一键祝福", "未检测到一键祝福")
+                if Find:
+                    current_state = "祝福界面"
+                else:
+                    current_state = "好友界面"
+                    flag_jiwen = 1
+                    Esc_print(Hwnd)
+                    Sleep_print(0.5)
+            case "祝福界面":
+                Find_Click_windows(Hwnd, "./pic/Sign/Zhufu.png", 0.05, "祝福", "未检测到祝福")
+                Sleep_print(1)
+                if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
+                    print("一键祝福成功")
+                    flag_jiwen = 1
+                    Esc_print(Hwnd)
+                    Sleep_print(0.5)
+                    Esc_print(Hwnd)
+                    Sleep_print(0.5)
+                else:
+                    print("一键祝福似乎未成功")
+                    Esc_print(Hwnd)
+                    Sleep_print(0.5)
+                    Find = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jiwen.png", 0.05, 0)
+                    if not Find:
+                        print("退出吉闻界面异常")
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        Itface_Host(Hwnd)
-                        return 1
+                    else:
+                        print("已正常退出吉闻界面")
+                current_state = "好友界面"
+            case "友情点界面":
+                Find = Find_Click_windows(Hwnd, "./pic/Sign/Yijianshouqu.png", 0.05, "一键收取", "未检测到一键收取")
+                if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
+                    print("一键收取成功")
+                    flag_youqingdian = 1
+                    Esc_print(Hwnd)
+                    Sleep_print(0.5)
+                    current_state = "end"
+                else:
+                    print("一键收取似乎未成功")
+            case "end":
+                if flag_youqingdian and flag_jiwen:
+                    # 退至庭院
+                    Esc_print(Hwnd)
+                    Sleep_print(0.5)
+                    Itface_Host(Hwnd)
+                    return 1
+    return 0
 
-        Itface_Host(Hwnd)
-        return 0
 
-
-def Work_Sign(Hwnd, Account):
+def MainTask_Signin():
     """
-    签到 福袋 纸人奖励
+    完成每日登录所有领取项
     @param Hwnd:    窗口句柄
     """
+
     MainTask_Mail()
 
     MainTask_Qiandao()
@@ -470,18 +485,4 @@ def Work_Sign(Hwnd, Account):
 
     MainTask_mianfeilibao()
 
-    # 每日友情点
-    youqingdain(Hwnd, Account)
-
-
-def MainTask_Signin(Hwnd, Account):
-    """
-    完成每日登录所有领取项
-    @param Hwnd:    窗口句柄
-    """
-
-    # 检测是否位于庭院主界面
-    Itface_Host(Hwnd)
-
-    # 开始每日签到以及福袋领取
-    Work_Sign(Hwnd, Account)
+    MainTask_youqingdain()

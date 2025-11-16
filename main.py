@@ -51,22 +51,6 @@ def Init_MuMu():
     return hwnds
 
 
-def Sign_In():
-    """
-    邮箱奖励与庭院收菜
-    """
-
-    print()
-    print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-    ctypes.windll.user32.SetForegroundWindow(hwnds[0])
-    MainTask_Signin(hwnds[0], "master")
-
-    print()
-    print("SHIF- ^^^^^ 切换游戏账号窗口 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-    ctypes.windll.user32.SetForegroundWindow(hwnds[1])
-    MainTask_Signin(hwnds[1], "slaves")
-
-
 def Full_operation():
     # 获取当前日期和时间，用于生成唯一的文件名
     now = datetime.datetime.now()
@@ -87,7 +71,7 @@ def Full_operation():
         try:
             print("        ")
             print("MAIN- ~~~~ 完整运行流程开始 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            Sign_In()
+            MainTask_Signin()
             MainTask_Jiejieyangcheng()
             MainTask_Digui()
             MainTask_Fengmo()
