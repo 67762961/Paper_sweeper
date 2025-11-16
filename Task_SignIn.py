@@ -247,6 +247,8 @@ def zhirenjiangli(Hwnd):
     """
     体力小纸人 勾玉小纸人 buff小纸人
     """
+    Itface_Host(Hwnd)
+
     # 检测体力小纸人
     if Find_Click_windows(Hwnd, "./pic/Sign/Tilixiaozhire.png", 0.07, "检测到体力小纸人", "未检测到体力小纸人"):
         Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
@@ -274,43 +276,63 @@ def zhirenjiangli(Hwnd):
     return 1
 
 
+def MainTask_mianfeilibao():
+    """
+    商店免费礼包主任务
+    """
+    print("        ")
+    current_time = datetime.now()
+    print("TASK- ----- 开始领取商店免费礼包")
+    config_data = read_config("./config/Last_times.json")
+    headers = list(config_data.keys())
+
+    for Account in headers:
+        print("    切换到 ", Account, " 账号")
+        print("        TIME- ----- 读取上次账号", Account, "领取商店免费礼包时间")
+        current_time = datetime.now()
+        Times_mianfeilibao = check_lasttime(Account, "免费礼包")
+        if Times_mianfeilibao.date() != current_time.date():
+            Hwnd = Find_windows(Account)
+            if mianfeilibao(Hwnd, Account):
+                # 更新配置 写入当前时间
+                config = read_config("./config/Last_times.json")
+                current_time = datetime.now()
+                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                config[Account]["免费礼包"] = Now
+                write_config("./config/Last_times.json", config)
+                print("        TIME- ----- 本次商店免费礼包领取时间: ")
+                print("        TIME- ----- ", Now)
+                print("        TASK- ----- 商店免费礼包领取成功 --------------------------------")
+            else:
+                print("        TASK- ----- 商店免费礼包任务执行过程中出现错误 中断任务 --------------------------------")
+        else:
+            print("        SKIP- ----- 今天已经领取过商店免费礼包 跳过 --------------------------------")
+
+
 def mianfeilibao(Hwnd, Account):
     """
     商店免费礼包
     """
-    # 读取上次免费礼包
-    print("TIME- ----- 读取上次免费礼包时间")
-    Times_mianfeilibao = check_lasttime(Account, "免费礼包")
-
-    current_time = datetime.now()
-
-    if Times_mianfeilibao.date() != current_time.date():
-        # 开卷轴
-        Itface_scroll(Hwnd)
-        for i in range(1):
-            if not Find_Click_windows(Hwnd, "./pic/Sign/Shangdian.png", 0.05, "进入商店", "未检测到商店"):
+    Itface_Host(Hwnd)
+    # 开卷轴
+    Itface_scroll(Hwnd)
+    for i in range(1):
+        if not Find_Click_windows(Hwnd, "./pic/Sign/Shangdian.png", 0.05, "进入商店", "未检测到商店"):
+            break
+        if not Find_Click_windows(Hwnd, "./pic/Sign/Libaowu.png", 0.05, "进入礼包屋", "未检测到礼包屋"):
+            if not Find_Click_windows(Hwnd, "./pic/Sign/Libaowu1.png", 0.05, "进入礼包屋", "未检测到礼包屋"):
                 break
-            if not Find_Click_windows(Hwnd, "./pic/Sign/Libaowu.png", 0.05, "进入礼包屋", "未检测到礼包屋"):
-                if not Find_Click_windows(Hwnd, "./pic/Sign/Libaowu1.png", 0.05, "进入礼包屋", "未检测到礼包屋"):
-                    break
 
-            # 此步骤有时候可跳过
-            Find_Click_windows(Hwnd, "./pic/Sign/Richang.png", 0.05, "进入日常项", "未检测到日常项")
+        # 此步骤有时候可跳过
+        Find_Click_windows(Hwnd, "./pic/Sign/Richang.png", 0.05, "进入日常项", "未检测到日常项")
 
-            if Find_Click_windows(Hwnd, "./pic/Sign/Mianfei.png", 0.05, "领取免费礼包", "未检测到免费礼包"):
-                # 检测领取状态
-                Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
-                print("免费礼包领取成功")
+        if Find_Click_windows(Hwnd, "./pic/Sign/Mianfei.png", 0.05, "领取免费礼包", "未检测到免费礼包"):
+            # 检测领取状态
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+            if Range:
+                print("        INFO-", Matchs, "免费礼包领取成功")
                 Esc_print(Hwnd)
                 Sleep_print(0.5)
-                # 更新配置，写入当前时间
-                config = read_config("./config/Last_times.json")
-                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                config[Account]["免费礼包"] = Now
-                write_config("./config/Last_times.json", config)
-                print("TIME- ----- 本次免费礼包领取时间")
-                print("TIME- ----- ", Now)
-
                 # 返回庭院
                 Esc_print(Hwnd)
                 Sleep_print(0.5)
@@ -318,10 +340,17 @@ def mianfeilibao(Hwnd, Account):
                 Sleep_print(0.5)
                 Itface_Host(Hwnd)
                 return 1
-        Itface_Host(Hwnd)
-        return 0
-    else:
-        print("SKIP- ----- 跳过商店免费礼包")
+            else:
+                print("        INFO-", Matchs, "免费礼包似乎未领取成功")
+                Esc_print(Hwnd)
+                Sleep_print(0.5)
+                # 返回庭院
+                Esc_print(Hwnd)
+                Sleep_print(0.5)
+                Esc_print(Hwnd)
+                Sleep_print(0.5)
+                return 0
+    return 0
 
 
 def youqingdain(Hwnd, Account):
@@ -439,8 +468,7 @@ def Work_Sign(Hwnd, Account):
 
     MainTask_Zhiren()
 
-    # 商店免费礼包
-    mianfeilibao(Hwnd, Account)
+    MainTask_mianfeilibao()
 
     # 每日友情点
     youqingdain(Hwnd, Account)
