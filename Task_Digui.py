@@ -5,7 +5,7 @@ import ctypes
 import win32gui
 import config
 from datetime import datetime, timedelta, time
-from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, Itface_explore, read_config, write_config, check_lasttime, Esc_print, Sleep_print
+from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, Itface_explore, read_config, write_config, check_lasttime, Esc_print, Sleep_print, Team_Preset
 
 
 def MainTask_Digui():
@@ -46,6 +46,9 @@ def Diyuguiwang(current_state, Hwnd):
     """
     挑战地域鬼王
     """
+    print("        INFO- ----- 装配阴界编队")
+    Team_Preset(Hwnd, "日常编组", "阴界编队")
+
     print("        INFO- ----- 前往地鬼界面")
     Itface_explore(Hwnd)
 

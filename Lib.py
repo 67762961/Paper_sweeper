@@ -503,3 +503,77 @@ def Itface_explore(Hwnd):
     else:
         print("未检测到地鬼入口 似乎未进入探索界面")
         Esc_print(Hwnd)
+
+
+def Team_Preset(Hwnd, Preset_Group, Preset_name):
+    """
+    选择预设编组
+    :param Hwnd:            窗口句柄
+    :param Preset_name:     预设名称
+    """
+    Itface_scroll(Hwnd)
+    current_state = "庭院卷轴界面"
+    for step in range(30):
+        Sleep_print(1)
+        match current_state:
+            case "庭院卷轴界面":
+                Find = Find_Click_windows(Hwnd, "./pic/Main/Shishenlu.png", 0.05, "点击式神录", "未检测到式神录")
+                Sleep_print(1)
+                if Find:
+                    print("        STEP- vvvvv 跳转式神录界面")
+                    current_state = "式神录界面"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "式神录界面":
+                Find = Find_Click_windows(Hwnd, "./pic/Team/Yushexuanxiang.png", 0.05, "点击预设选项", "未检测到预设选项")
+                if Find:
+                    print("        STEP- vvvvv 跳转队伍预设")
+                    current_state = "队伍预设"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "队伍预设":
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, f"./pic/Team/{Preset_Group}.png", 0.01, 0)
+                if Range:
+                    Find = Find_Click_windows(Hwnd, f"./pic/Team/{Preset_Group}.png", 0.01, f"选择预设编组 {Preset_Group}", f"未检测到预设编组 {Preset_Group}")
+                    if Find:
+                        print("        STEP- vvvvv 跳转组内预设")
+                        current_state = "组内预设"
+                    else:
+                        print("        STEP- vvvvv 跳转异常退出界面")
+                        current_state = "异常退出"
+                else:
+                    print("        INFO-", Matchs, "似乎已经在预设组 ", Preset_Group, " 中")
+                    print("        STEP- vvvvv 跳转组内预设")
+                    current_state = "组内预设"
+            case "组内预设":
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, f"./pic/Team/{Preset_name}.png", 0.01, 0)
+                if Range:
+                    Find = Find_Click_windows(Hwnd, f"./pic/Team/{Preset_name}.png", 0.01, f"选择预设队伍 {Preset_name}", f"未检测到预设队伍 {Preset_name}")
+                    if Find:
+                        print("        STEP- vvvvv 跳转应用预设")
+                        current_state = "应用预设"
+                    else:
+                        print("        STEP- vvvvv 跳转异常退出界面")
+                        current_state = "异常退出"
+                else:
+                    print("        INFO-", Matchs, "似乎已经选中预设队伍 ", Preset_name)
+                    print("        STEP- vvvvv 跳转应用预设")
+                    current_state = "应用预设"
+            case "应用预设":
+                Find = Find_Click_windows(Hwnd, "./pic/Team/应用御魂预设.png", 0.03, "点击应用御魂预设", "未检测到应用御魂预设按钮")
+                if Find:
+                    Find = Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未检测到确定按钮 似乎本就已经装配该预设")
+                    print("        STEP- vvvvv 跳转结束界面")
+                    current_state = "结束"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "结束":
+                Esc_print(Hwnd)
+                print("        STEP- vvvvv 御魂预设", f"{Preset_Group}", f"{Preset_name}" " 装配完成")
+                return 1
+            case "异常退出":
+                Itface_Host(Hwnd)
+                return 0
