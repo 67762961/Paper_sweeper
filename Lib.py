@@ -37,7 +37,7 @@ def Esc_print(Hwnd):
     pydirectinput.press("esc")
     time.sleep(0.1)
     print("        QUIT- ccccc 按Esc退出")
-    Itface_Quit(Hwnd)
+    return Itface_Quit(Hwnd)
 
 
 def Find_windows(title):
@@ -163,6 +163,12 @@ def Find_in_windows(Hwnd, Model_path, Threshold, Flag_show):
 
 
 def Find_in_screen(Img_model_path, Threshold, Flag_show):
+    Range, Matchs = Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show)
+    print("        INFO-", Matchs, end=" ")
+    return Range
+
+
+def Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show):
     """
     全屏截图 找到与模板匹配的图片区域
     :param Img_model_path:  用来检测的模板图片的路径
@@ -192,7 +198,8 @@ def Find_in_screen(Img_model_path, Threshold, Flag_show):
     Left_up = min_loc
     Right_down = (min_loc[0] + Img_model_width, min_loc[1] + Img_model_height)
 
-    print("        INFO-", f"{min_val:.3f}", end=" ")
+    return2 = f"{min_val:.3f}"
+
     if Flag_show:
         # 图像上绘制边框
         cv2.rectangle(Img, Left_up, Right_down, (0, 0, 255), 2)
@@ -203,9 +210,11 @@ def Find_in_screen(Img_model_path, Threshold, Flag_show):
 
     # 过滤方差过大的匹配结果
     if min_val > Threshold:
-        return None
+        return1 = None
     else:
-        return Left_up, Right_down
+        return1 = Left_up, Right_down
+
+    return return1, return2
 
 
 def Click(Hwnd, Loc, Wait):
@@ -251,14 +260,12 @@ def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
 def Find_Click_screen(Model_path, Threshold, message_F, message_C):
     while not config.stop_thread:
         try:
-            Range = Find_in_screen(Model_path, Threshold, 0)
+            Range, Matchs = Find_in_screen_Matchs(Model_path, Threshold, 0)
             Click(None, Range, 1)
-            # pyautogui.moveTo(10, 10)
             print(message_F)
             return 1
         except:
             print(message_C)
-            # config.stop_thread = True
             return 0
 
 
@@ -356,11 +363,14 @@ def Itface_Quit(Hwnd):
     """
     time.sleep(0.5)
     # 注：此处退出界面条件可以极为苛刻 一般识别取值为0.006
-    if Find_in_screen("./pic/Main/Tuichuyouxi.png", 0.01, 0):
-        print("检测到退出界面")
+    Range, Matchs = Find_in_screen_Matchs("./pic/Main/Tuichuyouxi.png", 0.01, 0)
+    if Range:
+        print("        INFO-", Matchs, "检测到退出界面")
         Find_Click_windows(Hwnd, "./pic/Main/Quxiaotuichu.png", 0.03, "取消退出", "取消退出失败")
+        return 1
     else:
-        print("未检测到退出界面")
+        print("        INFO-", Matchs, "未检测到退出界面")
+        return 0
 
 
 def Itface_Host(Hwnd):
@@ -369,43 +379,66 @@ def Itface_Host(Hwnd):
     :param Hwnd:    窗口句柄
     :return: None
     """
-    Wait = 0
-    while True:
-        # Itface_Quit(Hwnd)
-        time.sleep(0.5)
+    for Wait in range(30):
         # 检测到庭院 退出循环
         ctypes.windll.user32.SetForegroundWindow(Hwnd)
-        if Find_in_windows(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0):
-            Itface = "Host"
-            print("检测到进入庭院")
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
+        if Range:
+            print("        INFO-", Matchs, "检测到进入庭院")
             return 1
-            break
-        Wait += 1
-        time.sleep(1)
+
+        Sleep_print(1)
 
         if Wait >= 3:
             # 按esc尝试回到主界面
+            print("        INFO-", Matchs, "未检测到进入庭院 尝试esc")
+            # 调用原始Esc不带退出界面检测
             pydirectinput.press("esc")
-            print("未检测到进入庭院 尝试esc")
-            Itface_Quit(Hwnd)
 
-            # 检测弹窗
-            Range = Find_in_windows(Hwnd, "./pic/Main/Cha.png", 0.06, 0)
-            if Range:
-                # 点击弹窗插
-                Click(Hwnd, Range, 1)
-                print("关闭弹窗")
-            else:
-                print("未检测到弹窗")
+            if Itface_Quit(Hwnd) == 1:
+                print("        INFO- ----- 似乎Esc退出失败 尝试识别退出按钮进入庭院")
+
+                # 检测弹窗
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Cha.png", 0.06, 0)
+                if Range:
+                    # 点击弹窗叉
+                    Click(Hwnd, Range, 1)
+                    print("        INFO-", Matchs, "关闭弹窗")
+                    Sleep_print(1)
+                    ctypes.windll.user32.SetForegroundWindow(Hwnd)
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
+                    if Range:
+                        print("        INFO-", Matchs, "检测到进入庭院")
+                        return 1
+                else:
+                    print("        INFO-", Matchs, "未检测到弹窗")
+
+                # 检测退出标志1
+                Find_Click_windows(Hwnd, "./pic/Main/退出标志1.png", 0.05, "点击退出标志1", "未发现退出标志1")
+                Sleep_print(1)
+                ctypes.windll.user32.SetForegroundWindow(Hwnd)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
+                if Range:
+                    print("        INFO-", Matchs, "检测到进入庭院")
+                    return 1
+
+                # 检测退出标志2
+                Find_Click_windows(Hwnd, "./pic/Main/退出标志2.png", 0.05, "点击退出标志2", "未发现退出标志2")
+                Sleep_print(1)
+                ctypes.windll.user32.SetForegroundWindow(Hwnd)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
+                if Range:
+                    print("        INFO-", Matchs, "检测到进入庭院")
+                    return 1
+
         else:
-            print("未检测到进入庭院")
+            print("        INFO- ----- 未检测到进入庭院")
 
         # 30s未检测到 超时退出
         if Wait >= 30:
             Wait = 0
-            print("EROR- ***** 进入庭院 超时退出 ********************************")
+            print("        EROR- ***** 进入庭院 超时退出 ********************************")
             return 0
-            exit()
 
 
 def Itface_scroll(Hwnd):
@@ -418,21 +451,21 @@ def Itface_scroll(Hwnd):
     Itface_Host(Hwnd)
 
     # 检测底部卷轴是否展开
-    Range = Find_in_windows(Hwnd, "./pic/Main/Shishenlu.png", 0.05, 0)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Shishenlu.png", 0.05, 0)
     if not Range:
-        print("检测到卷轴尚未打开 点击打开卷轴")
+        print("        INFO-", Matchs, "检测到卷轴尚未打开 点击打开卷轴")
         # 坐标法点击展开卷轴
         Range = ((1780, 970), (1910, 1120))
         Click(Hwnd, Range, 2)
 
-        Range = Find_in_windows(Hwnd, "./pic/Main/Shishenlu.png", 0.05, 0)
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Shishenlu.png", 0.05, 0)
         if Range:
-            print("检测到卷轴已经打开")
+            print("        INFO-", Matchs, "检测到卷轴已经打开")
         else:
-            print("打开卷轴失败")
+            print("        INFO-", Matchs, "打开卷轴失败")
             return 0
     else:
-        print("检测到卷轴已经打开")
+        print("        INFO-", Matchs, "检测到卷轴已经打开")
         return 1
 
 
@@ -446,14 +479,14 @@ def Itface_guild(Hwnd):
     Itface_scroll(Hwnd)
 
     # 进入阴阳寮
-    Range = Find_in_windows(Hwnd, "./pic/Sis/Yinyangliao.png", 0.05, 0)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yinyangliao.png", 0.05, 0)
     if Range:
         Click(Hwnd, Range, 1)
-        print("进入阴阳寮")
+        print("        INFO-", Matchs, "进入阴阳寮")
         time.sleep(1)
         return 1
     else:
-        print("进入阴阳寮失败")
+        print("        INFO-", Matchs, "进入阴阳寮失败")
         return 0
 
 
@@ -497,11 +530,11 @@ def Itface_explore(Hwnd):
     Sleep_print(3)
     Esc_print(Hwnd)
     Sleep_print(1)
-
-    if Find_in_windows(Hwnd, "./pic/Digui/Diguitubiao.png", 0.05, 0):
-        print("检测到地鬼入口 已进入探索界面")
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Digui/Diguitubiao.png", 0.05, 0)
+    if Range:
+        print("        INFO-", Matchs, "检测到地鬼入口 已进入探索界面")
     else:
-        print("未检测到地鬼入口 似乎未进入探索界面")
+        print("        INFO-", Matchs, "未检测到地鬼入口 似乎未进入探索界面")
         Esc_print(Hwnd)
 
 

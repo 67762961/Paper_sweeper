@@ -138,7 +138,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                 Esc_print(Hwnd)
                 Sleep_print(2)
                 for i in range(5):
-                    Find = Find_Click_windows(Hwnd, "./pic/Sis/Tuichu.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
+                    Find = Find_Click_windows(Hwnd, "./pic/Main/退出标志2.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
                     if Find:
                         Sleep_print(1)
                         break
@@ -152,7 +152,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                 Esc_print(Hwnd)
                 Sleep_print(2)
                 for i in range(5):
-                    Find = Find_Click_windows(Hwnd, "./pic/Sis/Tuichu.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
+                    Find = Find_Click_windows(Hwnd, "./pic/Main/退出标志2.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
                     if Find:
                         Sleep_print(1)
                         break
