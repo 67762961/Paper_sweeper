@@ -135,7 +135,7 @@ def Diyuguiwang(current_state, Hwnd):
 
                     Find_Click_windows(Hwnd, "./pic/Team/Richangbianzu.png", 0.05, "点击日常编组", "似乎已经在日常编组中")
 
-                    if not Find_Click_windows(Hwnd, "./pic/Team/Jiejiedui.png", 0.05, "点击结界队", "未检测到结界队图标"):
+                    if not Find_Click_windows(Hwnd, "./pic/Team/阴界队出战.png", 0.05, "点阴界队", "未检测到阴界队图标"):
                         print("        STEP- vvvvv 跳转异常退出界面")
                         current_state = "异常退出"
                         break
