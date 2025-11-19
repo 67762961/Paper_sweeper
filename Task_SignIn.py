@@ -216,7 +216,7 @@ def Qiandao(Hwnd, Account):
                         Sleep_print(0.5)
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        return 0
+                        return 1
         else:
             Sleep_print(0.1)
     return 0
