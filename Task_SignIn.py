@@ -430,8 +430,9 @@ def youqingdain(Hwnd, Account):
             case "祝福界面":
                 Find_Click_windows(Hwnd, "./pic/Sign/Zhufu.png", 0.05, "祝福", "未检测到祝福")
                 Sleep_print(1)
-                if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
-                    print("一键祝福成功")
+                Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+                if Find:
+                    print("        INFO-", Matchs, "一键祝福成功")
                     flag_jiwen = 1
                     Esc_print(Hwnd)
                     Sleep_print(0.5)
@@ -450,9 +451,10 @@ def youqingdain(Hwnd, Account):
                         print("已正常退出吉闻界面")
                 current_state = "好友界面"
             case "友情点界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Sign/Yijianshouqu.png", 0.05, "一键收取", "未检测到一键收取")
-                if Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0):
-                    print("一键收取成功")
+                Find_Click_windows(Hwnd, "./pic/Sign/Yijianshouqu.png", 0.05, "一键收取", "未检测到一键收取")
+                Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+                if Find:
+                    print("        INFO-", Matchs, "一键收取成功")
                     flag_youqingdian = 1
                     Esc_print(Hwnd)
                     Sleep_print(0.5)
