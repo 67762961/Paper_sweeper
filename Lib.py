@@ -379,6 +379,7 @@ def Itface_Host(Hwnd):
     :param Hwnd:    窗口句柄
     :return: None
     """
+    round = 0
     for Wait in range(30):
         # 检测到庭院 退出循环
         ctypes.windll.user32.SetForegroundWindow(Hwnd)
@@ -395,41 +396,28 @@ def Itface_Host(Hwnd):
             # 调用原始Esc不带退出界面检测
             pydirectinput.press("esc")
 
-            if Itface_Quit(Hwnd) == 1:
+            if Itface_Quit(Hwnd) or round >= 3:
                 print("        INFO- ----- 似乎Esc退出失败 尝试识别退出按钮进入庭院")
 
                 # 检测弹窗
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Cha.png", 0.06, 0)
+                Range = Find_Click_windows(Hwnd, "./pic/Main/Cha.png", 0.06, "关闭弹窗", "未检测到弹窗")
+                Sleep_print(1)
                 if Range:
-                    # 点击弹窗叉
-                    Click(Hwnd, Range, 1)
-                    print("        INFO-", Matchs, "关闭弹窗")
-                    Sleep_print(1)
-                    ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
-                    if Range:
-                        print("        INFO-", Matchs, "检测到进入庭院")
-                        return 1
-                else:
-                    print("        INFO-", Matchs, "未检测到弹窗")
+                    return Itface_Host(Hwnd)
 
                 # 检测退出标志1
-                Find_Click_windows(Hwnd, "./pic/Main/退出标志1.png", 0.05, "点击退出标志1", "未发现退出标志1")
+                Range = Find_Click_windows(Hwnd, "./pic/Main/退出标志1.png", 0.05, "点击退出标志1", "未发现退出标志1")
                 Sleep_print(1)
-                ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
                 if Range:
-                    print("        INFO-", Matchs, "检测到进入庭院")
-                    return 1
+                    return Itface_Host(Hwnd)
 
                 # 检测退出标志2
-                Find_Click_windows(Hwnd, "./pic/Main/退出标志2.png", 0.05, "点击退出标志2", "未发现退出标志2")
+                Range = Find_Click_windows(Hwnd, "./pic/Main/退出标志2.png", 0.05, "点击退出标志2", "未发现退出标志2")
                 Sleep_print(1)
-                ctypes.windll.user32.SetForegroundWindow(Hwnd)
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
                 if Range:
-                    print("        INFO-", Matchs, "检测到进入庭院")
-                    return 1
+                    return Itface_Host(Hwnd)
+            else:
+                round += 1
 
         else:
             print("        INFO- ----- 未检测到进入庭院")
