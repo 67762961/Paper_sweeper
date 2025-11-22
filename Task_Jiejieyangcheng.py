@@ -336,7 +336,6 @@ def Yucheng(current_state, Hwnd):
                     Find = Find_Click_windows(Hwnd, "./pic/Sis/Shishenyucheng.png", 0.05, "检测到进入结界育成界面", "未检测到进入结界育成界面")
                     if Find:
                         print("        STEP- vvvvv 跳转育成界面")
-                        Sleep_print(1)
                         current_state = "育成界面"
                         break
                     else:
@@ -377,7 +376,6 @@ def Yucheng(current_state, Hwnd):
                             break
                 else:
                     print("        STEP- vvvvv 跳转寄养任务")
-                    Sleep_print(1)
                     current_state = "寄养任务"
 
             case "寄养任务":
@@ -423,7 +421,6 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     Find = Find_Click_windows(Hwnd, "./pic/Sis/Shishenyucheng.png", 0.05, "检测到进入结界育成界面", "未检测到进入结界育成界面")
                     if Find:
                         print("        STEP- vvvvv 跳转育成界面")
-                        Sleep_print(1)
                         current_state = "育成界面"
                         break
                     else:
@@ -438,7 +435,6 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                 Find = Find_Click_windows(Hwnd, "./pic/Sis/Jiyangrukou.png", 0.05, "检测到寄养空位", "已经有寄养")
                 if Find:
                     print("        STEP- vvvvv 跳转寄养列表")
-                    Sleep_print(1)
                     current_state = "寄养列表"
                 else:
                     print("        STEP- vvvvv 寄养任务完成")
@@ -462,7 +458,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     Str1 = "检测到" + string
                     Str2 = "未检测到" + string
                     Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
-                    if Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2):
+                    if Find:
                         if Find_Click_windows(Hwnd, "./pic/Sis/Jinrujiejie.png", 0.05, "点击进入结界", "点击进入结界异常"):
                             Sleep_print(2)
                             break
@@ -477,7 +473,6 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
 
                 if Find:
                     print("        STEP- vvvvv 跳转寄养结界")
-                    Sleep_print(1)
                     current_state = "寄养结界"
                 else:
                     print("        STEP- vvvvv 跳转异常退出界面")
