@@ -1,11 +1,5 @@
-import Lib
-import pyautogui
-import pydirectinput
-import ctypes
-import win32gui
-import config
-from datetime import datetime, timedelta, time
-from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, Itface_explore, read_config, write_config, check_lasttime, Esc_print, Sleep_print, Team_Preset
+from datetime import datetime, time
+from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_explore, read_config, write_config, check_lasttime, Esc_print, Sleep_print, Team_Preset
 
 
 def MainTask_Digui():

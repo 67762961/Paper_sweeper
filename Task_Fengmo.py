@@ -1,11 +1,5 @@
-import Lib
-import pyautogui
-import pydirectinput
-import ctypes
-import win32gui
-import config
-from datetime import datetime, timedelta, time
-from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, Itface_explore, Itface_daily, read_config, write_config, check_lasttime, Esc_print, Sleep_print
+from datetime import datetime, time
+from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_daily, read_config, write_config, check_lasttime, Esc_print, Sleep_print
 
 
 def MainTask_Fengmo():
@@ -91,7 +85,6 @@ def meirifengmo(Hwnd):
             if Range:
                 print("        INFO-", Matchs, "逢魔奖励领取成功")
                 Sleep_print(2)
-                ctypes.windll.user32.SetForegroundWindow(Hwnd)
                 Esc_print(Hwnd)
                 break
             else:
@@ -158,7 +151,6 @@ def fengmoboss(Hwnd):
                     return 1
                 else:
                     print("        INFO-", Matchs, "未进入备战场景")
-                    ctypes.windll.user32.SetForegroundWindow(Hwnd)
                     Esc_print(Hwnd)
                     Sleep_print(0.5)
                     p = 0

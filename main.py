@@ -1,18 +1,7 @@
-import time
-import ctypes
-import win32api
-import win32con
-import win32gui
 import sys
-import pyautogui
-import pydirectinput
-import win32process
-import config
 import os
-import subprocess
 import datetime
-from Lib import Find_windows, read_config, write_config
-from contextlib import redirect_stdout
+from Lib import Find_windows, read_config
 from Task_SignIn import MainTask_Signin
 from Task_Fengmo import MainTask_Fengmo
 from Task_Digui import MainTask_Digui

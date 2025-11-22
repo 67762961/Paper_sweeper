@@ -1,7 +1,3 @@
-import pyautogui
-import pydirectinput
-import ctypes
-import win32gui
 from datetime import datetime, timedelta
 from Lib import Find_in_windows_Matchs, Find_windows, Find_Click_windows, Click, Itface_Host, read_config, write_config, Itface_scroll, check_lasttime, Sleep_print, Esc_print
 

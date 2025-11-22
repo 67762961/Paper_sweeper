@@ -1,8 +1,5 @@
 import Lib
-import pyautogui
-import pydirectinput
 from Lib import Sleep_print
-from Lib import get_path
 
 
 def MainTask_Thirty(Hwnd):
