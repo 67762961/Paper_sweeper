@@ -53,7 +53,7 @@ def Find_windows(title):
     return hwnds[0] if hwnds else None
 
 
-def cv_imread_chinese(file_path):
+def Img_read_ch(file_path):
     """读取包含中文路径的图片"""
     # 使用numpy从二进制数据读取
     with open(file_path, "rb") as f:
@@ -62,87 +62,50 @@ def cv_imread_chinese(file_path):
     return img
 
 
-def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
+def Match_model(Img, Img_model_path, Threshold, Flag_show):
     """
-    全屏截图 找到与模板匹配的图片区域
-    :param Hwnd:            窗口句柄
-    :param Model_path:      用来检测的模板图片的路径
-    :param Threshold:       匹配的方差阈值 越小越好
-    :param Flag_show:       是否输出框选后图片 1为输出
-    :return:                返回检测到的区域范围坐标左上和右下
+    内部模板匹配函数
+    :param is_window_match: 是否为窗口匹配（用于控制是否显示内部点击区域）
     """
-
-    # 获取窗口位置和大小（考虑 DPI 缩放）
-    window_rect = win32gui.GetWindowRect(Hwnd)
-    left, top, right, bottom = window_rect
-
-    # 获取DPI缩放因子
-    # dpi_scale = win32api.GetDeviceCaps(win32api.GetDC(Hwnd), win32con.LOGPIXELSX) / 96.0
-    # 此处因为不明原因无法获取 1K分辨路下默认缩放为0.5
-    # dpi_scale = 0.5
-    dpi_scale = 1
-
-    # 计算实际截图大小，考虑DPI缩放
-    width = int((right - left) * dpi_scale)
-    height = int((bottom - top) * dpi_scale)
-
-    # 使用BitBlt截取窗口图像
-    hdc_window = win32gui.GetWindowDC(Hwnd)
-    hdc_mfc = win32ui.CreateDCFromHandle(hdc_window)
-    memdc = hdc_mfc.CreateCompatibleDC()
-    bmp = win32ui.CreateBitmap()
-    bmp.CreateCompatibleBitmap(hdc_mfc, width, height)
-    memdc.SelectObject(bmp)
-    memdc.BitBlt((0, 0), (width, height), hdc_mfc, (0, 0), win32con.SRCCOPY)
-
-    # 将截图数据转换为OpenCV可以处理的格式
-    bmp_info = bmp.GetInfo()
-    bmp_str = bmp.GetBitmapBits(True)
-    screenshot = np.frombuffer(bmp_str, dtype=np.uint8).reshape((height, width, 4))
-
-    # 将RGBA格式的 screenshot 转换为RGB格式
-    Img = cv2.cvtColor(screenshot, cv2.COLOR_RGBA2RGB)
-
-    # 根据DPI缩放因子调整图像大小
-    Img = cv2.resize(Img, (int(width / dpi_scale), int(height / dpi_scale)))
-
-    # 加载图像模板 并读取宽高
-    Img_model = cv_imread_chinese(Model_path)
+    # 加载图像模板
+    Img_model = Img_read_ch(Img_model_path)
     if Img_model is None:
         raise ValueError(f"无法找到文件: {Img_model_path}")
+
     Img_model_height, Img_model_width = Img_model.shape[0:2]
 
-    # 确保 Img 和 Img_model 的数据类型为 np.uint8
+    # 确保数据类型为 np.uint8
     Img = np.uint8(Img)
     Img_model = np.uint8(Img_model)
 
-    # 进行模板匹配 归一化平方差匹配方法 越小越好
+    # 进行模板匹配
     Result = cv2.matchTemplate(Img, Img_model, cv2.TM_SQDIFF_NORMED)
 
-    # 获取匹配结果中的最大值、最小值及其位置
+    # 获取匹配结果
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(Result)
 
     # 确定识别到的区域
     Left_up = min_loc
     Right_down = (min_loc[0] + Img_model_width, min_loc[1] + Img_model_height)
 
-    click_Left_up = (int(min_loc[0] + Img_model_width / 4), int(min_loc[1] + Img_model_height / 4))
-    click_Right_down = (int(min_loc[0] + 3 * Img_model_width / 4), int(min_loc[1] + 3 * Img_model_height / 4))
-
+    # 显示结果
     if Flag_show:
-        # 在图像上绘制边框，并显示截取窗口部分的图像
         cv2.rectangle(Img, Left_up, Right_down, (0, 0, 255), 2)
+
+        # 计算点击区域（与Click函数中的计算一致）
+        Width = Right_down[0] - Left_up[0]
+        Height = Right_down[1] - Left_up[1]
+        click_Left_up = (int(Left_up[0] + Width / 4), int(Left_up[1] + Height / 4))
+        click_Right_down = (int(Left_up[0] + 3 * Width / 4), int(Left_up[1] + 3 * Height / 4))
         cv2.rectangle(Img, click_Left_up, click_Right_down, (0, 255, 0), 2)
 
-        # 显示标记后的图像
         cv2.imshow("Output", Img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    # print("INFO-", f"{min_val:.3f}", end=" ")
+    # 返回结果
     return2 = f"{min_val:.3f}"
 
-    # 过滤方差过大的匹配结果
     if min_val > Threshold:
         return1 = None
     else:
@@ -151,73 +114,43 @@ def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     return return1, return2
 
 
-def Find_in_windows(Hwnd, Model_path, Threshold, Flag_show):
-    Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show)
-    print("        INFO-", Matchs, end=" ")
-    return Range
+def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
+    """
+    窗口内截图并找到与模板匹配的图片区域
+    """
+    # 获取窗口位置和大小
+    window_rect = win32gui.GetWindowRect(Hwnd)
+    left, top, right, bottom = window_rect
 
+    # 直接在全屏截图中截取窗口区域
+    Screenshot = pyautogui.screenshot(region=(left, top, right - left, bottom - top))
 
-def Find_in_screen(Img_model_path, Threshold, Flag_show):
-    Range, Matchs = Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show)
-    print("        INFO-", Matchs, end=" ")
-    return Range
+    # 转换为OpenCV格式
+    Img = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
+
+    # 调用内部模板匹配函数 并标记为窗口匹配
+    return Match_model(Img, Model_path, Threshold, Flag_show)
 
 
 def Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show):
     """
-    全屏截图 找到与模板匹配的图片区域
-    :param Img_model_path:  用来检测的模板图片的路径
-    :param Threshold:       匹配的方差阈值 越小越好
-    :param Flag_show:       是否输出框选后图片 1为输出
-    :return: 返回检测到的区域范围坐标左上和右下
+    全屏截图并找到与模板匹配的图片区域
     """
     # 截取屏幕
     Screenshot = pyautogui.screenshot()
 
-    # 将 PIL.Image.Image RGB 对象转换为 OpenCV 的 BGR NumPy 数组
+    # 转换为OpenCV格式
     Img = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
 
-    # 加载图像模板 并读取宽高
-    Img_model = cv_imread_chinese(Img_model_path)
-    if Img_model is None:
-        raise ValueError(f"无法找到文件: {Img_model_path}")
-    Img_model_height, Img_model_width = Img_model.shape[0:2]
-
-    # 进行模板匹配 归一化平方差匹配方法 越小越好
-    Result = cv2.matchTemplate(Img, Img_model, cv2.TM_SQDIFF_NORMED)
-
-    # 获取匹配结果中的最大值、最小值及其位置
-    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(Result)
-
-    # 确定识别到的区域
-    Left_up = min_loc
-    Right_down = (min_loc[0] + Img_model_width, min_loc[1] + Img_model_height)
-
-    return2 = f"{min_val:.3f}"
-
-    if Flag_show:
-        # 图像上绘制边框
-        cv2.rectangle(Img, Left_up, Right_down, (0, 0, 255), 2)
-
-        # 输出标记区域后图案
-        cv2.imshow("Output", Img)
-        cv2.waitKey(0)
-
-    # 过滤方差过大的匹配结果
-    if min_val > Threshold:
-        return1 = None
-    else:
-        return1 = Left_up, Right_down
-
-    return return1, return2
+    return Match_model(Img, Img_model_path, Threshold, Flag_show)
 
 
-def Click(Hwnd, Loc, Wait):
+def Move_to_range(Hwnd, Loc):
     """
-    接受一个坐标元组 自动点击
-    :param Loc:     坐标元组
-    :param Wait:    点击后自动延时的等待时间
-    :return: None
+    计算点击位置并移动鼠标到该位置
+    :param Hwnd: 窗口句柄 如果为None则使用屏幕坐标
+    :param Loc: 坐标元组 格式为[(左上x,左上y), (右下x,右下y)]
+    :return: 移动到的目标坐标 (x, y)
     """
     if Hwnd:
         # 计算点击区域在窗口内的绝对坐标
@@ -226,15 +159,33 @@ def Click(Hwnd, Loc, Wait):
     else:
         window_x, window_y = 0, 0
 
-    # 计算出识别区域长宽 然后点击区域中随机坐标
+    # 计算出识别区域长宽
     Width = Loc[1][0] - Loc[0][0]
     Height = Loc[1][1] - Loc[0][1]
 
-    loc_x = window_x + Loc[0][0] + Width / 4 + random.randint(0, Width) / 2
-    loc_y = window_y + Loc[0][1] + Height / 4 + random.randint(0, Height) / 2
+    # 计算点击区域（在识别区域内部的1/4到3/4范围内随机点击）
+    target_x = window_x + Loc[0][0] + Width / 4 + random.randint(0, Width) / 2
+    target_y = window_y + Loc[0][1] + Height / 4 + random.randint(0, Height) / 2
 
-    # 点击窗口内的指定区域
-    pyautogui.click(x=loc_x, y=loc_y, button="left")
+    # 移动鼠标到目标位置
+    pyautogui.moveTo(x=target_x, y=target_y)
+
+    return target_x, target_y
+
+
+def Click(Hwnd, Loc, Wait):
+    """
+    接受一个坐标元组 自动点击
+    :param Hwnd: 窗口句柄 如果为None则使用屏幕坐标
+    :param Loc: 坐标元组 格式为[(左上x,左上y), (右下x,右下y)]
+    :param Wait: 点击后自动延时的等待时间
+    :return: None
+    """
+    # 先移动鼠标到目标位置
+    Move_to_range(Hwnd, Loc)
+
+    # 执行点击操作
+    pyautogui.click(button="left")
     time.sleep(Wait)
 
 
@@ -243,12 +194,10 @@ def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
         try:
             Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
             Click(Hwnd, Range, 1)
-            # pyautogui.moveTo(10, 10)
             print("        INFO-", Matchs, message_F)
             return 1
         except:
             print("        INFO-", Matchs, message_C)
-            # config.stop_thread = True
             return 0
 
 
@@ -285,7 +234,7 @@ def write_config(FILE_PATH, data):
 
 def check_lasttime(Account, Times_name):
     """
-    检测上次运行的时间，如果文件或配置不存在则自动创建
+    检测上次运行的时间 如果文件或配置不存在则自动创建
     """
     file_path = "./config/Last_times.json"
 
@@ -299,9 +248,9 @@ def check_lasttime(Account, Times_name):
             print("无法创建目录 ", config_dir, ":", e)
             return datetime(2000, 1, 1, 0, 0)
 
-    # 检查文件是否存在，不存在则创建[1,9](@ref)
+    # 检查文件是否存在 不存在则创建[1,9](@ref)
     if not os.path.exists(file_path):
-        print("配置文件不存在，创建新文件: ", file_path)
+        print("配置文件不存在 创建新文件: ", file_path)
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump({}, f, ensure_ascii=False, indent=4)
@@ -310,7 +259,7 @@ def check_lasttime(Account, Times_name):
             print("创建配置文件失败: ", e)
             return datetime(2000, 1, 1, 0, 0)
     else:
-        # 文件存在，正常读取
+        # 文件存在 正常读取
         try:
             with open(file_path, "r", encoding="utf-8") as file:
                 content = file.read().strip()
@@ -319,7 +268,7 @@ def check_lasttime(Account, Times_name):
                 else:
                     config = json.loads(content)
         except (json.JSONDecodeError, KeyError) as e:
-            print("配置文件格式错误，将重置: ", e)
+            print("配置文件格式错误 将重置: ", e)
             config = {}
         except Exception as e:
             print("读取配置文件失败: ", e)
@@ -560,7 +509,7 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
                         print("        STEP- vvvvv 跳转异常退出界面")
                         current_state = "异常退出"
                 else:
-                    print("        INFO-", Matchs, "似乎已经在预设组 ", Preset_Group, " 中")
+                    print("        INFO-", Matchs, "似乎已经在预设组", Preset_Group, "中")
                     print("        STEP- vvvvv 跳转组内预设")
                     current_state = "组内预设"
             case "组内预设":
