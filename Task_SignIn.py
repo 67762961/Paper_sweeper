@@ -20,7 +20,7 @@ def MainTask_Mail():
         print("        TIME- ----- 读取上次账号", Account, "完成邮件时间")
         Times_youjian = check_lasttime(Account, "邮件领取")
         current_time = datetime.now()
-        if abs(current_time - Times_youjian) >= timedelta(hours=6):
+        if abs(current_time - Times_youjian) >= timedelta(hours=1):
             Hwnd = Find_windows(Account)
             if Work_Mail(Hwnd, Account):
                 # 更新配置 写入当前时间
@@ -34,7 +34,7 @@ def MainTask_Mail():
             else:
                 print("        TASK- ----- 邮件领取任务执行过程中出现错误 中断任务 --------------------------------")
         else:
-            print("        SKIP- ----- 邮件查看时间间隔未满六小时 跳过 --------------------------------")
+            print("        SKIP- ----- 邮件查看时间间隔未满一小时 跳过 --------------------------------")
 
 
 def Work_Mail(Hwnd, Account):
