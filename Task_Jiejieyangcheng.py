@@ -7,8 +7,8 @@ def MainTask_Jiejieyangcheng():
     结界养成主任务
     """
     print("        ")
+    print("TASK- ----- 开始结界养成任务 ----------------------------------------------------------------")
     current_time = datetime.now()
-    print("TASK- ----- 开始执行结界养成任务")
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
     for Account in headers:
@@ -26,11 +26,12 @@ def MainTask_Jiejieyangcheng():
                 write_config("./config/Last_times.json", config)
                 print("        TIME- ----- 本次结界养成完成时间")
                 print("        TIME- ----- ", Now)
-                print("        TASK- ----- 结界养成任务完成 --------------------------------")
+                print("        TASK- ----- 结界养成任务完成")
             else:
-                print("        TASK- ----- 结界养成任务执行过程中出现错误 中断任务 --------------------------------")
+                print("        TASK- ----- 结界养成任务执行过程中出现错误 中断任务")
         else:
-            print("        SKIP- ----- 结界养成任务时间间隔未满六小时 跳过 --------------------------------")
+            print("        SKIP- ----- 结界养成任务时间间隔未满六小时 跳过")
+    print("TASK- ----- 结界养成任务结束 ----------------------------------------------------------------")
 
 
 def Jiejieyangcheng(current_state, Hwnd):

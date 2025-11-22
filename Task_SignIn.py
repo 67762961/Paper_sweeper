@@ -2,13 +2,32 @@ from datetime import datetime, timedelta
 from Lib import Find_in_windows_Matchs, Find_windows, Find_Click_windows, Click, Itface_Host, read_config, write_config, Itface_scroll, check_lasttime, Sleep_print, Esc_print
 
 
+def MainTask_Signin():
+    """
+    完成每日登录所有领取项
+    @param Hwnd:    窗口句柄
+    """
+
+    MainTask_Mail()
+
+    MainTask_Qiandao()
+
+    MainTask_Fudai()
+
+    MainTask_Zhiren()
+
+    MainTask_mianfeilibao()
+
+    MainTask_youqingdain()
+
+
 def MainTask_Mail():
     """
     邮件主任务
     """
     print("        ")
+    print("TASK- ----- 开始执行邮件任务  ----------------------------------------------------------------")
     current_time = datetime.now()
-    print("TASK- ----- 开始执行邮件任务")
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
     for Account in headers:
@@ -26,11 +45,12 @@ def MainTask_Mail():
                 write_config("./config/Last_times.json", config)
                 print("        TIME- ----- 本次邮件领取时间")
                 print("        TIME- ----- ", Now)
-                print("        TASK- ----- 邮件领取完成 --------------------------------")
+                print("        TASK- ----- 邮件领取完成")
             else:
-                print("        TASK- ----- 邮件领取任务执行过程中出现错误 中断任务 --------------------------------")
+                print("        TASK- ----- 邮件领取任务执行过程中出现错误 中断任务")
         else:
-            print("        SKIP- ----- 邮件查看时间间隔未满一小时 跳过 --------------------------------")
+            print("        SKIP- ----- 邮件查看时间间隔未满一小时 跳过")
+    print("TASK- ----- 邮件任务执行完毕  ----------------------------------------------------------------")
 
 
 def Work_Mail(Hwnd, Account):
@@ -105,8 +125,8 @@ def MainTask_Fudai():
     福袋主任务
     """
     print("        ")
+    print("TASK- ----- 开始执行福袋任务 ----------------------------------------------------------------")
     current_time = datetime.now()
-    print("TASK- ----- 开始福袋任务")
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
 
@@ -126,11 +146,12 @@ def MainTask_Fudai():
                 write_config("./config/Last_times.json", config)
                 print("        TIME- ----- 本次福袋小纸人领取时间: ")
                 print("        TIME- ----- ", Now)
-                print("        TASK- ----- 福袋小纸人领取成功 --------------------------------")
+                print("        TASK- ----- 福袋小纸人领取成功")
             else:
-                print("        TASK- ----- 福袋小纸人领取任务执行过程中出现错误 中断任务 --------------------------------")
+                print("        TASK- ----- 福袋小纸人领取任务执行过程中出现错误 中断任务")
         else:
-            print("        SKIP- ----- 今天已经领取过福袋纸人 跳过 --------------------------------")
+            print("        SKIP- ----- 今天已经领取过福袋纸人 跳过")
+    print("TASK- ----- 福袋任务执行完毕 ----------------------------------------------------------------")
 
 
 def Fudai(Hwnd, Account):
@@ -159,8 +180,8 @@ def MainTask_Qiandao():
     签到主任务
     """
     print("        ")
+    print("TASK- ----- 开始执行签到任务 ----------------------------------------------------------------")
     current_time = datetime.now()
-    print("TASK- ----- 开始签到任务")
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
 
@@ -180,11 +201,12 @@ def MainTask_Qiandao():
                 write_config("./config/Last_times.json", config)
                 print("        TIME- ----- 本次每日一签时间: ")
                 print("        TIME- ----- ", Now)
-                print("        TASK- ----- 每日一签成功 --------------------------------")
+                print("        TASK- ----- 每日一签成功")
             else:
-                print("        TASK- ----- 每日一签任务执行过程中出现错误 中断任务 --------------------------------")
+                print("        TASK- ----- 每日一签任务执行过程中出现错误 中断任务")
         else:
-            print("        SKIP- ----- 今天已经完成每日一签 跳过 --------------------------------")
+            print("        SKIP- ----- 今天已经完成每日一签 跳过")
+    print("TASK- ----- 每日一签执行完毕 ----------------------------------------------------------------")
 
 
 def Qiandao(Hwnd, Account):
@@ -223,8 +245,8 @@ def MainTask_Zhiren():
     纸人奖励主任务
     """
     print("        ")
+    print("TASK- ----- 开始领取纸人奖励 ----------------------------------------------------------------")
     current_time = datetime.now()
-    print("TASK- ----- 开始领取纸人奖励")
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
 
@@ -234,9 +256,10 @@ def MainTask_Zhiren():
         if zhirenjiangli(Hwnd):
             Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print("        TIME- ----- ", Now)
-            print("        TASK- ----- 纸人奖励领取成功 --------------------------------")
+            print("        TASK- ----- 纸人奖励领取成功")
         else:
-            print("        TASK- ----- 纸人奖励领取任务执行过程中出现错误 中断任务 --------------------------------")
+            print("        TASK- ----- 纸人奖励领取任务执行过程中出现错误 中断任务")
+    print("TASK- ----- 纸人奖励领取完毕 ----------------------------------------------------------------")
 
 
 def zhirenjiangli(Hwnd):
@@ -277,8 +300,8 @@ def MainTask_mianfeilibao():
     商店免费礼包主任务
     """
     print("        ")
+    print("TASK- ----- 开始领取商店礼包 ----------------------------------------------------------------")
     current_time = datetime.now()
-    print("TASK- ----- 开始领取商店免费礼包")
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
 
@@ -298,11 +321,12 @@ def MainTask_mianfeilibao():
                 write_config("./config/Last_times.json", config)
                 print("        TIME- ----- 本次商店免费礼包领取时间: ")
                 print("        TIME- ----- ", Now)
-                print("        TASK- ----- 商店免费礼包领取成功 --------------------------------")
+                print("        TASK- ----- 商店免费礼包领取成功")
             else:
-                print("        TASK- ----- 商店免费礼包任务执行过程中出现错误 中断任务 --------------------------------")
+                print("        TASK- ----- 商店免费礼包任务执行过程中出现错误 中断任务")
         else:
-            print("        SKIP- ----- 今天已经领取过商店免费礼包 跳过 --------------------------------")
+            print("        SKIP- ----- 今天已经领取过商店免费礼包 跳过")
+    print("TASK- ----- 商店礼包领取完毕 ----------------------------------------------------------------")
 
 
 def mianfeilibao(Hwnd, Account):
@@ -354,8 +378,8 @@ def MainTask_youqingdain():
     友情点主任务
     """
     print("        ")
+    print("TASK- ----- 开始领取友情奖励 ----------------------------------------------------------------")
     current_time = datetime.now()
-    print("TASK- ----- 开始领取友情点以及吉闻祝福")
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
 
@@ -375,11 +399,12 @@ def MainTask_youqingdain():
                 write_config("./config/Last_times.json", config)
                 print("        TIME- ----- 本次领取友情点以及吉闻祝福时间: ")
                 print("        TIME- ----- ", Now)
-                print("        TASK- ----- 友情点以及吉闻祝福领取成功 --------------------------------")
+                print("        TASK- ----- 友情点以及吉闻祝福领取成功")
             else:
-                print("        TASK- ----- 领取友情点以及吉闻祝福任务执行过程中出现错误 中断任务 --------------------------------")
+                print("        TASK- ----- 领取友情点以及吉闻祝福任务执行过程中出现错误 中断任务")
         else:
-            print("        SKIP- ----- 今天已经领取过友情点以及吉闻祝福 跳过 --------------------------------")
+            print("        SKIP- ----- 今天已经领取过友情点以及吉闻祝福 跳过")
+    print("TASK- ----- 友情奖励领取完毕 ----------------------------------------------------------------")
 
 
 def youqingdain(Hwnd, Account):
@@ -465,22 +490,3 @@ def youqingdain(Hwnd, Account):
                     Itface_Host(Hwnd)
                     return 1
     return 0
-
-
-def MainTask_Signin():
-    """
-    完成每日登录所有领取项
-    @param Hwnd:    窗口句柄
-    """
-
-    MainTask_Mail()
-
-    MainTask_Qiandao()
-
-    MainTask_Fudai()
-
-    MainTask_Zhiren()
-
-    MainTask_mianfeilibao()
-
-    MainTask_youqingdain()

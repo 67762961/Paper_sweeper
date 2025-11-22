@@ -58,13 +58,13 @@ def Full_operation():
 
         try:
             print("        ")
-            print("MAIN- ~~~~ 完整运行流程开始 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("MAIN- ==== 完整运行流程开始 ================================================================")
             MainTask_Signin()
             MainTask_Jiejieyangcheng()
             MainTask_Digui()
             MainTask_Fengmo()
             print("        ")
-            print("MAIN- ~~~~ 完整运行流程结束 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("MAIN- ==== 完整运行流程结束 ================================================================")
 
         finally:
             sys.stdout = original_stdout  # 恢复原始 stdout
