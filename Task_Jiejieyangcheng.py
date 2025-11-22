@@ -1,5 +1,3 @@
-import pyautogui
-import win32gui
 from datetime import datetime, timedelta
 from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, read_config, write_config, check_lasttime, Scroll_print, Esc_print, Sleep_print
 
@@ -365,10 +363,7 @@ def Yucheng(current_state, Hwnd):
                         if not Find_Click_windows(Hwnd, "./pic/Sis/Fengweidamo.png", 0.07, "放上去一个奉为达摩", "未检测到达摩素材"):
                             Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
                             print("        INFO-", Matchs, "进入翻页区域")
-                            rect = win32gui.GetWindowRect(Hwnd)
-                            x = (Range[0][0] + Range[1][0]) // 2 + rect[0]
-                            y = (Range[0][1] + Range[1][1]) // 2 + rect[1]
-                            pyautogui.moveTo(x, y)
+                            Move_to_range(Hwnd, Range)
                             Scroll_print(Hwnd, -5)
                         else:
                             break
@@ -448,10 +443,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                 for times in range(100):
                     Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiyangliebiao.png", 0.05, 0)
                     print("        INFO-", Matchs, "移动到寄养列表")
-                    rect = win32gui.GetWindowRect(Hwnd)
-                    x = (Range[0][0] + Range[1][0]) // 2 + rect[0]
-                    y = (Range[0][1] + Range[1][1]) // 2 + rect[1]
-                    pyautogui.moveTo(x, y)
+                    Move_to_range(Hwnd, Range)
 
                     Str1 = "检测到" + string
                     Str2 = "未检测到" + string
@@ -493,12 +485,9 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
 
                     for j in range(10):
                         if not Find_Click_windows(Hwnd, "./pic/Sis/Fengweidamo.png", 0.07, "放上去一个奉为达摩", "未检测到达摩素材"):
-                            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
+                            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
                             print("        INFO-", Matchs, "进入翻页区域")
-                            rect = win32gui.GetWindowRect(Hwnd)
-                            x = (Find[0][0] + Find[1][0]) // 2 + rect[0]
-                            y = (Find[0][1] + Find[1][1]) // 2 + rect[1]
-                            pyautogui.moveTo(x, y)
+                            Move_to_range(Hwnd, Range)
                             Scroll_print(Hwnd, -5)
                         else:
                             Find_Click_windows(Hwnd, "./pic/Sis/Queding.png", 0.05, "点击确定", "点击确定异常")
