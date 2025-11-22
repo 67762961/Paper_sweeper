@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, read_config, write_config, check_lasttime, Scroll_print, Esc_print, Sleep_print
+from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, read_config, write_config, check_lasttime, Scroll_print, Esc_print, Sleep_print, Move_to_range
 
 
 def MainTask_Jiejieyangcheng():
