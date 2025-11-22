@@ -26,7 +26,7 @@ def MainTask_Mail():
     邮件主任务
     """
     print("        ")
-    print("TASK- ----- 开始执行邮件任务  ----------------------------------------------------------------")
+    print("TASK- ----- 开始执行邮件任务 ----------------------------------------------------------------")
     current_time = datetime.now()
     config_data = read_config("./config/Last_times.json")
     headers = list(config_data.keys())
@@ -50,7 +50,7 @@ def MainTask_Mail():
                 print("        TASK- ----- 邮件领取任务执行过程中出现错误 中断任务")
         else:
             print("        SKIP- ----- 邮件查看时间间隔未满一小时 跳过")
-    print("TASK- ----- 邮件任务执行完毕  ----------------------------------------------------------------")
+    print("TASK- ----- 邮件任务执行完毕 ----------------------------------------------------------------")
 
 
 def Work_Mail(Hwnd, Account):
