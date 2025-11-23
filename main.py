@@ -6,7 +6,7 @@ from Task_SignIn import MainTask_Signin
 from Task_Fengmo import MainTask_Fengmo
 from Task_Digui import MainTask_Digui
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
-
+from Task_Thirty import MainTask_Thirty
 
 # 全局变量 窗口句柄列表
 hwnds = []
@@ -62,6 +62,7 @@ def Full_operation():
             MainTask_Signin()
             MainTask_Jiejieyangcheng()
             MainTask_Digui()
+            MainTask_Thirty()
             MainTask_Fengmo()
             print("        ")
             print("MAIN- ===== 完整运行流程结束 ================================================================")
