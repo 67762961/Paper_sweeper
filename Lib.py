@@ -21,6 +21,7 @@ def Sleep_print(Wait_time):
 
 def Scroll_print(Hwnd, length):
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
+    time.sleep(0.1)
     for i in range(abs(length)):
         pyautogui.scroll(int(length / abs(length)))
         time.sleep(0.01)
@@ -29,6 +30,7 @@ def Scroll_print(Hwnd, length):
 
 def Esc_print(Hwnd):
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
+    time.sleep(0.1)
     pydirectinput.press("esc")
     time.sleep(0.1)
     print("        QUIT- ccccc 按Esc退出")
@@ -62,10 +64,16 @@ def Img_read_ch(file_path):
     return img
 
 
-def Match_model(Img, Img_model_path, Threshold, Flag_show):
+def Match_model(Img, Img_model_path, Threshold, Flag_show, search_range=None, is_window_match=False):
     """
     内部模板匹配函数
+    :param Img: 输入图像
+    :param Img_model_path: 模板图片路径
+    :param Threshold: 匹配阈值
+    :param Flag_show: 是否显示结果
+    :param search_range: 搜索区域，格式为[Left_up, Right_down]（相对于输入图像）
     :param is_window_match: 是否为窗口匹配（用于控制是否显示内部点击区域）
+    :return: 匹配结果和匹配得分
     """
     # 加载图像模板
     Img_model = Img_read_ch(Img_model_path)
@@ -78,28 +86,66 @@ def Match_model(Img, Img_model_path, Threshold, Flag_show):
     Img = np.uint8(Img)
     Img_model = np.uint8(Img_model)
 
+    # 如果指定了搜索区域，则在区域内进行匹配
+    if search_range is not None:
+        # 提取区域坐标
+        range_left_up, range_right_down = search_range
+
+        # 确保区域在图像范围内
+        height, width = Img.shape[0:2]
+        x1 = max(0, range_left_up[0])
+        y1 = max(0, range_left_up[1])
+        x2 = min(width, range_right_down[0])
+        y2 = min(height, range_right_down[1])
+
+        # 截取指定区域
+        Img_region = Img[y1:y2, x1:x2]
+    else:
+        # 如果没有指定区域，使用整个图像
+        Img_region = Img
+        x1, y1 = 0, 0  # 区域相对于原图像的偏移量
+
     # 进行模板匹配
-    Result = cv2.matchTemplate(Img, Img_model, cv2.TM_SQDIFF_NORMED)
+    Result = cv2.matchTemplate(Img_region, Img_model, cv2.TM_SQDIFF_NORMED)
 
     # 获取匹配结果
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(Result)
 
+    # 计算匹配区域在原图像中的位置
+    match_x = min_loc[0] + x1
+    match_y = min_loc[1] + y1
+
     # 确定识别到的区域
-    Left_up = min_loc
-    Right_down = (min_loc[0] + Img_model_width, min_loc[1] + Img_model_height)
+    Left_up = (match_x, match_y)
+    Right_down = (match_x + Img_model_width, match_y + Img_model_height)
 
     # 显示结果
     if Flag_show:
-        cv2.rectangle(Img, Left_up, Right_down, (0, 0, 255), 2)
+        # 深拷贝原始图像以避免修改
+        Img_display = Img.copy()
+
+        # 如果指定了搜索区域，用蓝框标定
+        if search_range is not None:
+            cv2.rectangle(Img_display, search_range[0], search_range[1], (255, 0, 0), 2)
+
+        # 用红框标定匹配区域
+        cv2.rectangle(Img_display, Left_up, Right_down, (0, 0, 255), 2)
 
         # 计算点击区域（与Click函数中的计算一致）
         Width = Right_down[0] - Left_up[0]
         Height = Right_down[1] - Left_up[1]
         click_Left_up = (int(Left_up[0] + Width / 4), int(Left_up[1] + Height / 4))
         click_Right_down = (int(Left_up[0] + 3 * Width / 4), int(Left_up[1] + 3 * Height / 4))
-        cv2.rectangle(Img, click_Left_up, click_Right_down, (0, 255, 0), 2)
 
-        cv2.imshow("Output", Img)
+        # 如果是窗口匹配，显示点击区域
+        if is_window_match:
+            cv2.rectangle(Img_display, click_Left_up, click_Right_down, (0, 255, 0), 2)
+
+        window_title = "Window Match" if is_window_match else "Screen Match"
+        if search_range is not None:
+            window_title += " with Range"
+
+        cv2.imshow(window_title, Img_display)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -128,8 +174,8 @@ def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     # 转换为OpenCV格式
     Img = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
 
-    # 调用内部模板匹配函数 并标记为窗口匹配
-    return Match_model(Img, Model_path, Threshold, Flag_show)
+    # 调用内部模板匹配函数，标记为窗口匹配
+    return Match_model(Img, Model_path, Threshold, Flag_show, is_window_match=True)
 
 
 def Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show):
@@ -142,7 +188,32 @@ def Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show):
     # 转换为OpenCV格式
     Img = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
 
+    # 调用内部模板匹配函数
     return Match_model(Img, Img_model_path, Threshold, Flag_show)
+
+
+def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):
+    """
+    在窗口内的指定区域内进行模板匹配
+    """
+    # 获取窗口位置和大小
+    window_rect = win32gui.GetWindowRect(Hwnd)
+    left, top, right, bottom = window_rect
+
+    # 截取整个窗口
+    Screenshot = pyautogui.screenshot(region=(left, top, right - left, bottom - top))
+    Img = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
+
+    # 调用Match_model函数，传入搜索区域
+    return1, return2 = Match_model(Img, Model_path, Threshold, Flag_show, search_range=Range, is_window_match=True)
+
+    # 如果匹配成功，返回窗口坐标
+    if return1 is not None:
+        return1_window = return1
+    else:
+        return1_window = None
+
+    return return1_window, return2
 
 
 def Move_to_range(Hwnd, Loc):
@@ -305,6 +376,7 @@ def Itface_Quit(Hwnd):
     :param Hwnd:    窗口句柄
     :return: None
     """
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
     time.sleep(0.5)
     # 注：此处退出界面条件可以极为苛刻 一般识别取值为0.006
     Range, Matchs = Find_in_screen_Matchs("./pic/Main/Tuichuyouxi.png", 0.01, 0)
@@ -323,6 +395,7 @@ def Itface_Host(Hwnd):
     :param Hwnd:    窗口句柄
     :return: None
     """
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
     round = 0
     for Wait in range(30):
         # 检测到庭院 退出循环
@@ -380,6 +453,7 @@ def Itface_scroll(Hwnd):
     @return:        1正常0异常
     """
     # 检测是否位于庭院主界面
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
     Itface_Host(Hwnd)
 
     # 检测底部卷轴是否展开
@@ -426,6 +500,7 @@ def Itface_daily(Hwnd):
     """
     循环检测多种外显的日常入口
     """
+    Itface_Host(Hwnd)
     for i in range(1):
         if Find_Click_windows(Hwnd, "./pic/Main/Fengmorukou.png", 0.05, "进入逢魔入口", "未检测到逢魔入口"):
             break
