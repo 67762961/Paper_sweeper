@@ -196,6 +196,7 @@ def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):
     """
     在窗口内的指定区域内进行模板匹配
     """
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
     # 获取窗口位置和大小
     window_rect = win32gui.GetWindowRect(Hwnd)
     left, top, right, bottom = window_rect
@@ -221,8 +222,14 @@ def Move_to_range(Hwnd, Loc):
     计算点击位置并移动鼠标到该位置
     :param Hwnd: 窗口句柄 如果为None则使用屏幕坐标
     :param Loc: 坐标元组 格式为[(左上x,左上y), (右下x,右下y)]
-    :return: 移动到的目标坐标 (x, y)
+    :return: 移动到的目标坐标 (x, y) 或 0（当Loc为空时）
     """
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
+    # 检测Loc是否为空
+    if not Loc or len(Loc) < 2:
+        print("Loc参数非法 ", Loc, " 跳过鼠标移动操作")
+        return 0
+
     if Hwnd:
         # 计算点击区域在窗口内的绝对坐标
         window_x, window_y, _, _ = win32gui.GetWindowRect(Hwnd)
@@ -252,6 +259,7 @@ def Click(Hwnd, Loc, Wait):
     :param Wait: 点击后自动延时的等待时间
     :return: None
     """
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
     # 先移动鼠标到目标位置
     Move_to_range(Hwnd, Loc)
 
@@ -261,27 +269,32 @@ def Click(Hwnd, Loc, Wait):
 
 
 def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
-    while not config.stop_thread:
-        try:
-            Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
-            Click(Hwnd, Range, 1)
-            print("        INFO-", Matchs, message_F)
-            return 1
-        except:
-            print("        INFO-", Matchs, message_C)
-            return 0
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
+    if not Matchs:
+        Matchs = 0
+    if Range:
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
+        Click(Hwnd, Range, 1)
+        print("        INFO-", Matchs, message_F)
+        return 1
+    else:
+        print("        INFO-", Matchs, message_C)
+        return 0
 
 
 def Find_Click_screen(Model_path, Threshold, message_F, message_C):
-    while not config.stop_thread:
-        try:
-            Range, Matchs = Find_in_screen_Matchs(Model_path, Threshold, 0)
-            Click(None, Range, 1)
-            print(message_F)
-            return 1
-        except:
-            print(message_C)
-            return 0
+    ctypes.windll.user32.SetForegroundWindow(Hwnd)
+    Range, Matchs = Find_in_screen_Matchs(Model_path, Threshold, 0)
+    if not Matchs:
+        Matchs = 0
+    if Range:
+        Click(None, Range, 1)
+        print("        INFO-", Matchs, message_F)
+        return 1
+    else:
+        print("        INFO-", Matchs, message_C)
+        return 0
 
 
 def read_config(FILE_PATH):
@@ -604,7 +617,12 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
             case "应用预设":
                 Find = Find_Click_windows(Hwnd, "./pic/Team/应用御魂预设.png", 0.03, "点击应用御魂预设", "未检测到应用御魂预设按钮")
                 if Find:
-                    Find = Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未检测到确定按钮 似乎本就已经装配该预设")
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Queding.png", 0.05, 0)
+                    if Range:
+                        Click(Hwnd, Range, 0.5)
+                        print("        INFO-", Matchs, "点击确认")
+                    else:
+                        print("        INFO-", Matchs, "未发现二次确认按钮 似乎已经是此配置")
                     print("        STEP- vvvvv 跳转结束界面")
                     current_state = "结束"
                 else:
