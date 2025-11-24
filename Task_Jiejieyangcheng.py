@@ -1,5 +1,19 @@
 from datetime import datetime, timedelta
-from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_Host, Itface_guild, read_config, write_config, check_lasttime, Scroll_print, Esc_print, Sleep_print, Move_to_range
+from Lib import (
+    Find_windows,
+    Find_in_windows_Matchs,
+    Find_Click_windows,
+    Itface_Host,
+    Itface_guild,
+    read_config,
+    write_config,
+    check_lasttime,
+    Scroll_print,
+    Esc_print,
+    Sleep_print,
+    Move_to_range,
+    Click,
+)
 
 
 def MainTask_Jiejieyangcheng():
@@ -42,7 +56,7 @@ def Jiejieyangcheng(current_state, Hwnd):
         match current_state:
             case "庭院界面":
                 # 先进入阴阳寮界面
-                print("        INFO------ 尝试前往寮界面")
+                print("        INFO- ----- 尝试前往寮界面")
                 Itface_guild(Hwnd)
                 for Wait in range(3):
                     Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiejie.png", 0.05, 0)
@@ -330,15 +344,18 @@ def Yucheng(current_state, Hwnd):
         match current_state:
             case "结界界面":
                 for Wait in range(10):
-                    Find = Find_Click_windows(Hwnd, "./pic/Sis/Shishenyucheng.png", 0.05, "检测到进入结界育成界面", "未检测到进入结界育成界面")
-                    if Find:
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Shishenyucheng.png", 0.05, 0)
+                    if Range:
+                        print("        INFO-", Matchs, "检测到结界育成界面")
+                        Move_to_range(Hwnd, Range)
+                        Click(Hwnd, Range, 1)
                         print("        STEP- vvvvv 跳转育成界面")
                         current_state = "育成界面"
                         break
                     else:
                         print("        WAIT- wwwww 等待育成界面检测 已等待 {waittime} 秒".format(waittime=Wait + 1))
                         Sleep_print(1)
-                if not Find:
+                if not Range:
                     print("        STEP- vvvvv 跳转异常退出界面")
                     Sleep_print(1)
                     return 0
@@ -361,13 +378,18 @@ def Yucheng(current_state, Hwnd):
 
                     for j in range(10):
                         Sleep_print(0.5)
-                        if not Find_Click_windows(Hwnd, "./pic/Sis/Fengweidamo.png", 0.07, "放上去一个奉为达摩", "未检测到达摩素材"):
+                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Fengweidamo.png", 0.07, 0)
+                        if Range:
+                            print("        INFO-", Matchs, "放上去一个奉为达摩")
+                            Move_to_range(Hwnd, Range)
+                            Click(Hwnd, Range, 1)
+                            break
+                        else:
+                            print("        INFO-", Matchs, "未找到奉为达摩")
                             Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
                             print("        INFO-", Matchs, "进入翻页区域")
                             Move_to_range(Hwnd, Range)
-                            Scroll_print(Hwnd, -5)
-                        else:
-                            break
+                            Scroll_print(Hwnd, -3)
                 else:
                     print("        STEP- vvvvv 跳转寄养任务")
                     current_state = "寄养任务"
@@ -460,7 +482,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                             return 0
                         else:
                             print("        INFO-", Matchs, "未到寄养列表末尾")
-                            Scroll_print(Hwnd, -5)
+                            Scroll_print(Hwnd, -3)
 
                 if Find:
                     print("        STEP- vvvvv 跳转寄养结界")
@@ -489,7 +511,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                             Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
                             print("        INFO-", Matchs, "进入翻页区域")
                             Move_to_range(Hwnd, Range)
-                            Scroll_print(Hwnd, -5)
+                            Scroll_print(Hwnd, -3)
                         else:
                             Find_Click_windows(Hwnd, "./pic/Sis/Queding.png", 0.05, "点击确定", "点击确定异常")
                             Esc_print(Hwnd)
