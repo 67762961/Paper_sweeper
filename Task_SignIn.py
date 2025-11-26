@@ -232,9 +232,12 @@ def Qiandao(Hwnd, Account):
                         print("        INFO-", Matchs, "未检测到解签小纸人")
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        Esc_print(Hwnd)
-                        Sleep_print(0.5)
-                        return 1
+                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
+                        if Range:
+                            print("        INFO-", Matchs, "检测到解签小纸人 每日一签成功")
+                            Esc_print(Hwnd)
+                            Sleep_print(0.5)
+                            return 1
         else:
             Sleep_print(0.1)
     return 0
