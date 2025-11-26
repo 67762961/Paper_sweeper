@@ -19,7 +19,7 @@ from Lib import (
 )
 
 
-def MainTask_Thirty():
+def FullTask_Thirty():
     """
     寮三十主任务
     """
@@ -31,7 +31,6 @@ def MainTask_Thirty():
         print("TASK- ----- 当前时间不在16:50-21:50之间 可以执行寮三十任务")
         config_data = read_config("./config/Last_times.json")
         Account = list(config_data.keys())
-        current_time = datetime.now()
         Flag = {}
         for i in range(2):
             print("        TIME- ----- 读取上次账号", Account[i], "完成寮三十任务时间")
@@ -40,27 +39,34 @@ def MainTask_Thirty():
         # 如果两个账号都未做寮三十 则进行寮三十任务
         Hwnd = {}
         if not (Flag[0] and Flag[1]):
-            print("        TASK- ----- 开始执行寮三十任务")
-            Hwnd[0] = Find_windows(Account[0])
-            Hwnd[1] = Find_windows(Account[1])
-            if Task_Liao_30(Hwnd[0], Hwnd[1], Account):
-                # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.json")
-                Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                config[Account[0]]["寮三十"] = Now
-                config[Account[1]]["寮三十"] = Now
-                write_config("./config/Last_times.json", config)
-                print("        TIME- ----- 本次寮三十完成时间")
-                print("        TIME- ----- ", Now)
-                print("        TASK- ----- 寮三十任务完成")
-            else:
-                print("        TASK- ----- 寮三十任务执行过程中出现错误 中断任务")
+            MainTask_Thirty()
         else:
             for i in range(2):
                 print("        SKIP- ----- 今日账号", Account[i], "已完成寮三十任务 跳过")
     else:
         print("TASK- ----- 时间在16:50-21:50之间 跳过")
     print("TASK- ----- 寮三十任务已完成 ----------------------------------------------------------------")
+
+
+def MainTask_Thirty():
+    config_data = read_config("./config/Last_times.json")
+    Account = list(config_data.keys())
+    print("        TASK- ----- 开始执行寮三十任务")
+    Hwnd = {}
+    Hwnd[0] = Find_windows(Account[0])
+    Hwnd[1] = Find_windows(Account[1])
+    if Task_Liao_30(Hwnd[0], Hwnd[1], Account):
+        # 更新配置 写入当前时间
+        config = read_config("./config/Last_times.json")
+        Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        config[Account[0]]["寮三十"] = Now
+        config[Account[1]]["寮三十"] = Now
+        write_config("./config/Last_times.json", config)
+        print("        TIME- ----- 本次寮三十完成时间")
+        print("        TIME- ----- ", Now)
+        print("        TASK- ----- 寮三十任务完成")
+    else:
+        print("        TASK- ----- 寮三十任务执行过程中出现错误 中断任务")
 
 
 def Task_Liao_30(Hwnd1, Hwnd2, Account):
@@ -75,7 +81,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
     御魂副本寮三十
     """
     Hwnd = [Hwnd1, Hwnd2]
-    current_state = "庭院界面"
+    current_state = "御魂装配"
     match Fuben:
         case "魂虚":
             print("        INFO- ----- 选择魂虚副本")
@@ -275,5 +281,6 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 return 1
 
             case "异常退出":
-                Itface_Host(Hwnd)
+                Itface_Host(Hwnd[0])
+                Itface_Host(Hwnd[1])
                 return 0
