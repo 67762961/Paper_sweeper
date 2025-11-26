@@ -24,7 +24,7 @@ def MainTask_Thirty():
     寮三十主任务
     """
     print("        ")
-    print("TASK- ----- 开始执行寮三十任务 ----------------------------------------------------------------")
+    print("TASK- ----- 开始执行寮三十任务 --------------------------------------------------------------")
     current_time = datetime.now()
     ######## 时间设定上暂时避开逢魔任务
     if not (time(16, 50) <= current_time.time() <= time(21, 50)):
@@ -100,13 +100,15 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
     for step in range(30):
         Sleep_print(1)
         match current_state:
-            case "庭院界面":
+            case "御魂装配":
                 for i in range(2):
                     print("    切换到 ", Account[i], " 账号")
                     print("        INFO- -----", Account[i], "装配", Preset_name)
                     Team_Preset(Hwnd[i], Preset_Group, Preset_name)
                     Itface_scroll(Hwnd[i])
-
+                print("        STEP- vvvvv 跳转庭院界面")
+                current_state = "庭院界面"
+            case "庭院界面":
                 print("    切换到 ", Account[1], " 账号")
                 Find = Find_Click_windows(Hwnd[1], "./pic/Thr/组队图标.png", 0.05, "点击组队图标", "未找到组队图标")
                 if Find:
@@ -195,6 +197,19 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                     else:
                         print("        STEP- vvvvv 跳转小纸人设置")
                         current_state = "小纸人设置"
+                else:
+                    print("        STEP- vvvvv 跳转重新创建队伍")
+                    current_state = "重新创建队伍"
+            case "重新创建队伍":
+                Itface_Host(Hwnd[0])
+                print("    切换到 ", Account[1], " 账号")
+                Esc_print(Hwnd[1])
+                Sleep_print(1)
+                Find = Find_Click_windows(Hwnd[1], "./pic/Main/Queding.png", 0.03, "点击确定", "未找到确定图标")
+                Itface_Host(Hwnd[1])
+                if Find:
+                    print("        STEP- vvvvv 跳转庭院界面")
+                    current_state = "庭院界面"
                 else:
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
