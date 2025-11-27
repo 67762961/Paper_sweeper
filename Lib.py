@@ -178,20 +178,6 @@ def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     return Match_model(Img, Model_path, Threshold, Flag_show, is_window_match=True)
 
 
-def Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show):
-    """
-    全屏截图并找到与模板匹配的图片区域
-    """
-    # 截取屏幕
-    Screenshot = pyautogui.screenshot()
-
-    # 转换为OpenCV格式
-    Img = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
-
-    # 调用内部模板匹配函数
-    return Match_model(Img, Img_model_path, Threshold, Flag_show)
-
-
 def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):
     """
     在窗口内的指定区域内进行模板匹配
@@ -215,6 +201,79 @@ def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):
         return1_window = None
 
     return return1_window, return2
+
+
+def Find_multiple_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show, max_matches=10):
+    """
+    窗口内截图并找到多个与模板匹配的图片区域
+    通过重复调用Match_model实现 每次找到后蒙版盖住再找下一个
+    """
+    # 获取窗口位置和大小
+    window_rect = win32gui.GetWindowRect(Hwnd)
+    left, top, right, bottom = window_rect
+
+    # 直接在全屏截图中截取窗口区域
+    Screenshot = pyautogui.screenshot(region=(left, top, right - left, bottom - top))
+
+    # 转换为OpenCV格式
+    Img_original = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
+
+    # 创建用于匹配的图像副本
+    Img_working = Img_original.copy()
+
+    positions = []  # 存储匹配位置 [(Left_up, Right_down), ...]
+    scores = []  # 存储匹配得分
+
+    # 循环查找多个匹配
+    for i in range(max_matches):
+        # 调用现有的Match_model函数
+        return1, return2 = Match_model(Img_working, Model_path, Threshold, False, None, True)
+
+        # 将匹配度字符串转换为浮点数
+        try:
+            match_score = float(return2)
+        except ValueError:
+            match_score = 1.0  # 如果转换失败，设为最差值
+
+        # 如果没有找到匹配或匹配度超过阈值，停止搜索
+        if return1 is None or match_score > Threshold:
+            break
+
+        # 获取匹配位置
+        Left_up, Right_down = return1
+
+        # 记录匹配结果
+        positions.append((Left_up, Right_down))
+        scores.append(match_score)
+
+        # 用蒙版盖住已匹配区域（避免重复检测）
+        cv2.rectangle(Img_working, Left_up, Right_down, (0, 0, 0), -1)
+
+    # 显示结果（如果启用）
+    if Flag_show and positions:
+        # 深拷贝原始图像以避免修改
+        Img_display = Img_original.copy()
+
+        # 每个匹配位置都显示红色框和绿色点击区域框
+        for Left_up, Right_down in positions:
+            # 用红框标定匹配区域
+            cv2.rectangle(Img_display, Left_up, Right_down, (0, 0, 255), 2)
+
+            # 计算点击区域（与Click函数中的计算一致）
+            Width = Right_down[0] - Left_up[0]
+            Height = Right_down[1] - Left_up[1]
+            click_Left_up = (int(Left_up[0] + Width / 4), int(Left_up[1] + Height / 4))
+            click_Right_down = (int(Left_up[0] + 3 * Width / 4), int(Left_up[1] + 3 * Height / 4))
+
+            # 显示点击区域（绿色框）
+            cv2.rectangle(Img_display, click_Left_up, click_Right_down, (0, 255, 0), 2)
+
+        cv2.imshow("Multiple Window Matches", Img_display)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    # 返回结果：数量, 位置列表, 匹配度列表
+    return len(positions), positions, scores
 
 
 def Move_to_range(Hwnd, Loc):
@@ -281,6 +340,20 @@ def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
     else:
         print("        INFO-", Matchs, message_C)
         return 0
+
+
+def Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show):
+    """
+    全屏截图并找到与模板匹配的图片区域
+    """
+    # 截取屏幕
+    Screenshot = pyautogui.screenshot()
+
+    # 转换为OpenCV格式
+    Img = cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
+
+    # 调用内部模板匹配函数
+    return Match_model(Img, Img_model_path, Threshold, Flag_show)
 
 
 def Find_Click_screen(Model_path, Threshold, message_F, message_C):
@@ -392,7 +465,7 @@ def Itface_Quit(Hwnd):
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     time.sleep(0.5)
     # 注：此处退出界面条件可以极为苛刻 一般识别取值为0.006
-    Range, Matchs = Find_in_screen_Matchs("./pic/Main/Tuichuyouxi.png", 0.01, 0)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Tuichuyouxi.png", 0.01, 0)
     if Range:
         print("        INFO-", Matchs, "检测到退出界面")
         Find_Click_windows(Hwnd, "./pic/Main/Quxiaotuichu.png", 0.03, "取消退出", "取消退出失败")

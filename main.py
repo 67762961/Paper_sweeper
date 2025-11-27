@@ -7,6 +7,7 @@ from Task_Fengmo import MainTask_Fengmo
 from Task_Digui import MainTask_Digui
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
 from Task_Thirty import MainTask_Thirty, FullTask_Thirty
+from Task_JiejieFight import MainTask_JiejieFight, FullTask_JiejieFight
 
 # 全局变量 窗口句柄列表
 hwnds = []
@@ -63,6 +64,7 @@ def Full_operation():
             MainTask_Jiejieyangcheng()
             MainTask_Digui()
             FullTask_Thirty()
+            FullTask_JiejieFight()
             MainTask_Fengmo()
             print("        ")
             print("MAIN- ===== 完整运行流程结束 ================================================================")
