@@ -195,7 +195,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                     current_state = "异常退出"
             case "加入队伍":
                 print("    切换到 ", Account[0], " 账号")
-                Find = Find_Click_windows(Hwnd[0], "./pic/Thr/点击加入.png", 0.01, "点击加入队伍", "未找到点击加入")
+                Find = Find_Click_windows(Hwnd[0], "./pic/Thr/点击加入.png", 0.03, "点击加入队伍", "未找到点击加入")
                 if Find:
                     if Buff:
                         print("        STEP- vvvvv 跳转加成")
