@@ -81,7 +81,7 @@ def FullTask_JiejieFight():
 
 def JiejieFight(Hwnd):
     current_state = "御魂装配"
-    for step in range(100):
+    for step in range(120):
         Sleep_print(1)
         match current_state:
             case "御魂装配":
@@ -137,7 +137,7 @@ def JiejieFight(Hwnd):
                     if Range:
                         print("        INFO-", Matchs, "点击结束奖励")
                         Move_to_range(Hwnd, Range)
-                        Click(Hwnd, Range, 0.5)
+                        Click(Hwnd, Range, 1)
                         print("        STEP- vvvvv 跳转战斗结束界面")
                         current_state = "战斗结束界面"
                         break
