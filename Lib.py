@@ -612,23 +612,50 @@ def Itface_explore(Hwnd):
     param Hwnd:    窗口句柄
     """
     # 检测是否位于庭院主界面
-    Itface_Host(Hwnd)
-    Find = Find_Click_windows(Hwnd, "./pic/Main/Feng.png", 0.05, "进入悬赏封印界面", "未进入悬赏封印界面")
-    if not Find:
-        Find_Click_windows(Hwnd, "./pic/Main/Feng1.png", 0.05, "进入悬赏封印界面", "未进入悬赏封印界面")
-
-    Find_Click_windows(Hwnd, "./pic/Main/Xuanshangxing.png", 0.05, "点击悬赏星", "未检测到悬赏星")
-    Find_Click_windows(Hwnd, "./pic/Main/Xuanshangqianwang.png", 0.05, "进入探索地图界面", "未进入探索地图界面")
-
-    Sleep_print(3)
-    Esc_print(Hwnd)
-    Sleep_print(1)
-    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Digui/Diguitubiao.png", 0.05, 0)
-    if Range:
-        print("        INFO-", Matchs, "检测到地鬼入口 已进入探索界面")
-    else:
-        print("        INFO-", Matchs, "未检测到地鬼入口 似乎未进入探索界面")
-        Esc_print(Hwnd)
+    Itface_scroll(Hwnd)
+    current_state = "庭院界面"
+    for step in range(30):
+        Sleep_print(1)
+        match current_state:
+            case "庭院界面":
+                Find = Find_Click_windows(Hwnd, "./pic/Main/阴阳术.png", 0.05, "点击阴阳术图标", "未检测到阴阳术图标")
+                if Find:
+                    print("        STEP- vvvvv 跳转阴阳术界面")
+                    current_state = "阴阳术界面"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "阴阳术界面":
+                Find = Find_Click_windows(Hwnd, "./pic/Main/御神.png", 0.05, "点击御神按钮", "未检测到御神按钮")
+                if Find:
+                    print("        STEP- vvvvv 跳转御神界面")
+                    current_state = "御神界面"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "御神界面":
+                Find = Find_Click_windows(Hwnd, "./pic/Main/前往六道.png", 0.05, "点击前往六道按钮", "未检测到前往六道按钮")
+                if Find:
+                    print("        STEP- vvvvv 跳转六道界面")
+                    current_state = "六道界面"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "六道界面":
+                print("        INFO- -----点击退出区域")
+                Range = [(20, 105), (91, 175)]
+                Click(Hwnd, Range, 1)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Digui/Diguitubiao.png", 0.05, 0)
+                if Range:
+                    print("        INFO-", Matchs, "检测到地鬼入口 已进入探索界面")
+                    return 1
+                else:
+                    print("        INFO-", Matchs, "未检测到地鬼入口 似乎未进入探索界面")
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "异常退出":
+                Itface_Host(Hwnd)
+                return 0
 
 
 def Team_Preset(Hwnd, Preset_Group, Preset_name):
