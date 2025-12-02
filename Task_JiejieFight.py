@@ -105,6 +105,13 @@ def JiejieFight(Hwnd):
                 Num, Range, Matchs = Find_multiple_in_windows_Matchs(Hwnd, "./pic/JiejieFight/已攻破结界.png", 0.07, 0)
                 if Num < 8:
                     print("        INFO- ----- 检测到", Num, "个已攻破结界 继续挑战未攻破结界")
+                    if Num == 0:
+                        Num, Range, Matchs = Find_multiple_in_windows_Matchs(Hwnd, "./pic/JiejieFight/勋章.png", 0.03, 0, 45)
+                        print("        INFO- ----- 检测到", Num, "个勋章")
+                        if Num < 20:
+                            print("        INFO- ----- 勋章少于20个 暂停结界突破任务 等待人工刷新")
+                            Itface_Host(Hwnd)
+                            return 0
                     print("        STEP- vvvvv 跳转正常战斗界面")
                     current_state = "正常战斗界面"
                 else:
@@ -163,9 +170,14 @@ def JiejieFight(Hwnd):
             case "三退战斗界面":
                 for times in range(3):
                     print("        INFO- ----- 第", times + 1, "次退出")
-                    Esc_print(Hwnd)
-                    Find_Click_windows(Hwnd, "./pic/JiejieFight/确认.png", 0.05, "点击确认", "未检测到确认按钮")
-                    Sleep_print(1)
+                    for wait in range(10):
+                        Sleep_print(0.5)
+                        Esc_print(Hwnd)
+                        Sleep_print(0.5)
+                        Find = Find_Click_windows(Hwnd, "./pic/JiejieFight/确认.png", 0.05, "点击确认", "未检测到确认按钮")
+                        if Find:
+                            break
+
                     for wait in range(10):
                         Sleep_print(3)
                         Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/JiejieFight/再次挑战.png", 0.05, 0)
@@ -196,9 +208,7 @@ def JiejieFight(Hwnd):
                 Esc_print(Hwnd)
                 Sleep_print(1)
                 Esc_print(Hwnd)
-                Sleep_print(1)
-                Esc_print(Hwnd)
-                Sleep_print(1)
+                Sleep_print(2)
                 Itface_Host(Hwnd)
                 return 1
 
