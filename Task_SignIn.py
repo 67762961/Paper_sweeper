@@ -111,8 +111,9 @@ def Work_Mail(Hwnd, Account):
             Esc_print(Hwnd)
             Sleep_print(1)
             # 检测消息邮件
-            while 1:
-                if not Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "点击消息邮件", "未发现消息邮件"):
+            for i in range(10):
+                Find = Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "点击消息邮件", "未发现消息邮件")
+                if not Find:
                     break
 
             Esc_print(Hwnd)
