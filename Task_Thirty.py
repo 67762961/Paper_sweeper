@@ -16,6 +16,7 @@ from Lib import (
     Itface_scroll,
     Click,
     Find_in_windows_Range,
+    read_config_yml,
 )
 
 
@@ -50,7 +51,12 @@ def FullTask_Thirty():
 
 def MainTask_Thirty():
     config_data = read_config("./config/Last_times.json")
-    Account = list(config_data.keys())
+    # Account = list(config_data.keys())
+    config = read_config_yml("./config/Setting.yml")
+    Account = {}
+    Account[0] = config["寮三十"]["主账号"]
+    Account[1] = config["寮三十"]["副账号"]
+
     print("        TASK- ----- 开始执行寮三十任务")
     Hwnd = {}
     Hwnd[0] = Find_windows(Account[0])
@@ -73,7 +79,11 @@ def Task_Liao_30(Hwnd1, Hwnd2, Account):
     """
     挑战寮三十
     """
-    return Yuhun(Hwnd1, Hwnd2, Account, "魂王", 30)
+    config = read_config_yml("./config/Setting.yml")
+    Fuben = config["寮三十"]["副本"]
+    Times = config["寮三十"]["次数"]
+
+    return Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times)
 
 
 def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
@@ -247,6 +257,10 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                     match Times:
                         case 30:
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数3.png", 0.01, "点击小纸人计数3", "未找到小纸人计数3图标")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数0.png", 0.01, "点击小纸人计数0", "未找到小纸人计数0图标")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数确定.png", 0.01, "点击小纸人计数确定", "未找到小纸人计数确定图标")
+                        case 50:
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数5.png", 0.01, "点击小纸人计数5", "未找到小纸人计数5图标")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数0.png", 0.01, "点击小纸人计数0", "未找到小纸人计数0图标")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数确定.png", 0.01, "点击小纸人计数确定", "未找到小纸人计数确定图标")
                     Find = Find_Click_windows(Hwnd[i], "./pic/Thr/退出0.png", 0.05, "点击退出", "未找到退出图标")

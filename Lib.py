@@ -12,6 +12,7 @@ from datetime import datetime
 import os
 import config
 import json
+import ruamel.yaml
 
 
 def Sleep_print(Wait_time):
@@ -377,6 +378,18 @@ def read_config(FILE_PATH):
     if os.path.exists(FILE_PATH):
         with open(FILE_PATH, "r", encoding="utf-8") as file:
             return json.load(file)
+    else:
+        return {}
+
+
+def read_config_yml(FILE_PATH):
+    """
+    读取YAML配置文件
+    """
+    yaml = ruamel.yaml.YAML()
+    if os.path.exists(FILE_PATH):
+        with open(FILE_PATH, "r", encoding="utf-8") as f:
+            return yaml.load(f)
     else:
         return {}
 
