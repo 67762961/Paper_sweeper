@@ -281,7 +281,7 @@ def Move_to_range(Hwnd, Loc):
     计算点击位置并移动鼠标到该位置
     :param Hwnd: 窗口句柄 如果为None则使用屏幕坐标
     :param Loc: 坐标元组 格式为[(左上x,左上y), (右下x,右下y)]
-    :return: 移动到的目标坐标 (x, y) 或 0（当Loc为空时）
+    :return: 移动到的目标坐标 (x, y) 或 0 当Loc为空时
     """
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     # 检测Loc是否为空
@@ -332,7 +332,7 @@ def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
     Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
     if not Matchs:
         Matchs = 0
-    if Range:
+    if Range and (len(Range) >= 2):
         Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
         Click(Hwnd, Range, 1)
         print("        INFO-", Matchs, message_F)
@@ -479,57 +479,95 @@ def Itface_Host(Hwnd):
     """
     检测是否处在主界面
     :param Hwnd:    窗口句柄
-    :return: None
+    :return: 成功 1 失败 0
     """
-    ctypes.windll.user32.SetForegroundWindow(Hwnd)
-    round = 0
-    for Wait in range(30):
-        # 检测到庭院 退出循环
-        ctypes.windll.user32.SetForegroundWindow(Hwnd)
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
-        if Range:
-            print("        INFO-", Matchs, "检测到进入庭院")
-            return 1
 
-        Sleep_print(1)
-
-        if Wait >= 3:
-            # 按esc尝试回到主界面
-            print("        INFO-", Matchs, "未检测到进入庭院 尝试esc")
-            # 调用原始Esc不带退出界面检测
-            pydirectinput.press("esc")
-
-            if Itface_Quit(Hwnd) or round >= 3:
-                print("        INFO- ----- 似乎Esc退出失败 尝试识别退出按钮进入庭院")
-
-                # 检测弹窗
-                Range = Find_Click_windows(Hwnd, "./pic/Main/Cha.png", 0.06, "关闭弹窗", "未检测到弹窗")
-                Sleep_print(1)
-                if Range:
-                    return Itface_Host(Hwnd)
-
-                # 检测退出标志1
-                Range = Find_Click_windows(Hwnd, "./pic/Main/退出标志1.png", 0.05, "点击退出标志1", "未发现退出标志1")
-                Sleep_print(1)
-                if Range:
-                    return Itface_Host(Hwnd)
-
-                # 检测退出标志2
-                Range = Find_Click_windows(Hwnd, "./pic/Main/退出标志2.png", 0.05, "点击退出标志2", "未发现退出标志2")
-                Sleep_print(1)
-                if Range:
-                    return Itface_Host(Hwnd)
+    def Host_check(Hwnd, Wait):
+        for i in range(Wait):
+            ctypes.windll.user32.SetForegroundWindow(Hwnd)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
+            if Range:
+                print("        INFO-", Matchs, "检测到进入庭院")
+                return 1
             else:
-                round += 1
+                Sleep_print(1)
+        return 0
 
-        else:
-            print("        INFO- ----- 未检测到进入庭院")
+    current_state = "庭院界面"
+    Wait = 3
+    for step in range(30):
+        match current_state:
+            case "庭院界面":
+                Check = Host_check(Hwnd, Wait)
+                if Check:
+                    return 1
+                else:
+                    current_state = "Esc退出"
 
-        # 30s未检测到 超时退出
-        if Wait >= 30:
-            Wait = 0
-            print("        EROR- ***** 进入庭院 超时退出 ********************************")
-            return 0
+            case "Esc退出":
+                for i in range(3):
+                    # 若Esc未触发退出界面 则再尝试
+                    if not Esc_print(Hwnd):
+                        Sleep_print(1)
+                        Check = Host_check(Hwnd, 1)
+                        if Check:
+                            return 1
+                    else:
+                        current_state = "检测弹窗"
+                        break
+                current_state = "检测弹窗"
+
+            case "检测弹窗":
+                # 检测弹窗
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Cha.png", 0.01, 0)
+                Sleep_print(1)
+                if Range:
+                    Click(Hwnd, Range, 1)
+                    print("        INFO-", Matchs, "关闭弹窗")
+                    Check = Host_check(Hwnd, 1)
+                    if Check:
+                        return 1
+                    else:
+                        current_state = "庭院界面"
+                        Wait = 1
+                else:
+                    print("        INFO-", Matchs, "未发现弹窗")
+                current_state = "检测退出标志1"
+
+            case "检测退出标志1":
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/退出标志1.png", 0.05, 0)
+                Sleep_print(1)
+                if Range:
+                    Click(Hwnd, Range, 1)
+                    print("        INFO-", Matchs, "点击退出标志1")
+                    Check = Host_check(Hwnd, 1)
+                    if Check:
+                        return 1
+                    else:
+                        current_state = "庭院界面"
+                        Wait = 1
+                else:
+                    print("        INFO-", Matchs, "未发现退出标志1")
+                current_state = "检测退出标志2"
+
+            case "检测退出标志2":
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/退出标志2.png", 0.05, 0)
+                Sleep_print(1)
+                if Range:
+                    Click(Hwnd, Range, 1)
+                    print("        INFO-", Matchs, "点击退出标志2")
+                    Check = Host_check(Hwnd, 1)
+                    if Check:
+                        return 1
+                    else:
+                        current_state = "庭院界面"
+                        Wait = 1
+                else:
+                    print("        INFO-", Matchs, "未发现退出标志2")
+                current_state = "庭院界面"
+
+    print("        STEP- vvvvv 状态机轮次耗尽")
+    return 0
 
 
 def Itface_scroll(Hwnd):
