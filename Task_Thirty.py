@@ -27,9 +27,8 @@ def FullTask_Thirty():
     print("        ")
     print("TASK- ----- 开始执行寮三十任务 --------------------------------------------------------------")
     current_time = datetime.now()
-    ######## 时间设定上暂时避开逢魔任务
-    if not (time(16, 50) <= current_time.time() <= time(21, 50)):
-        print("TASK- ----- 当前时间不在16:50-21:50之间 可以执行寮三十任务")
+    if time(12, 0) <= current_time.time() <= time(23, 00):
+        print("TASK- ----- 当前时间在12:00-24:00之间 可以执行寮三十任务")
         config_data = read_config("./config/Last_times.json")
         Account = list(config_data.keys())
         Flag = {}
@@ -45,7 +44,7 @@ def FullTask_Thirty():
             for i in range(2):
                 print("        SKIP- ----- 今日账号", Account[i], "已完成寮三十任务 跳过")
     else:
-        print("TASK- ----- 时间在16:50-21:50之间 跳过")
+        print("TASK- ----- 时间不在12:00-24:00之间 跳过")
     print("TASK- ----- 寮三十任务已完成 ----------------------------------------------------------------")
 
 
@@ -94,7 +93,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
     current_state = "御魂装配"
     match Fuben:
         case "魂虚":
-            print("        INFO- ----- 选择魂虚副本")
+            print("        INFO- ----- 选择魂虚副本", Times, "次")
             Preset_Group, Preset_name = "副本编组", "魂虚编队"
             Fuben_Name = "虚无"
             Fuben_Group_Name = "御魂"
@@ -104,7 +103,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Img1 = "./pic/Thr/虚无副本图标1.png"
             Buff = 1
         case "魂王":
-            print("        INFO- ----- 选择神罚副本")
+            print("        INFO- ----- 选择神罚副本", Times, "次")
             Preset_Group, Preset_name = "副本编组", "魂王编队"
             Fuben_Name = "神罚"
             Fuben_Group_Name = "御魂"
@@ -255,6 +254,9 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                     Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人图标.png", 0.05, "点击小纸人图标", "未找到小纸人图标")
                     Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数.png", 0.01, "点击小纸人计数", "未找到小纸人计数图标")
                     match Times:
+                        case 1:
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数1.png", 0.01, "点击小纸人计数1", "未找到小纸人计数1图标")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数确定.png", 0.01, "点击小纸人计数确定", "未找到小纸人计数确定图标")
                         case 30:
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数3.png", 0.01, "点击小纸人计数3", "未找到小纸人计数3图标")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数0.png", 0.01, "点击小纸人计数0", "未找到小纸人计数0图标")
@@ -290,8 +292,32 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             case "战斗":
                 Sleep_print(6)
                 Find_Click_windows(Hwnd[0], "./pic/Thr/收起频道框.png", 0.05, "点击收起频道框", "未找到收起频道框图标")
-
-                ################### 理论上后续需要跑完任务后的处理
+                print("        INFO-", Matchs, "开始等待战斗结束")
+                Sleep_print(30)
+                for Wait in range(120):
+                    Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Thr/取消图标.png", 0.05, 0)
+                    if Range:
+                        print("        INFO-", Matchs, "检测到结束")
+                        for i in range(2):
+                            print("    切换到 ", Account[i], " 账号")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/取消图标.png", 0.05, "点击取消继续", "未找到取消图标")
+                        print("        STEP- vvvvv 跳转结束界面")
+                        current_state = "结束界面"
+                        break
+                    else:
+                        print("        INFO-", Matchs, "未检测到结束")
+                        print("        WAIT- wwwww 等待准备 已等待 {waittime} 分钟".format(waittime=(Wait + 1) * 0.5))
+                        Sleep_print(30)
+            case "结束界面":
+                print("    切换到 ", Account[1], " 账号")
+                Find_Click_windows(Hwnd[1], "./pic/Thr/取消图标.png", 0.05, "点击取消继续邀请", "未找到取消图标")
+                Sleep_print(1)
+                for i in range(2):
+                    print("    切换到 ", Account[i], " 账号")
+                    Find_Click_windows(Hwnd[i], "./pic/Thr/庭院加成.png", 0.05, "点击加成", "未找到加成图标")
+                    Find_Click_windows(Hwnd[i], "./pic/Thr/关闭加成.png", 0.05, "点击关闭加成", "未找到关闭加成")
+                    Esc_print(Hwnd[i])
+                    Itface_Host(Hwnd[i])
                 return 1
 
             case "异常退出":
