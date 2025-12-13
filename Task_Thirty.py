@@ -50,7 +50,6 @@ def FullTask_Thirty():
 
 def MainTask_Thirty():
     config_data = read_config("./config/Last_times.json")
-    # Account = list(config_data.keys())
     config = read_config_yml("./config/Setting.yml")
     Account = {}
     Account[0] = config["寮三十"]["主账号"]
@@ -79,8 +78,12 @@ def Task_Liao_30(Hwnd1, Hwnd2, Account):
     挑战寮三十
     """
     config = read_config_yml("./config/Setting.yml")
-    Fuben = config["寮三十"]["副本"]
-    Times = config["寮三十"]["次数"]
+    today = datetime.now()
+    week_day = today.weekday()
+    week_list = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+    print("        TIME- ----- 今天是", week_list[week_day])
+    Fuben = config["寮三十"]["副本"][week_day]
+    Times = config["寮三十"]["次数"][week_day]
     if Times == 0:
         print("        INFO- ----- 副本次数为 0 次 无需执行寮三十任务")
         return 0
@@ -104,6 +107,8 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Group_card = "./pic/Thr/御魂组别选项.png"
             Fuben_Img0 = "./pic/Thr/虚无副本图标0.png"
             Fuben_Img1 = "./pic/Thr/虚无副本图标1.png"
+            Tuichutubiao = "./pic/Thr/退出0.png"
+            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标.png"
             Buff = 1
         case "魂王":
             print("        INFO- ----- 选择神罚副本", Times, "次")
@@ -114,7 +119,21 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Group_card = "./pic/Thr/御魂组别选项.png"
             Fuben_Img0 = "./pic/Thr/神罚副本图标0.png"
             Fuben_Img1 = "./pic/Thr/神罚副本图标1.png"
+            Tuichutubiao = "./pic/Thr/退出0.png"
+            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标.png"
             Buff = 1
+        case "魂海":
+            print("        INFO- ----- 选择魂海四副本", Times, "次")
+            Preset_Group, Preset_name = "副本编组", "魂海编队"
+            Fuben_Name = "魂海"
+            Fuben_Group_Name = "永生之海"
+            Fuben_Group = "./pic/Thr/永生之海组别.png"
+            Fuben_Group_card = "./pic/Thr/永生之海组别选项.png"
+            Fuben_Img0 = "./pic/Thr/永生之海四副本图标0.png"
+            Fuben_Img1 = "./pic/Thr/永生之海四副本图标1.png"
+            Tuichutubiao = "./pic/Thr/退出00.png"
+            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标魂海.png"
+            Buff = 0
     for step in range(30):
         Sleep_print(1)
         match current_state:
@@ -144,8 +163,8 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 else:
                     print("        INFO-", Matchs, "目前不正在", Fuben_Group_Name, "副本组别内")
                     for i in range(5):
-                        Massage1 = "点击", Fuben_Group_Name, "组别选项"
-                        Massage2 = "未找到", Fuben_Group_Name, "组别选项"
+                        Massage1 = "点击" + Fuben_Group_Name + "组别选项"
+                        Massage2 = "未找到" + Fuben_Group_Name + "组别选项"
                         Find = Find_Click_windows(Hwnd[1], Fuben_Group_card, 0.01, Massage1, Massage2)
                         Find = Find_Click_windows(Hwnd[1], Fuben_Group_card, 0.01, Massage1, Massage2)
                         if Find:
@@ -268,7 +287,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数5.png", 0.01, "点击小纸人计数5", "未找到小纸人计数5图标")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数0.png", 0.01, "点击小纸人计数0", "未找到小纸人计数0图标")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数确定.png", 0.01, "点击小纸人计数确定", "未找到小纸人计数确定图标")
-                    Find = Find_Click_windows(Hwnd[i], "./pic/Thr/退出0.png", 0.05, "点击退出", "未找到退出图标")
+                    Find = Find_Click_windows(Hwnd[i], Tuichutubiao, 0.05, "点击退出", "未找到退出图标")
                     if Find:
                         print("        STEP- vvvvv 跳转自动挑战")
                         current_state = "自动挑战"
@@ -278,7 +297,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             case "自动挑战":
                 for i in range(2):
                     print("    切换到 ", Account[i], " 账号")
-                    Find = Find_Click_windows(Hwnd[i], "./pic/Thr/自动战斗图标.png", 0.05, "点击自动战斗", "未找到自动战斗图标")
+                    Find = Find_Click_windows(Hwnd[i], Zidongzhandoutubiao, 0.05, "点击自动战斗", "未找到自动战斗图标")
                     Range, Matchs = Find_in_windows_Matchs(Hwnd[i], "./pic/Thr/取消图标.png", 0.05, 0)
                     if Range:
                         print("        INFO-", Matchs, "取消继续计数")
