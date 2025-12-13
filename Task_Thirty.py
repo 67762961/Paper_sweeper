@@ -81,6 +81,9 @@ def Task_Liao_30(Hwnd1, Hwnd2, Account):
     config = read_config_yml("./config/Setting.yml")
     Fuben = config["寮三十"]["副本"]
     Times = config["寮三十"]["次数"]
+    if Times == 0:
+        print("        INFO- ----- 副本次数为 0 次 无需执行寮三十任务")
+        return 0
 
     return Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times)
 
