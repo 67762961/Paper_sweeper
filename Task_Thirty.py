@@ -4,7 +4,6 @@ from Lib import (
     Find_in_windows_Matchs,
     Find_Click_windows,
     Itface_Host,
-    Itface_explore,
     read_config,
     write_config,
     check_lasttime,
@@ -16,7 +15,6 @@ from Lib import (
     Itface_scroll,
     Click,
     Find_in_windows_Range,
-    read_config_yml,
 )
 
 
@@ -50,7 +48,7 @@ def FullTask_Thirty():
 
 def MainTask_Thirty():
     config_data = read_config("./config/Last_times.json")
-    config = read_config_yml("./config/Setting.yml")
+    config = read_config("./config/Setting.yml")
     Account = {}
     Account[0] = config["寮三十"]["主账号"]
     Account[1] = config["寮三十"]["副账号"]
@@ -77,7 +75,7 @@ def Task_Liao_30(Hwnd1, Hwnd2, Account):
     """
     挑战寮三十
     """
-    config = read_config_yml("./config/Setting.yml")
+    config = read_config("./config/Setting.yml")
     today = datetime.now()
     week_day = today.weekday()
     week_list = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]

@@ -28,7 +28,7 @@ def MainTask_Mail():
     print("        ")
     print("TASK- ----- 开始执行邮件任务 ----------------------------------------------------------------")
     current_time = datetime.now()
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     headers = list(config_data.keys())
     for Account in headers:
         print("    切换到 ", Account, " 账号")
@@ -39,10 +39,10 @@ def MainTask_Mail():
             Hwnd = Find_windows(Account)
             if Work_Mail(Hwnd, Account):
                 # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.json")
+                config = read_config("./config/Last_times.yml")
                 Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 config[Account]["邮件领取"] = Now
-                write_config("./config/Last_times.json", config)
+                write_config("./config/Last_times.yml", config)
                 print("        TIME- ----- 本次邮件领取时间")
                 print("        TIME- ----- ", Now)
                 print("        TASK- ----- 邮件领取完成")
@@ -128,7 +128,7 @@ def MainTask_Fudai():
     print("        ")
     print("TASK- ----- 开始执行福袋任务 ----------------------------------------------------------------")
     current_time = datetime.now()
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     headers = list(config_data.keys())
 
     for Account in headers:
@@ -140,11 +140,11 @@ def MainTask_Fudai():
             Hwnd = Find_windows(Account)
             if Fudai(Hwnd, Account):
                 # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.json")
+                config = read_config("./config/Last_times.yml")
                 current_time = datetime.now()
                 Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
                 config[Account]["福袋纸人"] = Now
-                write_config("./config/Last_times.json", config)
+                write_config("./config/Last_times.yml", config)
                 print("        TIME- ----- 本次福袋小纸人领取时间: ")
                 print("        TIME- ----- ", Now)
                 print("        TASK- ----- 福袋小纸人领取成功")
@@ -183,7 +183,7 @@ def MainTask_Qiandao():
     print("        ")
     print("TASK- ----- 开始执行签到任务 ----------------------------------------------------------------")
     current_time = datetime.now()
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     headers = list(config_data.keys())
 
     for Account in headers:
@@ -195,11 +195,11 @@ def MainTask_Qiandao():
             Hwnd = Find_windows(Account)
             if Qiandao(Hwnd, Account):
                 # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.json")
+                config = read_config("./config/Last_times.yml")
                 current_time = datetime.now()
                 Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
                 config[Account]["每日一签"] = Now
-                write_config("./config/Last_times.json", config)
+                write_config("./config/Last_times.yml", config)
                 print("        TIME- ----- 本次每日一签时间: ")
                 print("        TIME- ----- ", Now)
                 print("        TASK- ----- 每日一签成功")
@@ -251,7 +251,7 @@ def MainTask_Zhiren():
     print("        ")
     print("TASK- ----- 开始领取纸人奖励 ----------------------------------------------------------------")
     current_time = datetime.now()
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     headers = list(config_data.keys())
 
     for Account in headers:
@@ -306,7 +306,7 @@ def MainTask_mianfeilibao():
     print("        ")
     print("TASK- ----- 开始领取商店礼包 ----------------------------------------------------------------")
     current_time = datetime.now()
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     headers = list(config_data.keys())
 
     for Account in headers:
@@ -318,11 +318,11 @@ def MainTask_mianfeilibao():
             Hwnd = Find_windows(Account)
             if mianfeilibao(Hwnd, Account):
                 # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.json")
+                config = read_config("./config/Last_times.yml")
                 current_time = datetime.now()
                 Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
                 config[Account]["免费礼包"] = Now
-                write_config("./config/Last_times.json", config)
+                write_config("./config/Last_times.yml", config)
                 print("        TIME- ----- 本次商店免费礼包领取时间: ")
                 print("        TIME- ----- ", Now)
                 print("        TASK- ----- 商店免费礼包领取成功")
@@ -384,7 +384,7 @@ def MainTask_youqingdain():
     print("        ")
     print("TASK- ----- 开始领取友情奖励 ----------------------------------------------------------------")
     current_time = datetime.now()
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     headers = list(config_data.keys())
 
     for Account in headers:
@@ -396,11 +396,11 @@ def MainTask_youqingdain():
             Hwnd = Find_windows(Account)
             if youqingdain(Hwnd, Account):
                 # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.json")
+                config = read_config("./config/Last_times.yml")
                 current_time = datetime.now()
                 Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
                 config[Account]["送友情点"] = Now
-                write_config("./config/Last_times.json", config)
+                write_config("./config/Last_times.yml", config)
                 print("        TIME- ----- 本次领取友情点以及吉闻祝福时间: ")
                 print("        TIME- ----- ", Now)
                 print("        TASK- ----- 友情点以及吉闻祝福领取成功")

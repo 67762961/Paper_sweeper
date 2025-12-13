@@ -11,7 +11,7 @@ def MainTask_Fengmo():
     current_time = datetime.now()
     if time(17, 0) <= current_time.time() <= time(21, 50):
         print("TASK- ----- 当前时间在17:00-21:50之间 开始执行逢魔之时任务")
-        config_data = read_config("./config/Last_times.json")
+        config_data = read_config("./config/Last_times.yml")
         headers = list(config_data.keys())
         for Account in headers:
             print("    切换到 ", Account, " 账号")
@@ -22,10 +22,10 @@ def MainTask_Fengmo():
                 Hwnd = Find_windows(Account)
                 if Task_Fengmo(Hwnd, Account):
                     # 更新配置，写入当前时间
-                    config = read_config("./config/Last_times.json")
+                    config = read_config("./config/Last_times.yml")
                     Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     config[Account]["逢魔之时"] = Now
-                    write_config("./config/Last_times.json", config)
+                    write_config("./config/Last_times.yml", config)
                     print("        TIME- ----- 本次逢魔之时完成时间")
                     print("        TIME- ----- ", Now)
                     print("        TASK- ----- 结界逢魔之时任务完成")

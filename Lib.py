@@ -1,6 +1,4 @@
 import win32gui
-import win32ui
-import win32con
 import ctypes
 import cv2
 import pyautogui
@@ -10,8 +8,6 @@ import numpy as np
 import random
 from datetime import datetime
 import os
-import config
-import json
 import ruamel.yaml
 
 
@@ -373,17 +369,6 @@ def Find_Click_screen(Model_path, Threshold, message_F, message_C):
 
 def read_config(FILE_PATH):
     """
-    读取配置文件
-    """
-    if os.path.exists(FILE_PATH):
-        with open(FILE_PATH, "r", encoding="utf-8") as file:
-            return json.load(file)
-    else:
-        return {}
-
-
-def read_config_yml(FILE_PATH):
-    """
     读取YAML配置文件
     """
     yaml = ruamel.yaml.YAML()
@@ -396,19 +381,30 @@ def read_config_yml(FILE_PATH):
 
 def write_config(FILE_PATH, data):
     """
-    将配置写入 JSON 文件
+    将配置写入文件
     """
+    yaml = ruamel.yaml.YAML()
+    # 设置保留引号格式和缩进
+    yaml.preserve_quotes = True
+    yaml.indent(mapping=2, sequence=4, offset=2)
     with open(FILE_PATH, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
+        yaml.dump(data, file)
 
 
 def check_lasttime(Account, Times_name):
     """
     检测上次运行的时间 如果文件或配置不存在则自动创建
+    使用ruamel.yaml处理YAML格式配置文件
     """
-    file_path = "./config/Last_times.json"
+    file_path = "./config/Last_times.yml"  # 改为YAML文件扩展名
 
-    # 确保配置目录存在[4,11](@ref)
+    # 初始化ruamel.yaml
+    yaml = ruamel.yaml.YAML()
+    yaml.preserve_quotes = True
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    CommentedMap = ruamel.yaml.comments.CommentedMap
+
+    # 确保配置目录存在
     config_dir = os.path.dirname(file_path)
     if config_dir and not os.path.exists(config_dir):
         try:
@@ -418,13 +414,16 @@ def check_lasttime(Account, Times_name):
             print("无法创建目录 ", config_dir, ":", e)
             return datetime(2000, 1, 1, 0, 0)
 
-    # 检查文件是否存在 不存在则创建[1,9](@ref)
+    # 检查文件是否存在 不存在则创建
     if not os.path.exists(file_path):
         print("配置文件不存在 创建新文件: ", file_path)
         try:
+            # 创建空的CommentedMap以保留YAML结构
+            config = CommentedMap()
+            # 使用ruamel.yaml保存空配置
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump({}, f, ensure_ascii=False, indent=4)
-            config = {}
+                yaml.dump(config, f)
+            config = CommentedMap()
         except Exception as e:
             print("创建配置文件失败: ", e)
             return datetime(2000, 1, 1, 0, 0)
@@ -434,22 +433,44 @@ def check_lasttime(Account, Times_name):
             with open(file_path, "r", encoding="utf-8") as file:
                 content = file.read().strip()
                 if not content:  # 处理空文件情况
-                    config = {}
+                    config = CommentedMap()
                 else:
-                    config = json.loads(content)
-        except (json.JSONDecodeError, KeyError) as e:
-            print("配置文件格式错误 将重置: ", e)
-            config = {}
+                    config = yaml.load(content)
+                    if config is None:  # 处理YAML文件内容为null的情况
+                        config = CommentedMap()
         except Exception as e:
             print("读取配置文件失败: ", e)
-            return datetime(2000, 1, 1, 0, 0)
+            # 尝试使用更宽松的方式重新读取
+            try:
+                with open(file_path, "r", encoding="utf-8") as file:
+                    config = yaml.load(file) or CommentedMap()
+            except:
+                print("配置文件格式错误 将重置")
+                config = CommentedMap()
+
+    # 确保配置是CommentedMap类型
+    if not isinstance(config, CommentedMap):
+        config = CommentedMap(config)
 
     # 确保Account键存在
     if Account not in config:
-        config[Account] = {}
+        config[Account] = CommentedMap()
+
+    # 确保Account对应的值也是CommentedMap类型
+    if not isinstance(config[Account], (dict, CommentedMap)):
+        config[Account] = CommentedMap({Times_name: config[Account]})
 
     Times_need_str = config[Account].get(Times_name, None)
-    Times_need = datetime.fromisoformat(Times_need_str) if Times_need_str else None
+
+    # 解析时间字符串
+    if Times_need_str is not None:
+        try:
+            Times_need = datetime.fromisoformat(Times_need_str)
+        except (ValueError, TypeError):
+            print(f"时间格式错误: {Times_need_str}，将使用默认时间")
+            Times_need = None
+    else:
+        Times_need = None
 
     if Times_need is not None:
         print("        TIME- ----- ", Times_need.strftime("%Y-%m-%d %H:%M:%S"))
@@ -459,10 +480,11 @@ def check_lasttime(Account, Times_name):
         Initial_time = datetime(2000, 1, 1, 0, 0)
         config[Account][Times_name] = Initial_time.isoformat()
 
-        # 安全写入配置[11](@ref)
+        # 安全写入配置
         try:
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, ensure_ascii=False, indent=4)
+                yaml.dump(config, f)
+            print("配置已更新并保存")
         except Exception as e:
             print("保存配置失败: ", e)
 

@@ -23,7 +23,7 @@ def MainTask_Jiejieyangcheng():
     print("        ")
     print("TASK- ----- 开始结界养成任务 ----------------------------------------------------------------")
     current_time = datetime.now()
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     headers = list(config_data.keys())
     for Account in headers:
         print("    切换到 ", Account, " 账号")
@@ -34,10 +34,10 @@ def MainTask_Jiejieyangcheng():
             Hwnd = Find_windows(Account)
             if Jiejieyangcheng("庭院界面", Hwnd):
                 # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.json")
+                config = read_config("./config/Last_times.yml")
                 Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 config[Account]["结界养成"] = Now
-                write_config("./config/Last_times.json", config)
+                write_config("./config/Last_times.yml", config)
                 print("        TIME- ----- 本次结界养成完成时间")
                 print("        TIME- ----- ", Now)
                 print("        TASK- ----- 结界养成任务完成")

@@ -12,10 +12,7 @@ from Lib import (
     Sleep_print,
     Team_Preset,
     Move_to_range,
-    Scroll_print,
-    Itface_scroll,
     Click,
-    Find_in_windows_Range,
     Find_multiple_in_windows_Matchs,
 )
 
@@ -23,17 +20,17 @@ from Lib import (
 def MainTask_JiejieFight():
     print("        ")
     print("TASK- ----- 开始结界突破任务 ----------------------------------------------------------------")
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     headers = list(config_data.keys())
     for Account in headers:
         print("    切换到 ", Account, " 账号")
         Hwnd = Find_windows(Account)
         if JiejieFight(Hwnd):
             # 更新配置 写入当前时间
-            config = read_config("./config/Last_times.json")
+            config = read_config("./config/Last_times.yml")
             Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             config[Account]["结界突破"] = Now
-            write_config("./config/Last_times.json", config)
+            write_config("./config/Last_times.yml", config)
             print("        TIME- ----- 本次结界突破完成时间")
             print("        TIME- ----- ", Now)
             print("        TASK- ----- 结界突破任务完成")
@@ -50,8 +47,8 @@ def FullTask_JiejieFight():
     print("TASK- ----- 开始结界突破任务 ----------------------------------------------------------------")
     current_time = datetime.now()
     if time(12, 0) <= current_time.time() <= time(23, 00):
-        print("TASK- ----- 当前时间在12:00-24:00之间 可以执行结界突破任务")
-        config_data = read_config("./config/Last_times.json")
+        print("TASK- ----- 当前时间在12:00-23:00之间 可以执行结界突破任务")
+        config_data = read_config("./config/Last_times.yml")
         headers = list(config_data.keys())
         for Account in headers:
             print("    切换到 ", Account, " 账号")
@@ -63,10 +60,10 @@ def FullTask_JiejieFight():
                 Hwnd = Find_windows(Account)
                 if JiejieFight(Hwnd):
                     # 更新配置 写入当前时间
-                    config = read_config("./config/Last_times.json")
+                    config = read_config("./config/Last_times.yml")
                     Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     config[Account]["结界突破"] = Now
-                    write_config("./config/Last_times.json", config)
+                    write_config("./config/Last_times.yml", config)
                     print("        TIME- ----- 本次结界突破完成时间")
                     print("        TIME- ----- ", Now)
                     print("        TASK- ----- 结界突破任务完成")
@@ -75,7 +72,7 @@ def FullTask_JiejieFight():
             else:
                 print("        SKIP- ----- 今日已完成结界突破任务 跳过")
     else:
-        print("TASK- ----- 当前时间不在12:00-24:00之间 跳过")
+        print("TASK- ----- 当前时间不在12:00-23:00之间 跳过")
     print("TASK- ----- 结界突破任务结束 ----------------------------------------------------------------")
 
 
