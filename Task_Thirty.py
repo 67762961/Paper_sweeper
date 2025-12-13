@@ -134,6 +134,18 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Tuichutubiao = "./pic/Thr/退出00.png"
             Zidongzhandoutubiao = "./pic/Thr/自动战斗图标魂海.png"
             Buff = 0
+        case "日蚀":
+            print("        INFO- ----- 选择日轮副本", Times, "次")
+            Preset_Group, Preset_name = "副本编组", "日轮编队"
+            Fuben_Name = "日蚀"
+            Fuben_Group_Name = "日轮之陨"
+            Fuben_Group = "./pic/Thr/日轮副本组别.png"
+            Fuben_Group_card = "./pic/Thr/日轮之陨组别选项.png"
+            Fuben_Img0 = "./pic/Thr/日蚀副本图标0.png"
+            Fuben_Img1 = "./pic/Thr/日蚀副本图标1.png"
+            Tuichutubiao = "./pic/Thr/退出0.png"
+            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标.png"
+            Buff = 0
     for step in range(30):
         Sleep_print(1)
         match current_state:
@@ -310,7 +322,6 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 else:
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
-
             case "战斗":
                 Sleep_print(6)
                 Find_Click_windows(Hwnd[0], "./pic/Thr/收起频道框.png", 0.05, "点击收起频道框", "未找到收起频道框图标")
@@ -336,12 +347,13 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 Sleep_print(1)
                 for i in range(2):
                     print("    切换到 ", Account[i], " 账号")
-                    Find_Click_windows(Hwnd[i], "./pic/Thr/庭院加成.png", 0.05, "点击加成", "未找到加成图标")
-                    Find_Click_windows(Hwnd[i], "./pic/Thr/关闭加成.png", 0.05, "点击关闭加成", "未找到关闭加成")
-                    Esc_print(Hwnd[i])
                     Itface_Host(Hwnd[i])
+                    if Buff:
+                        Find_Click_windows(Hwnd[i], "./pic/Thr/庭院加成.png", 0.05, "点击加成", "未找到加成图标")
+                        Find_Click_windows(Hwnd[i], "./pic/Thr/关闭加成.png", 0.05, "点击关闭加成", "未找到关闭加成")
+                        Esc_print(Hwnd[i])
+                        Itface_Host(Hwnd[i])
                 return 1
-
             case "异常退出":
                 Itface_Host(Hwnd[0])
                 Itface_Host(Hwnd[1])
