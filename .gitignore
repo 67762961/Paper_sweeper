@@ -13,3 +13,4 @@ logs
 Backup
 test_main.py
 pyside6_env
+app_crash.log

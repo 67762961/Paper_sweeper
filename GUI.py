@@ -4,23 +4,23 @@ from qt_material import apply_stylesheet
 from main import Full_operation
 import config
 
-# import traceback
-# import logging
-# import sys
+import traceback
+import logging
+import sys
 
-# logging.basicConfig(filename="app_crash.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
-
-
-# def handle_exception(exc_type, exc_value, exc_traceback):
-#     """处理未捕获的异常"""
-#     if issubclass(exc_type, KeyboardInterrupt):
-#         sys.__excepthook__(exc_type, exc_value, exc_traceback)
-#         return
-#     logging.critical("未捕获的异常:", exc_info=(exc_type, exc_value, exc_traceback))
-#     print(f"发生致命错误，详情请查看日志文件: app_crash.log")
+logging.basicConfig(filename="app_crash.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-# sys.excepthook = handle_exception
+def handle_exception(exc_type, exc_value, exc_traceback):
+    """处理未捕获的异常"""
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    logging.critical("未捕获的异常:", exc_info=(exc_type, exc_value, exc_traceback))
+    print(f"发生致命错误，详情请查看日志文件: app_crash.log")
+
+
+sys.excepthook = handle_exception
 
 
 class WorkerThread(QThread):

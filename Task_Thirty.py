@@ -27,7 +27,7 @@ def FullTask_Thirty():
     current_time = datetime.now()
     if time(12, 0) <= current_time.time() <= time(23, 00):
         print("TASK- ----- 当前时间在12:00-24:00之间 可以执行寮三十任务")
-        config_data = read_config("./config/Last_times.json")
+        config_data = read_config("./config/Last_times.yml")
         Account = list(config_data.keys())
         Flag = {}
         for i in range(2):
@@ -47,7 +47,7 @@ def FullTask_Thirty():
 
 
 def MainTask_Thirty():
-    config_data = read_config("./config/Last_times.json")
+    config_data = read_config("./config/Last_times.yml")
     config = read_config("./config/Setting.yml")
     Account = {}
     Account[0] = config["寮三十"]["主账号"]
@@ -59,11 +59,11 @@ def MainTask_Thirty():
     Hwnd[1] = Find_windows(Account[1])
     if Task_Liao_30(Hwnd[0], Hwnd[1], Account):
         # 更新配置 写入当前时间
-        config = read_config("./config/Last_times.json")
+        config = read_config("./config/Last_times.yml")
         Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         config[Account[0]]["寮三十"] = Now
         config[Account[1]]["寮三十"] = Now
-        write_config("./config/Last_times.json", config)
+        write_config("./config/Last_times.yml", config)
         print("        TIME- ----- 本次寮三十完成时间")
         print("        TIME- ----- ", Now)
         print("        TASK- ----- 寮三十任务完成")
