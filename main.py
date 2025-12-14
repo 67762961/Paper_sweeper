@@ -28,8 +28,9 @@ class Tee(QObject):
     def write(self, text):
         # 写入所有文件
         for file in self.files:
-            file.write(text)
-            file.flush()
+            if file is not None:
+                file.write(text)
+                file.flush()
 
         # 处理文本并发送到UI
         if self.text_signal:
