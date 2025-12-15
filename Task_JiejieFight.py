@@ -99,6 +99,7 @@ def JiejieFight(Hwnd):
                     current_state = "异常退出"
 
             case "结界突破界面":
+                Flag_Skip = False
                 Num, Range, Matchs = Find_multiple_in_windows_Matchs(Hwnd, "./pic/JiejieFight/已攻破结界.png", 0.07, 0)
                 if Num < 8:
                     print("        INFO- ----- 检测到", Num, "个已攻破结界 继续挑战未攻破结界")
@@ -106,11 +107,24 @@ def JiejieFight(Hwnd):
                         Num, Range, Matchs = Find_multiple_in_windows_Matchs(Hwnd, "./pic/JiejieFight/勋章.png", 0.03, 0, 45)
                         print("        INFO- ----- 检测到", Num, "个勋章")
                         if Num < 20:
-                            print("        INFO- ----- 勋章少于20个 暂停结界突破任务 等待人工刷新")
-                            Itface_Host(Hwnd)
-                            return 0
-                    print("        STEP- vvvvv 跳转正常战斗界面")
-                    current_state = "正常战斗界面"
+                            Find = Find_Click_windows(Hwnd, "./pic/JiejieFight/刷新.png", 0.05, "点击刷新图标", "未检测到刷新图标")
+                            if Find:
+                                Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未检测到确定图标")
+                                print("        STEP- vvvvv 跳转结界突破界面")
+                                current_state = "结界突破界面"
+                                Flag_Skip = True
+                            else:
+                                print("        INFO- ----- 勋章少于20个 暂停结界突破任务 等待人工刷新")
+                                Itface_Host(Hwnd)
+                                return 0
+                        else:
+                            print("        INFO- ----- 勋章充足 继续结界突破任务")
+                            Sleep_print(1)
+                            print("        STEP- vvvvv 跳转正常战斗界面")
+                            current_state = "正常战斗界面"
+                    else:
+                        print("        STEP- vvvvv 跳转正常战斗界面")
+                        current_state = "正常战斗界面"
                 else:
                     print("        INFO- ----- 检测到", Num, "个已攻破结界 准备三退")
                     print("        STEP- vvvvv 跳转三退战斗界面")
@@ -118,21 +132,22 @@ def JiejieFight(Hwnd):
 
                 Sleep_print(1)
 
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/JiejieFight/目标结界.png", 0.005, 0)
-                if Range:
-                    print("        INFO-", Matchs, "发现目标结界 准备战斗")
-                    Move_to_range(Hwnd, Range)
-                    Click(Hwnd, Range, 0.5)
-                    Find = Find_Click_windows(Hwnd, "./pic/JiejieFight/进攻.png", 0.05, "点击进攻", "未检测到进攻图标")
-                    Sleep_print(1)
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/JiejieFight/进攻.png", 0.05, 0)
+                if not Flag_Skip:
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/JiejieFight/目标结界.png", 0.005, 0)
                     if Range:
-                        print("        INFO-", Matchs, "进攻按钮点击失败 似乎已经无结界挑战券")
-                        print("        STEP- vvvvv 跳转结束")
-                        current_state = "结束"
-                else:
-                    print("        STEP- vvvvv 跳转异常退出界面")
-                    current_state = "异常退出"
+                        print("        INFO-", Matchs, "发现目标结界 准备战斗")
+                        Move_to_range(Hwnd, Range)
+                        Click(Hwnd, Range, 0.5)
+                        Find = Find_Click_windows(Hwnd, "./pic/JiejieFight/进攻.png", 0.05, "点击进攻", "未检测到进攻图标")
+                        Sleep_print(1)
+                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/JiejieFight/进攻.png", 0.05, 0)
+                        if Range:
+                            print("        INFO-", Matchs, "进攻按钮点击失败 似乎已经无结界挑战券")
+                            print("        STEP- vvvvv 跳转结束")
+                            current_state = "结束"
+                    else:
+                        print("        STEP- vvvvv 跳转异常退出界面")
+                        current_state = "异常退出"
 
             case "正常战斗界面":
                 Sleep_print(10)
