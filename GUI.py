@@ -8,7 +8,7 @@ import traceback
 import logging
 import sys
 
-logging.basicConfig(filename="app_crash.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(filename="app_crash.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s", encoding="utf-8")
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
