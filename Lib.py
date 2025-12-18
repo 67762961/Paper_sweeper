@@ -317,11 +317,14 @@ def Click(Hwnd, Loc, Wait):
     """
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     # 先移动鼠标到目标位置
-    Move_to_range(Hwnd, Loc)
-
-    # 执行点击操作
-    pyautogui.click(button="left")
-    time.sleep(Wait)
+    if not Move_to_range(Hwnd, Loc):
+        print("点击位置无效 跳过点击操作")
+        return 0
+    else:
+        # 执行点击操作
+        pyautogui.click(button="left")
+        time.sleep(Wait)
+        return 1
 
 
 def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
@@ -331,9 +334,12 @@ def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
         Matchs = 0
     if Range and (len(Range) >= 2):
         Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
-        Click(Hwnd, Range, 1)
-        print("        INFO-", Matchs, message_F)
-        return 1
+        if Click(Hwnd, Range, 1):
+            print("        INFO-", Matchs, message_F)
+            return 1
+        else:
+            print("        INFO- 点击失败", Matchs, message_C)
+            return 0
     else:
         print("        INFO-", Matchs, message_C)
         return 0
