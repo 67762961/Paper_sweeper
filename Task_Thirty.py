@@ -198,8 +198,8 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 else:
                     print("        INFO-", Matchs, "并未处在", Fuben_Name, "副本内")
                     for i in range(3):
-                        Massage1 = "点击", Fuben_Name, "副本图标"
-                        Massage2 = "未找到", Fuben_Name, "副本图标"
+                        Massage1 = "点击" + Fuben_Name + "副本图标"
+                        Massage2 = "未找到" + Fuben_Name + "副本图标"
                         Find = Find_Click_windows(Hwnd[1], Fuben_Img1, 0.01, Massage1, Massage2)
                         if Find:
                             print("        STEP- vvvvv 跳转阴阳寮频道")
@@ -227,6 +227,12 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             case "创建队伍":
                 print("    切换到 ", Account[1], " 账号")
                 Find = Find_Click_windows(Hwnd[1], "./pic/Thr/创建队伍.png", 0.01, "点击创建队伍", "未找到创建队伍图标")
+                Range, Matchs = Find_in_windows_Matchs(Hwnd[1], "./pic/Thr/邀请好友和寮成员.png", 0.01, 0)
+                if Range:
+                    Click(Hwnd[1], Range, 1)
+                    print("        INFO-", Matchs, "选择邀请好友和寮成员")
+                else:
+                    print("        INFO-", Matchs, "已经选择邀请好友和寮成员")
                 if Find:
                     Find_Click_windows(Hwnd[1], "./pic/Thr/创建.png", 0.01, "点击创建", "未找到创建图标")
                     print("        STEP- vvvvv 跳转加入队伍")
