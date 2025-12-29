@@ -26,8 +26,8 @@ def FullTask_Thirty():
     print("        ")
     print("TASK- ----- 开始执行寮三十任务 --------------------------------------------------------------")
     current_time = datetime.now()
-    if time(12, 0) <= current_time.time() <= time(23, 00):
-        print("TASK- ----- 当前时间在12:00-24:00之间 可以执行寮三十任务")
+    if time(7, 0) <= current_time.time() <= time(23, 00):
+        print("TASK- ----- 当前时间在7:00-23:00之间 可以执行寮三十任务")
         config_data = read_config("./config/Last_times.yml")
         Account = list(config_data.keys())
         Flag = {}
@@ -47,7 +47,7 @@ def FullTask_Thirty():
             for i in range(2):
                 print("        SKIP- ----- 今日账号", Account[i], "已完成寮三十任务 跳过")
     else:
-        print("TASK- ----- 时间不在12:00-24:00之间 跳过")
+        print("TASK- ----- 时间不在7:00-23:00之间 跳过")
     print("TASK- ----- 寮三十任务已完成 ----------------------------------------------------------------")
 
 
