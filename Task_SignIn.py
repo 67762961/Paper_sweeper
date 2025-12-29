@@ -220,7 +220,10 @@ def Qiandao(Hwnd, Account):
         # 检测签小纸人
         if Find_Click_windows(Hwnd, "./pic/Sign/Qiandaoxiaozhiren.png", 0.07, "检测到签到小纸人", "未检测到签到小纸人"):
             # 点击签到小人后
-            if Find_Click_windows(Hwnd, "./pic/Sign/Meiriyiqian.png", 0.05, "每日一签", "签到异常"):
+            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Meiriyiqian.png", 0.05, 0)
+            if Find:
+                print("        INFO-", Matchs, "每日一签")
+                Click(Hwnd, Find, 1)
                 for i in range(2):
                     Sleep_print(0.5)
                     Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
@@ -239,6 +242,10 @@ def Qiandao(Hwnd, Account):
                             Esc_print(Hwnd)
                             Sleep_print(0.5)
                             return 1
+            else:
+                print("        INFO-", Matchs, "未检测到每日一签界面")
+                Itface_Host(Hwnd)
+                return 0
         else:
             Sleep_print(0.1)
     return 0
