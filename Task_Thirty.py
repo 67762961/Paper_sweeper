@@ -15,6 +15,7 @@ from Lib import (
     Itface_scroll,
     Click,
     Find_in_windows_Range,
+    Itface_explore,
 )
 
 
@@ -37,13 +38,49 @@ def FullTask_Thirty():
         # 如果两个账号都未做寮三十 则进行寮三十任务
         Hwnd = {}
         if not (Flag[0] and Flag[1]):
-            MainTask_Thirty()
+            if MainTask_Thirty():
+                today = datetime.now()
+                week_day = today.weekday()
+                if week_day == 1:
+                    MainTask_Real_Snake()
         else:
             for i in range(2):
                 print("        SKIP- ----- 今日账号", Account[i], "已完成寮三十任务 跳过")
     else:
         print("TASK- ----- 时间不在12:00-24:00之间 跳过")
     print("TASK- ----- 寮三十任务已完成 ----------------------------------------------------------------")
+
+
+def MainTask_Real_Snake():
+    config_data = read_config("./config/Last_times.yml")
+    Accounts = list(config_data.keys())
+    Account1 = Accounts[0]
+    Account2 = Accounts[1]
+    Hwnd1 = Find_windows(Accounts[0])
+    Hwnd2 = Find_windows(Accounts[1])
+    Hwnd = [Hwnd1, Hwnd2]
+    for Account in Accounts:
+        print("    切换到 ", Account, " 账号")
+        print("        TIME- ----- 读取上次账号", Account, "完成真蛇时间")
+        Times_zhenshe = check_lasttime(Account, "真蛇")
+        current_time = datetime.now()
+        if Times_zhenshe.date() != current_time.date():
+            if Real_Snake("御魂装配", Hwnd, Accounts):
+                # 更新配置 写入当前时间
+                config = read_config("./config/Last_times.yml")
+                Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                config[Account]["真蛇"] = Now
+                write_config("./config/Last_times.yml", config)
+                print("        TIME- ----- 本次真蛇完成时间")
+                print("        TIME- ----- ", Now)
+                print("        TASK- ----- 真蛇任务完成")
+            else:
+                print("        TASK- ----- 真蛇任务执行过程中出现错误 中断任务")
+        else:
+            print("        SKIP- ----- 今日已完成真蛇任务 跳过")
+
+        Hwnd = [Hwnd2, Hwnd1]
+        Accounts = [Account2, Account1]
 
 
 def MainTask_Thirty():
@@ -67,8 +104,10 @@ def MainTask_Thirty():
         print("        TIME- ----- 本次寮三十完成时间")
         print("        TIME- ----- ", Now)
         print("        TASK- ----- 寮三十任务完成")
+        return 1
     else:
         print("        TASK- ----- 寮三十任务执行过程中出现错误 中断任务")
+        return 0
 
 
 def Task_Liao_30(Hwnd1, Hwnd2, Account):
@@ -86,7 +125,116 @@ def Task_Liao_30(Hwnd1, Hwnd2, Account):
         print("        INFO- ----- 副本次数为 0 次 无需执行寮三十任务")
         return 0
 
-    return Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times)
+    Return = Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times)
+
+    return Return
+
+
+def Real_Snake(current_state, Hwnd, Account):
+    """
+    真蛇
+    """
+    for step in range(30):
+        Sleep_print(1)
+        match current_state:
+            case "御魂装配":
+                for i in range(2):
+                    print("    切换到 ", Account[i], " 账号")
+                    print("        INFO- -----", Account[i], "装配", "真蛇编队")
+                    Team_Preset(Hwnd[i], "日常编组", "真蛇编队")
+                    Itface_scroll(Hwnd[i])
+                print("        STEP- vvvvv 跳转探索界面")
+                current_state = "探索界面"
+            case "探索界面":
+                print("    切换到 ", Account[0], " 账号")
+                Itface_explore(Hwnd[0])
+                Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Thr/真蛇图标.png", 0.05, 0)
+                if Range:
+                    print("        INFO-", Match, "检测到真蛇副本图标")
+                    Click(Hwnd[0], Range, 1)
+                    print("        STEP- vvvvv 跳转阴阳寮频道")
+                    current_state = "阴阳寮频道"
+                else:
+                    print("        INFO-", Match, "未检测到真蛇副本图标 跳过真蛇任务")
+                    return 0
+            case "阴阳寮频道":
+                print("    切换到 ", Account[1], " 账号")
+                Itface_Host(Hwnd[1])
+                Find = Find_Click_windows(Hwnd[1], "./pic/Thr/频道.png", 0.05, "点击频道图标", "未找到频道图标")
+                if Find:
+                    Find = Find_Click_windows(Hwnd[1], "./pic/Thr/阴阳寮频道.png", 0.05, "选择阴阳寮频道", "未找到阴阳寮频道选项 似乎已在其中")
+                    print("        STEP- vvvvv 跳转创建队伍")
+                    current_state = "创建队伍"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "创建队伍":
+                print("    切换到 ", Account[0], " 账号")
+                Find_Click_windows(Hwnd[0], "./pic/Thr/真蛇挑战图标.png", 0.05, "点击真蛇挑战图标", "未找到真蛇挑战图标")
+                Find_Click_windows(Hwnd[0], "./pic/Main/Queding.png", 0.03, "点击确定", "未找到确定图标")
+                Sleep_print(0.5)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd[0], "./pic/Thr/邀请好友和寮成员.png", 0.03, 0)
+                if Range:
+                    Click(Hwnd[1], Range, 1)
+                    print("        INFO-", Matchs, "选择邀请好友和寮成员")
+                else:
+                    print("        INFO-", Matchs, "已经选择邀请好友和寮成员")
+                Find_Click_windows(Hwnd[0], "./pic/Thr/真蛇队伍创建图标.png", 0.01, "点击创建队伍", "未找到创建队伍图标")
+                print("        STEP- vvvvv 跳转加入队伍")
+                current_state = "加入队伍"
+            case "加入队伍":
+                print("    切换到 ", Account[1], " 账号")
+                Find = Find_Click_windows(Hwnd[1], "./pic/Thr/点击加入.png", 0.01, "点击加入队伍", "未找到点击加入")
+                if Find:
+                    Find_Click_windows(Hwnd[1], "./pic/Main/Queding.png", 0.03, "点击确定", "未找到确定图标")
+                    print("        STEP- vvvvv 跳转准备挑战")
+                    current_state = "准备挑战"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
+            case "准备挑战":
+                print("    切换到 ", Account[0], " 账号")
+                Find_Click_windows(Hwnd[0], "./pic/Thr/真蛇挑战.png", 0.03, "点击挑战", "未找到挑战图标")
+                Sleep_print(2)
+                print("    切换到 ", Account[1], " 账号")
+                Find_Click_windows(Hwnd[1], "./pic/Thr/收起频道框.png", 0.05, "点击收起频道框", "未找到收起频道框图标")
+                for i in range(2):
+                    print("    切换到 ", Account[i], " 账号")
+                    Find_Click_windows(Hwnd[i], "./pic/Thr/真蛇准备.png", 0.03, "点击准备", "未找到准备图标")
+                Sleep_print(1)
+                print("        STEP- vvvvv 跳转战斗阶段")
+                current_state = "战斗阶段"
+            case "战斗阶段":
+                for i in range(2):
+                    print("    切换到 ", Account[i], " 账号")
+                    Find_Click_windows(Hwnd[i], "./pic/Thr/真蛇自动准备.png", 0.03, "点击自动准备", "未找到自动准备图标")
+                print("        INFO- ----- 开始等待战斗")
+                Sleep_print(100)
+                for Wait in range(10):
+                    Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Digui/Zhandoujiangli.png", 0.05, 0)
+                    if not Range:
+                        Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Main/Queding.png", 0.03, 0)
+                    if Range:
+                        print("        INFO-", Match, "检测到战斗奖励")
+                        for i in range(2):
+                            print("    切换到 ", Account[i], " 账号")
+                            Find = Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
+                            if not Find:
+                                Find = Find_Click_windows(Hwnd[i], "./pic/Main/Queding.png", 0.05, "点击确定", "未检测到确定图标")
+                        print("        STEP- vvvvv 跳转结束界面")
+                        current_state = "结束界面"
+                        break
+                    else:
+                        print("        INFO-", Match, "未检测到结束")
+                        print("        WAIT- wwwww 等待准备 已等待 {waittime} 秒".format(waittime=(Wait * 10 + 100)))
+                        Sleep_print(10)
+            case "结束界面":
+                for i in range(2):
+                    print("    切换到 ", Account[i], " 账号")
+                    Itface_Host(Hwnd[i])
+                return 1
+    print("        STEP- vvvvv 状态机轮次耗尽")
+    return 0
 
 
 def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
@@ -334,7 +482,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 for Wait in range(120):
                     Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Thr/取消图标.png", 0.05, 0)
                     if Range:
-                        print("        INFO-", Matchs, "检测到结束")
+                        print("        INFO-", Match, "检测到结束")
                         for i in range(2):
                             print("    切换到 ", Account[i], " 账号")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/取消图标.png", 0.05, "点击取消继续", "未找到取消图标")
@@ -342,7 +490,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                         current_state = "结束界面"
                         break
                     else:
-                        print("        INFO-", Matchs, "未检测到结束")
+                        print("        INFO-", Match, "未检测到结束")
                         print("        WAIT- wwwww 等待准备 已等待 {waittime} 分钟".format(waittime=(Wait + 1) * 0.5))
                         Sleep_print(30)
             case "结束界面":

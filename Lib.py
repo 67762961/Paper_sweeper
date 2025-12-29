@@ -790,7 +790,7 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
                         print("        STEP- vvvvv 跳转异常退出界面")
                         current_state = "异常退出"
                 else:
-                    print("        INFO-", Matchs, "似乎已经选中预设队伍 ", Preset_name)
+                    print("        INFO-", Matchs, "似乎已经选中预设队伍", Preset_name)
                     print("        STEP- vvvvv 跳转应用预设")
                     current_state = "应用预设"
             case "应用预设":
