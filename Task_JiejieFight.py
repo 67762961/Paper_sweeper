@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from Lib import (
     Find_windows,
     Find_in_windows_Matchs,
@@ -56,7 +56,7 @@ def FullTask_JiejieFight():
             Times_jiejieFight = check_lasttime(Account, "结界突破")
             current_time = datetime.now()
             # 当天未完成结界突破任务 则执行
-            if Times_jiejieFight.date() != current_time.date():
+            if abs(current_time - Times_jiejieFight) >= timedelta(hours=6):
                 Hwnd = Find_windows(Account)
                 if JiejieFight(Hwnd):
                     # 更新配置 写入当前时间
