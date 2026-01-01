@@ -467,9 +467,11 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiyangliebiao.png", 0.05, 0)
                     print("        INFO-", Matchs, "移动到寄养列表")
                     Move_to_range(Hwnd, Range)
-
-                    Str1 = "检测到" + string
-                    Str2 = "未检测到" + string
+                    Str1 = "点击" + string
+                    Str2 = "无法点击" + string
+                    Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
+                    Str1 = "再次点击" + string
+                    Str2 = "无法点击" + string
                     Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
                     if Find:
                         if Find_Click_windows(Hwnd, "./pic/Sis/Jinrujiejie.png", 0.05, "点击进入结界", "点击进入结界异常"):
