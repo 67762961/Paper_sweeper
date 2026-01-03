@@ -554,10 +554,25 @@ def Itface_Host(Hwnd):
                         if Check:
                             return 1
                     else:
-                        current_state = "检测弹窗"
+                        current_state = "检测协作"
                         break
+                current_state = "检测协作"
+            case "检测协作":
+                # 检测协作
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/拒绝协作.png", 0.01, 0)
+                Sleep_print(1)
+                if Range:
+                    Click(Hwnd, Range, 1)
+                    print("        INFO-", Matchs, "关闭协作")
+                    Check = Host_check(Hwnd, 1)
+                    if Check:
+                        return 1
+                    else:
+                        current_state = "庭院界面"
+                        Wait = 1
+                else:
+                    print("        INFO-", Matchs, "未发现协作")
                 current_state = "检测弹窗"
-
             case "检测弹窗":
                 # 检测弹窗
                 Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Cha.png", 0.01, 0)
