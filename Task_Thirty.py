@@ -41,7 +41,8 @@ def FullTask_Thirty():
             if MainTask_Thirty():
                 today = datetime.now()
                 week_day = today.weekday()
-                if week_day == 1:
+                if week_day == 0:
+                    print("        INFO- ----- 今天是星期一 开始执行真蛇任务")
                     MainTask_Real_Snake()
         else:
             for i in range(2):
@@ -213,14 +214,16 @@ def Real_Snake(current_state, Hwnd, Account):
                 for Wait in range(10):
                     Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Digui/Zhandoujiangli.png", 0.05, 0)
                     if not Range:
-                        Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Main/Queding.png", 0.03, 0)
+                        Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Thr/真蛇确定.png", 0.05, 0)
                     if Range:
                         print("        INFO-", Match, "检测到战斗奖励")
                         for i in range(2):
                             print("    切换到 ", Account[i], " 账号")
                             Find = Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
                             if not Find:
-                                Find = Find_Click_windows(Hwnd[i], "./pic/Main/Queding.png", 0.05, "点击确定", "未检测到确定图标")
+                                Find_Click_windows(Hwnd[i], "./pic/Thr/真蛇确定.png", 0.05, "点击确定", "未检测到确定图标")
+                                Sleep_print(1)
+                                Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
                         print("        STEP- vvvvv 跳转结束界面")
                         current_state = "结束界面"
                         break
@@ -475,7 +478,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
             case "战斗":
-                Sleep_print(6)
+                Sleep_print(7)
                 Find_Click_windows(Hwnd[0], "./pic/Thr/收起频道框.png", 0.05, "点击收起频道框", "未找到收起频道框图标")
                 print("        INFO-", Matchs, "开始等待战斗结束")
                 Sleep_print(30)
