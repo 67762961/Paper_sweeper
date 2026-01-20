@@ -136,7 +136,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
     御魂副本寮三十
     """
     Hwnd = [Hwnd1, Hwnd2]
-    current_state = "结束界面"
+    current_state = "御魂装配"
     match Fuben:
         case "魂虚":
             print("        INFO- ----- 选择魂虚副本", Times, "次")
@@ -387,8 +387,9 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                         print("        INFO-", Match, "未检测到结束")
                         print("        WAIT- wwwww 等待准备 已等待 {waittime} 分钟".format(waittime=(Wait + 1) * 0.5))
                         Sleep_print(30)
-                    print("        INFO- 等待轮耗尽 尝试再次进入等待轮")
-                    current_state = "结束界面"
+                    if Wait == 119:
+                        print("        INFO- 等待轮耗尽 尝试再次进入等待轮")
+                        current_state = "结束界面"
             case "结束界面":
                 print("    切换到 ", Account[1], " 账号")
                 Find_Click_windows(Hwnd[1], "./pic/Thr/取消图标.png", 0.05, "点击取消继续邀请", "未找到取消图标")
