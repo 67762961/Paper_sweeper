@@ -335,15 +335,15 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                     Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数.png", 0.01, "点击小纸人计数", "未找到小纸人计数图标")
                     match Times:
                         case 1:
-                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数1.png", 0.01, "点击小纸人计数1", "未找到小纸人计数1图标")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数1.png", 0.005, "点击小纸人计数1", "未找到小纸人计数1图标")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数确定.png", 0.01, "点击小纸人计数确定", "未找到小纸人计数确定图标")
                         case 30:
-                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数3.png", 0.01, "点击小纸人计数3", "未找到小纸人计数3图标")
-                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数0.png", 0.01, "点击小纸人计数0", "未找到小纸人计数0图标")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数3.png", 0.005, "点击小纸人计数3", "未找到小纸人计数3图标")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数0.png", 0.005, "点击小纸人计数0", "未找到小纸人计数0图标")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数确定.png", 0.01, "点击小纸人计数确定", "未找到小纸人计数确定图标")
                         case 50:
-                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数5.png", 0.01, "点击小纸人计数5", "未找到小纸人计数5图标")
-                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数0.png", 0.01, "点击小纸人计数0", "未找到小纸人计数0图标")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数5.png", 0.005, "点击小纸人计数5", "未找到小纸人计数5图标")
+                            Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数0.png", 0.005, "点击小纸人计数0", "未找到小纸人计数0图标")
                             Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数确定.png", 0.01, "点击小纸人计数确定", "未找到小纸人计数确定图标")
                     Find = Find_Click_windows(Hwnd[i], Tuichutubiao, 0.05, "点击退出", "未找到退出图标")
                     if Find:
