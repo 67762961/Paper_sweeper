@@ -543,8 +543,24 @@ def Itface_Host(Hwnd):
                 if Check:
                     return 1
                 else:
-                    current_state = "Esc退出"
 
+                    current_state = "一键返回"
+            case "一键返回":
+                # 一键返回
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/一键返回庭院.png", 0.01, 0)
+                Sleep_print(1)
+                if Range:
+                    Click(Hwnd, Range, 1)
+                    print("        INFO-", Matchs, "一键返回庭院")
+                    Check = Host_check(Hwnd, 1)
+                    if Check:
+                        return 1
+                    else:
+                        current_state = "庭院界面"
+                        Wait = 1
+                else:
+                    print("        INFO-", Matchs, "未发现一键返回庭院图标")
+                current_state = "Esc退出"
             case "Esc退出":
                 for i in range(3):
                     # 若Esc未触发退出界面 则再尝试
