@@ -9,6 +9,7 @@ from Task_Digui import MainTask_Digui
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
 from Task_Thirty import MainTask_Thirty, FullTask_Thirty
 from Task_JiejieFight import MainTask_JiejieFight, FullTask_JiejieFight
+from Task_Shouliezhan import MainTask_Shouliezhan
 
 
 # 创建了一个 Tee 类，用于同时将输出写入文件和控制台
@@ -90,6 +91,7 @@ def Full_operation(console_signal=None):
             MainTask_Digui()
             FullTask_Thirty()
             FullTask_JiejieFight()
+            MainTask_Shouliezhan()
             MainTask_Fengmo()
             print("        ")
             print("MAIN- ===== 完整运行流程结束 ================================================================")

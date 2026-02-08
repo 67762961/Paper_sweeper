@@ -727,7 +727,7 @@ def Itface_daily(Hwnd):
             break
         if Find_Click_windows(Hwnd, "./pic/Main/Doujirukou.png", 0.05, "进入斗技入口", "未检测到斗技入口"):
             break
-        if Find_Click_windows(Hwnd, "./pic/Main/Yinjiezhimenrukou.png", 0.05, "进入阴界之门入口", "未检测到阴界之门入口"):
+        if Find_Click_windows(Hwnd, "./pic/Shouliezhan/阴界之门入口.png", 0.05, "进入阴界之门入口", "未检测到阴界之门入口"):
             break
         if Find_Click_windows(Hwnd, "./pic/Main/Daoguanrukou.png", 0.05, "进入道馆入口", "未检测到道馆入口"):
             break
