@@ -1,3 +1,9 @@
+import os
+import sys
+
+if sys.platform == "win32":
+    os.environ["QT_QPA_PLATFORM"] = "windows:dpiawareness=1"
+
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QScrollArea, QFrame, QLabel
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from qt_material import apply_stylesheet
