@@ -9,6 +9,8 @@ import random
 from datetime import datetime
 import os
 import ruamel.yaml
+import subprocess
+import yaml
 
 
 def Sleep_print(Wait_time):
@@ -49,7 +51,33 @@ def Find_windows(title):
 
     hwnds = []
     win32gui.EnumWindows(callback, hwnds)
-    return hwnds[0] if hwnds else None
+    if hwnds:
+        return hwnds[0]
+    else:
+        print("        INFO- ----- 未检测到窗口", title, "正在尝试启动游戏")
+        Log_in(title)
+        return Find_windows(title)
+
+
+def Log_in(title):
+    with open("./config/Setting.yml", "r", encoding="utf-8") as f:
+        config = read_config("./config/Setting.yml")
+        launch_cmd = config["启动项"][title]["启动命令"]
+    subprocess.Popen(launch_cmd, shell=True)
+    print("        INFO- -----", title, "正在启动")
+    time.sleep(20)
+    Hwnd = Find_windows(title)
+
+    for Wait in range(100):
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/适龄提示标.png", 0.03, 0)
+        if Range:
+            print("        INFO-", Matchs, "检测到适龄提示界面 点击进入游戏")
+            Click(Hwnd, [(830, 940), (1085, 1010)], 7)
+            return 1
+        else:
+            print("        INFO-", Matchs, "未检测到适龄提示界面")
+            print("        WAIT- wwwww 等待准备 已等待 {waittime} 秒".format(waittime=Wait * 1 + 20))
+            Sleep_print(1)
 
 
 def Img_read_ch(file_path):
@@ -531,6 +559,19 @@ def Itface_Host(Hwnd):
                 print("        INFO-", Matchs, "检测到进入庭院")
                 return 1
             else:
+                print("        INFO-", Matchs, "未检测到庭院界面")
+                # 一键返回
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/一键返回庭院.png", 0.05, 0)
+                Sleep_print(1)
+                if Range:
+                    Click(Hwnd, Range, 1)
+                    print("        INFO-", Matchs, "一键返回庭院")
+                    Sleep_print(2)
+                    Check = Host_check(Hwnd, 1)
+                    if Check:
+                        return 1
+                else:
+                    print("        INFO-", Matchs, "未发现一键返回庭院图标")
                 Sleep_print(1)
         return 0
 
@@ -543,36 +584,7 @@ def Itface_Host(Hwnd):
                 if Check:
                     return 1
                 else:
-
-                    current_state = "一键返回"
-            case "一键返回":
-                # 一键返回
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/一键返回庭院.png", 0.01, 0)
-                Sleep_print(1)
-                if Range:
-                    Click(Hwnd, Range, 1)
-                    print("        INFO-", Matchs, "一键返回庭院")
-                    Check = Host_check(Hwnd, 1)
-                    if Check:
-                        return 1
-                    else:
-                        current_state = "庭院界面"
-                        Wait = 1
-                else:
-                    print("        INFO-", Matchs, "未发现一键返回庭院图标")
-                current_state = "Esc退出"
-            case "Esc退出":
-                for i in range(3):
-                    # 若Esc未触发退出界面 则再尝试
-                    if not Esc_print(Hwnd):
-                        Sleep_print(1)
-                        Check = Host_check(Hwnd, 1)
-                        if Check:
-                            return 1
-                    else:
-                        current_state = "检测协作"
-                        break
-                current_state = "检测协作"
+                    current_state = "检测协作"
             case "检测协作":
                 # 检测协作
                 Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/拒绝协作.png", 0.01, 0)
@@ -636,6 +648,19 @@ def Itface_Host(Hwnd):
                         Wait = 1
                 else:
                     print("        INFO-", Matchs, "未发现退出标志2")
+                current_state = "Esc退出"
+
+            case "Esc退出":
+                for i in range(3):
+                    # 若Esc未触发退出界面 则再尝试
+                    if not Esc_print(Hwnd):
+                        Sleep_print(1)
+                        Check = Host_check(Hwnd, 1)
+                        if Check:
+                            return 1
+                    else:
+                        current_state = "庭院界面"
+                        break
                 current_state = "庭院界面"
 
     print("        STEP- vvvvv 状态机轮次耗尽")

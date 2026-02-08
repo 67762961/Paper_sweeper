@@ -146,16 +146,6 @@ def Jiejieyangcheng(current_state, Hwnd):
                     current_state = "异常退出"
 
             case "结束":
-                Esc_print(Hwnd)
-                Sleep_print(2)
-                for i in range(5):
-                    Find = Find_Click_windows(Hwnd, "./pic/Main/退出标志2.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
-                    if Find:
-                        Sleep_print(1)
-                        break
-                    else:
-                        Sleep_print(3)
-                        Esc_print(Hwnd)
                 Itface_Host(Hwnd)
                 return 1
 
