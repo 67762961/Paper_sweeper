@@ -71,6 +71,7 @@ def Log_in(title):
     for Wait in range(100):
         Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/适龄提示标.png", 0.03, 0)
         if Range:
+            Sleep_print(1)
             print("        INFO-", Matchs, "检测到适龄提示界面 点击进入游戏")
             Click(Hwnd, [(830, 940), (1085, 1010)], 7)
             return 1
