@@ -93,6 +93,7 @@ def Task_Yingjiezhimen(Hwnd, Account):
                 if Find:
                     print("        STEP- vvvvv 跳转战斗界面")
                     current_state = "战斗界面"
+                    Sleep_print(2)
                 else:
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
