@@ -109,7 +109,17 @@ def Work_Mail(Hwnd, Account):
             print("        INFO-", Matchs, "领取成功")
             # 按下esc退出
             Esc_print(Hwnd)
-            Sleep_print(1)
+            Sleep_print(2)
+
+            # 检测万华牌
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/万华牌跳过.png", 0.05, 0)
+            if Range:
+                Click(Hwnd, Range, 1)
+                print("        INFO-", Matchs, "领取万华牌")
+                Find_Click_windows(Hwnd, "./pic/Main/Cha.png", 0.05, "点击关闭", "未正常关闭万华牌")
+            else:
+                print("        INFO-", Matchs, "未检测到万华牌")
+
             # 检测消息邮件
             for i in range(10):
                 Find = Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "点击消息邮件", "未发现消息邮件")
