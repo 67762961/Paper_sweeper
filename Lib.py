@@ -779,6 +779,7 @@ def Itface_explore(Hwnd):
                     current_state = "异常退出"
             case "六道界面":
                 print("        INFO- -----点击退出区域")
+                Sleep_print(1)
                 Range = [(20, 105), (91, 175)]
                 Click(Hwnd, Range, 1)
                 Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Digui/Diguitubiao.png", 0.05, 0)
