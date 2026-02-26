@@ -275,6 +275,8 @@ def Find_multiple_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show, max_
         # 用蒙版盖住已匹配区域（避免重复检测）
         cv2.rectangle(Img_working, Left_up, Right_down, (0, 0, 0), -1)
 
+        time.sleep(0.05)
+
     # 显示结果（如果启用）
     if Flag_show and positions:
         # 深拷贝原始图像以避免修改
