@@ -25,7 +25,7 @@ def MainTask_JiejieFight():
     for Account in headers:
         print("    切换到 ", Account, " 账号")
         Hwnd = Find_windows(Account)
-        if JiejieFight(Hwnd):
+        if JiejieFight(Hwnd, Account):
             # 更新配置 写入当前时间
             config = read_config("./config/Last_times.yml")
             Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -58,7 +58,7 @@ def FullTask_JiejieFight():
             # 当天未完成结界突破任务 则执行
             if abs(current_time - Times_jiejieFight) >= timedelta(hours=6):
                 Hwnd = Find_windows(Account)
-                if JiejieFight(Hwnd):
+                if JiejieFight(Hwnd, Account):
                     # 更新配置 写入当前时间
                     config = read_config("./config/Last_times.yml")
                     Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -76,7 +76,14 @@ def FullTask_JiejieFight():
     print("TASK- ----- 结界突破任务结束 ----------------------------------------------------------------")
 
 
-def JiejieFight(Hwnd):
+def JiejieFight(Hwnd, Account):
+
+    config = read_config("./config/Setting.yml")
+    Num_tui = config["结界突破"][Account]["退出次数"]
+    Num_Start = config["结界突破"][Account]["开打勋章"]
+    print("        TASK- ----- 读取", Account, "配置为 打 9 退", Num_tui)
+    print("        TASK- ----- 满", Num_Start, "勋章开打")
+
     current_state = "御魂装配"
     for step in range(120):
         Sleep_print(1)
@@ -106,7 +113,7 @@ def JiejieFight(Hwnd):
                     if Num == 0:
                         Num, Range, Matchs = Find_multiple_in_windows_Matchs(Hwnd, "./pic/JiejieFight/勋章.png", 0.03, 0, 45)
                         print("        INFO- ----- 检测到", Num, "个勋章")
-                        if Num < 20:
+                        if Num < Num_Start:
                             Find = Find_Click_windows(Hwnd, "./pic/JiejieFight/刷新.png", 0.05, "点击刷新图标", "未检测到刷新图标")
                             if Find:
                                 Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未检测到确定图标")
@@ -114,7 +121,9 @@ def JiejieFight(Hwnd):
                                 current_state = "结界突破界面"
                                 Flag_Skip = True
                             else:
-                                print("        INFO- ----- 勋章少于20个 暂停结界突破任务 等待人工刷新")
+                                print("        INFO- ----- 勋章少于", Num_Start, "个 跳过结界突破任务")
+
+                                Find_Click_windows(Hwnd, "./pic/Main/Cha.png", 0.05, "关闭结界突破界面", "未检测到关闭图标")
                                 Itface_Host(Hwnd)
                                 return 0
                         else:
@@ -126,9 +135,9 @@ def JiejieFight(Hwnd):
                         print("        STEP- vvvvv 跳转正常战斗界面")
                         current_state = "正常战斗界面"
                 else:
-                    print("        INFO- ----- 检测到", Num, "个已攻破结界 准备三退")
-                    print("        STEP- vvvvv 跳转三退战斗界面")
-                    current_state = "三退战斗界面"
+                    print("        INFO- ----- 检测到", Num, "个已攻破结界 准备", Num_tui, "次退出")
+                    print("        STEP- vvvvv 跳转退战斗界面")
+                    current_state = "退战斗界面"
 
                 Sleep_print(1)
 
@@ -179,8 +188,8 @@ def JiejieFight(Hwnd):
                     print("        STEP- vvvvv 跳转结界突破界面")
                     current_state = "结界突破界面"
 
-            case "三退战斗界面":
-                for times in range(3):
+            case "退战斗界面":
+                for times in range(Num_tui):
                     print("        INFO- ----- 第", times + 1, "次退出")
                     for wait in range(10):
                         Sleep_print(0.5)
@@ -208,7 +217,7 @@ def JiejieFight(Hwnd):
                         Find_Click_windows(Hwnd, "./pic/JiejieFight/确认.png", 0.05, "点击确认", "未检测到确认按钮")
                     else:
                         print("        INFO- ----- 未出现再次挑战二次确认弹框")
-                print("        INFO- ----- 三退完成")
+                print("        INFO- ----- ", Num_tui, "次退出完成")
                 print("        STEP- vvvvv 跳转正常战斗界面")
                 current_state = "正常战斗界面"
 
