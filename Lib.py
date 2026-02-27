@@ -606,7 +606,7 @@ def Itface_Host(Hwnd):
                 current_state = "检测弹窗"
             case "检测弹窗":
                 # 检测弹窗
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Cha.png", 0.01, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Cha.png", 0.01 + 0.01 * step, 0)
                 Sleep_print(1)
                 if Range:
                     Click(Hwnd, Range, 1)
