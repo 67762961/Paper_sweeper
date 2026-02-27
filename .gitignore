@@ -6,7 +6,6 @@ test.py
 txt.txt
 build
 dist
-GUI.spec
 config
 GUI.exe
 logs
