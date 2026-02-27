@@ -136,7 +136,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
     御魂副本寮三十
     """
     Hwnd = [Hwnd1, Hwnd2]
-    current_state = "御魂装配"
+    current_state = "组队界面"
     match Fuben:
         case "魂虚":
             print("        INFO- ----- 选择魂虚副本", Times, "次")
@@ -214,11 +214,11 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                     current_state = "副本组别界面"
                 else:
                     print("        INFO-", Matchs, "目前不正在", Fuben_Group_Name, "副本组别内")
-                    for i in range(5):
+                    for i in range(7):
                         Massage1 = "点击" + Fuben_Group_Name + "组别选项"
                         Massage2 = "未找到" + Fuben_Group_Name + "组别选项"
                         Find = Find_Click_windows(Hwnd[1], Fuben_Group_card, 0.01, Massage1, Massage2)
-                        Find = Find_Click_windows(Hwnd[1], Fuben_Group_card, 0.01, Massage1, Massage2)
+                        Find_Click_windows(Hwnd[1], Fuben_Group_card, 0.01, Massage1, Massage2)
                         if Find:
                             print("        STEP- vvvvv 跳转副本组别界面")
                             current_state = "副本组别界面"
@@ -227,7 +227,10 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                             Range, Matchs = Find_in_windows_Matchs(Hwnd[1], "./pic/Thr/副本组别表头.png", 0.05, 0)
                             print("        INFO-", Matchs, "转到副本组别表头位置")
                             Move_to_range(Hwnd[1], Range)
-                            Scroll_print(Hwnd[1], 1)
+                            if i <= 2:
+                                Scroll_print(Hwnd[1], 3)
+                            else:
+                                Scroll_print(Hwnd[1], -1)
                     if not Find:
                         print("        STEP- vvvvv 跳转异常退出界面")
                         current_state = "异常退出"
