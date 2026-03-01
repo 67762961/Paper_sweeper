@@ -862,6 +862,13 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
                         print("        INFO-", Matchs, "点击确认")
                     else:
                         print("        INFO-", Matchs, "未发现二次确认按钮 似乎已经是此配置")
+                    if Find:
+                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Queding.png", 0.05, 0)
+                        if Range:
+                            Click(Hwnd, Range, 0.5)
+                            print("        INFO-", Matchs, "点击确认更换御灵")
+                        else:
+                            print("        INFO-", Matchs, "未发现二次确认按钮 似乎已经是此配置")
                     print("        STEP- vvvvv 跳转结束界面")
                     current_state = "结束"
                 else:
