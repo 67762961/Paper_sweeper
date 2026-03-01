@@ -136,7 +136,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
     御魂副本寮三十
     """
     Hwnd = [Hwnd1, Hwnd2]
-    current_state = "组队界面"
+    current_state = "御魂装配"
     match Fuben:
         case "魂虚":
             print("        INFO- ----- 选择魂虚副本", Times, "次")
