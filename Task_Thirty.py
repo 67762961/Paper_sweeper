@@ -41,14 +41,16 @@ def FullTask_Thirty():
             if MainTask_Thirty():
                 today = datetime.now()
                 week_day = today.weekday()
-                if week_day == 0:
-                    print("        INFO- ----- 今天是星期一 开始执行真蛇任务")
-                    MainTask_Real_Snake()
         else:
             for i in range(2):
                 print("        SKIP- ----- 今日账号", Account[i], "已完成寮三十任务 跳过")
     else:
         print("TASK- ----- 时间不在9:00-23:00之间 跳过")
+
+    week_day = datetime.now().weekday()
+    if week_day < 5:
+        print("        INFO- ----- 今天是非周末 开始执行真蛇任务")
+        MainTask_Real_Snake()
     print("TASK- ----- 寮三十任务已完成 ----------------------------------------------------------------")
 
 
@@ -65,7 +67,8 @@ def MainTask_Real_Snake():
         print("        TIME- ----- 读取上次账号", Account, "完成真蛇时间")
         Times_zhenshe = check_lasttime(Account, "真蛇")
         current_time = datetime.now()
-        if Times_zhenshe.date() != current_time.date():
+        if Times_zhenshe.isocalendar() != current_time.isocalendar():
+            print("        INFO- ----- 账号", Account, "本周未完成真蛇任务 开始执行真蛇任务")
             if Real_Snake("御魂装配", Hwnd, Accounts):
                 # 更新配置 写入当前时间
                 config = read_config("./config/Last_times.yml")
@@ -78,7 +81,7 @@ def MainTask_Real_Snake():
             else:
                 print("        TASK- ----- 真蛇任务执行过程中出现错误 中断任务")
         else:
-            print("        SKIP- ----- 今日已完成真蛇任务 跳过")
+            print("        SKIP- ----- 本周已完成真蛇任务 跳过")
 
         Hwnd = [Hwnd2, Hwnd1]
         Accounts = [Account2, Account1]
@@ -505,7 +508,7 @@ def Real_Snake(current_state, Hwnd, Account):
                             Find = Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
                             if not Find:
                                 Find_Click_windows(Hwnd[i], "./pic/Thr/真蛇确定.png", 0.05, "点击确定", "未检测到确定图标")
-                                Sleep_print(1)
+                                Sleep_print(5)
                                 Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
                         print("        STEP- vvvvv 跳转结束界面")
                         current_state = "结束界面"
