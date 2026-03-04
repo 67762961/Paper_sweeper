@@ -67,7 +67,7 @@ def MainTask_Real_Snake():
         print("        TIME- ----- 读取上次账号", Account, "完成真蛇时间")
         Times_zhenshe = check_lasttime(Account, "真蛇")
         current_time = datetime.now()
-        if Times_zhenshe.isocalendar() != current_time.isocalendar():
+        if Times_zhenshe.isocalendar()[1] != current_time.isocalendar()[1]:
             print("        INFO- ----- 账号", Account, "本周未完成真蛇任务 开始执行真蛇任务")
             if Real_Snake("御魂装配", Hwnd, Accounts):
                 # 更新配置 写入当前时间
