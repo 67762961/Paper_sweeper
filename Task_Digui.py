@@ -42,8 +42,8 @@ def Diyuguiwang(current_state, Hwnd):
     """
     挑战地域鬼王
     """
-    print("        INFO- ----- 装配阴界编队")
-    Team_Preset(Hwnd, "日常编组", "阴界编队")
+    print("        INFO- ----- 装配结界编队")
+    Team_Preset(Hwnd, "日常编组", "结界编队")
 
     print("        INFO- ----- 前往地鬼界面")
     Itface_explore(Hwnd)
@@ -131,7 +131,7 @@ def Diyuguiwang(current_state, Hwnd):
 
                     Find_Click_windows(Hwnd, "./pic/Team/Richangbianzu.png", 0.05, "点击日常编组", "似乎已经在日常编组中")
 
-                    if not Find_Click_windows(Hwnd, "./pic/Team/阴界队出战.png", 0.05, "点阴界队", "未检测到阴界队图标"):
+                    if not Find_Click_windows(Hwnd, "./pic/Team/结界队出战.png", 0.05, "点结界队", "未检测到结界队图标"):
                         print("        STEP- vvvvv 跳转异常退出界面")
                         current_state = "异常退出"
                         break
