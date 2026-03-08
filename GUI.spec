@@ -1,7 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-distpath = '.'  # 设置输出路径为根目录
-
 a = Analysis(
     ['GUI.py'],
     binaries=[],
