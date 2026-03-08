@@ -12,7 +12,7 @@ def MainTask_Shouliezhan():
     today = datetime.now()
     week_day = today.weekday()
     week_list = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
-    if week_day >= 5:
+    if week_day >= 4:
         print("TASK- ----- 今天是", week_list[week_day], "进行阴界之门任务")
         MainTask_Yingjiezhimen()
     else:
@@ -62,7 +62,7 @@ def Task_Yingjiezhimen(Hwnd, Account):
         match current_state:
             case "御魂装配":
                 print("        INFO- ----- 装配结界编队")
-                Team_Preset(Hwnd, "日常编组", "阴界编队")
+                Team_Preset(Hwnd, "日常编组", "结界编队")
                 print("        STEP- vvvvv 跳转庭院界面")
                 current_state = "庭院界面"
 
