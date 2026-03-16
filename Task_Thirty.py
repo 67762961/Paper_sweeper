@@ -509,10 +509,11 @@ def Real_Snake(current_state, Hwnd, Account):
                             if not Find:
                                 Find_Click_windows(Hwnd[i], "./pic/Thr/真蛇确定.png", 0.05, "点击确定", "未检测到确定图标")
                                 Sleep_print(5)
-                                Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
-                        print("        STEP- vvvvv 跳转结束界面")
-                        current_state = "结束界面"
-                        break
+                                Find = Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
+                        if Find:
+                            print("        STEP- vvvvv 跳转结束界面")
+                            current_state = "结束界面"
+                            break
                     else:
                         print("        INFO-", Match, "未检测到结束")
                         print("        WAIT- wwwww 等待准备 已等待 {waittime} 秒".format(waittime=(Wait * 10 + 100)))
@@ -522,5 +523,9 @@ def Real_Snake(current_state, Hwnd, Account):
                     print("    切换到 ", Account[i], " 账号")
                     Itface_Host(Hwnd[i])
                 return 1
+            case "异常退出":
+                Itface_Host(Hwnd[0])
+                Itface_Host(Hwnd[1])
+                return 0
     print("        STEP- vvvvv 状态机轮次耗尽")
     return 0
