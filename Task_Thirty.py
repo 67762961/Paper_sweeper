@@ -151,7 +151,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Img0 = "./pic/Thr/虚无副本图标0.png"
             Fuben_Img1 = "./pic/Thr/虚无副本图标1.png"
             Tuichutubiao = "./pic/Thr/退出0.png"
-            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标.png"
+            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标魂虚.png"
             Buff = 1
         case "魂王":
             print("        INFO- ----- 选择神罚副本", Times, "次")
@@ -163,7 +163,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Img0 = "./pic/Thr/神罚副本图标0.png"
             Fuben_Img1 = "./pic/Thr/神罚副本图标1.png"
             Tuichutubiao = "./pic/Thr/退出0.png"
-            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标.png"
+            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标魂虚.png"
             Buff = 1
         case "魂海":
             print("        INFO- ----- 选择魂海四副本", Times, "次")
@@ -338,6 +338,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 for i in range(2):
                     print("    切换到 ", Account[i], " 账号")
                     Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人图标.png", 0.05, "点击小纸人图标", "未找到小纸人图标")
+                    Find_Click_windows(Hwnd[i], "./pic/Thr/花车图标.png", 0.05, "点击花车图标", "未找到花车图标")
                     Find_Click_windows(Hwnd[i], "./pic/Thr/小纸人计数.png", 0.01, "点击小纸人计数", "未找到小纸人计数图标")
                     match Times:
                         case 1:
