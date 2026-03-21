@@ -102,7 +102,7 @@ def Work_Mail(Hwnd, Account):
 
         # 点击确定
         Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未正常领取确认")
-        Sleep_print(1)
+        Sleep_print(2)
         # 检测领取
         Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
         if Range:
@@ -129,6 +129,9 @@ def Work_Mail(Hwnd, Account):
             Esc_print(Hwnd)
             Itface_Host(Hwnd)
             return 1
+
+        Itface_Host(Hwnd)
+        return 0
 
 
 def MainTask_Fudai():
