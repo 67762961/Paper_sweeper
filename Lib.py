@@ -14,8 +14,11 @@ import yaml
 
 
 def Sleep_print(Wait_time):
-    time.sleep(Wait_time)
-    print("        WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
+    if Wait_time <= 1:
+        time.sleep(Wait_time)
+        print("        WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
+    else:
+        Sleep_print_long(Wait_time)
 
 
 def Scroll_print(Hwnd, length):
@@ -402,6 +405,18 @@ def Find_Click_screen(Model_path, Threshold, message_F, message_C):
     else:
         print("        INFO-", Matchs, message_C)
         return 0
+
+
+def Sleep_print_long(Wait_time):
+
+    time.sleep(Wait_time)
+    print("        WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
+
+    # 拒绝协作
+    if Wait_time > 1:
+        Range, Matchs = Find_in_screen_Matchs("./pic/Main/拒绝协作.png", 0.01, 0)
+        if Range:
+            Find_click_screen("./pic/Main/拒绝协作.png", 0.01, "拒绝协作", "未发现协作")
 
 
 def read_config(FILE_PATH):
