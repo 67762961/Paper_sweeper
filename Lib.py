@@ -68,7 +68,7 @@ def Log_in(title):
         launch_cmd = config["启动项"][title]["启动命令"]
     subprocess.Popen(launch_cmd, shell=True)
     print("        INFO- -----", title, "正在启动")
-    time.sleep(20)
+    time.sleep(25)
     Hwnd = Find_windows(title)
 
     for Wait in range(100):
@@ -76,8 +76,13 @@ def Log_in(title):
         if Range:
             Sleep_print(1)
             print("        INFO-", Matchs, "检测到适龄提示界面 点击进入游戏")
-            Click(Hwnd, [(830, 940), (1085, 1010)], 7)
-            return 1
+            Click(Hwnd, [(830, 940), (1085, 1010)], 1)
+            Sleep_print(1)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/适龄提示标.png", 0.03, 0)
+            if not Range:
+                print("        INFO-", Matchs, "未检测到适龄提示界面 已经进入游戏")
+                Sleep_print(2)
+                return 1
         else:
             print("        INFO-", Matchs, "未检测到适龄提示界面")
             print("        WAIT- wwwww 等待准备 已等待 {waittime} 秒".format(waittime=Wait * 1 + 20))
