@@ -15,8 +15,8 @@ import yaml
 
 def Sleep_print(Wait_time):
     if Wait_time <= 1:
-        time.sleep(Wait_time)
         print("        WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
+        time.sleep(Wait_time)
     else:
         Sleep_print_long(Wait_time)
 
@@ -399,7 +399,6 @@ def Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show):
 
 
 def Find_Click_screen(Model_path, Threshold, message_F, message_C):
-    ctypes.windll.user32.SetForegroundWindow(Hwnd)
     Range, Matchs = Find_in_screen_Matchs(Model_path, Threshold, 0)
     if not Matchs:
         Matchs = 0
@@ -414,14 +413,14 @@ def Find_Click_screen(Model_path, Threshold, message_F, message_C):
 
 def Sleep_print_long(Wait_time):
 
-    time.sleep(Wait_time)
     print("        WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
+    time.sleep(Wait_time)
 
     # 拒绝协作
     if Wait_time > 1:
         Range, Matchs = Find_in_screen_Matchs("./pic/Main/拒绝协作.png", 0.01, 0)
         if Range:
-            Find_click_screen("./pic/Main/拒绝协作.png", 0.01, "拒绝协作", "未发现协作")
+            Find_Click_screen("./pic/Main/拒绝协作.png", 0.01, "拒绝协作", "未发现协作")
 
 
 def read_config(FILE_PATH):
