@@ -460,7 +460,7 @@ def Real_Snake(current_state, Hwnd, Account):
                 print("    切换到 ", Account[0], " 账号")
                 Find_Click_windows(Hwnd[0], "./pic/Thr/真蛇挑战图标.png", 0.05, "点击真蛇挑战图标", "未找到真蛇挑战图标")
                 Find_Click_windows(Hwnd[0], "./pic/Main/Queding.png", 0.03, "点击确定", "未找到确定图标")
-                Sleep_print(0.5)
+                Sleep_print(1)
                 Range, Matchs = Find_in_windows_Matchs(Hwnd[0], "./pic/Thr/邀请好友和寮成员.png", 0.03, 0)
                 if Range:
                     Click(Hwnd[1], Range, 1)
@@ -472,7 +472,7 @@ def Real_Snake(current_state, Hwnd, Account):
                 current_state = "加入队伍"
             case "加入队伍":
                 print("    切换到 ", Account[1], " 账号")
-                Find = Find_Click_windows(Hwnd[1], "./pic/Thr/点击加入.png", 0.01, "点击加入队伍", "未找到点击加入")
+                Find = Find_Click_windows(Hwnd[1], "./pic/Thr/点击加入.png", 0.03, "点击加入队伍", "未找到点击加入")
                 if Find:
                     Find_Click_windows(Hwnd[1], "./pic/Main/Queding.png", 0.03, "点击确定", "未找到确定图标")
                     print("        STEP- vvvvv 跳转准备挑战")
@@ -498,27 +498,36 @@ def Real_Snake(current_state, Hwnd, Account):
                     Find_Click_windows(Hwnd[i], "./pic/Thr/真蛇自动准备.png", 0.03, "点击自动准备", "未找到自动准备图标")
                 print("        INFO- ----- 开始等待战斗")
                 Sleep_print(100)
-                for Wait in range(10):
+                for Wait in range(20):
                     Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Digui/Zhandoujiangli.png", 0.05, 0)
                     if not Range:
                         Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/Thr/真蛇确定.png", 0.05, 0)
                     if Range:
                         print("        INFO-", Match, "检测到战斗奖励")
-                        for i in range(2):
-                            print("    切换到 ", Account[i], " 账号")
-                            Find = Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
-                            if not Find:
-                                Find_Click_windows(Hwnd[i], "./pic/Thr/真蛇确定.png", 0.05, "点击确定", "未检测到确定图标")
-                                Sleep_print(5)
-                                Find = Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
-                        if Find:
-                            print("        STEP- vvvvv 跳转结束界面")
-                            current_state = "结束界面"
-                            break
+                        print("        STEP- vvvvv 跳转收取奖励阶段")
+                        current_state = "收取奖励阶段"
+                        break
                     else:
                         print("        INFO-", Match, "未检测到结束")
                         print("        WAIT- wwwww 等待准备 已等待 {waittime} 秒".format(waittime=(Wait * 10 + 100)))
                         Sleep_print(10)
+            case "收取奖励阶段":
+                for i in range(2):
+                    print("    切换到 ", Account[i], " 账号")
+                    Find = Find_Click_windows(Hwnd[i], "./pic/Thr/真蛇确定.png", 0.05, "点击确定", "未检测到确定图标")
+                    if Find:
+                        Sleep_print(10)
+
+                for i in range(2):
+                    print("    切换到 ", Account[i], " 账号")
+                    Find = Find_Click_windows(Hwnd[i], "./pic/Digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
+
+                if Find:
+                    print("        STEP- vvvvv 跳转结束界面")
+                    current_state = "结束界面"
+                else:
+                    print("        STEP- vvvvv 跳转异常退出界面")
+                    current_state = "异常退出"
             case "结束界面":
                 for i in range(2):
                     print("    切换到 ", Account[i], " 账号")
