@@ -22,8 +22,8 @@ def MainTask_Shouliezhan():
 
 def MainTask_Qilin():
     current_time = datetime.now()
-    if time(17, 0) <= current_time.time() <= time(23, 00):
-        print("TASK- ----- 当前时间在17:00-23:00之间 开始执行麒麟任务")
+    if time(9, 0) <= current_time.time() <= time(23, 00):
+        print("TASK- ----- 当前时间在9:00-23:00之间 开始执行麒麟任务")
         config_data = read_config("./config/Last_times.yml")
         headers = list(config_data.keys())
         for Account in headers:
@@ -47,7 +47,7 @@ def MainTask_Qilin():
             else:
                 print("        SKIP- ----- 今日已完成狩猎战任务 跳过")
     else:
-        print("TASK- ----- 当前时间不在17:00-21:50之间 跳过")
+        print("TASK- ----- 当前时间不在9:00-23:00之间 跳过")
     print("TASK- ----- 狩猎战任务结束 ----------------------------------------------------------------")
 
 
