@@ -1,5 +1,5 @@
 from datetime import datetime, time
-from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_daily, read_config, write_config, check_lasttime, Esc_print, Sleep_print, Team_Preset, Itface_Host
+from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_daily, read_config, write_config, check_lasttime, Esc_print, Sleep_print, Team_Preset, Itface_Host, Scroll_print
 
 
 def MainTask_Shouliezhan():
@@ -163,6 +163,7 @@ def Task_Yingjiezhimen(Hwnd, Account):
             case "庭院界面":
                 print("        INFO- ----- 前往阴界之门界面")
                 Itface_daily(Hwnd)
+                Scroll_print(Hwnd, -3)
                 Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/阴界之门图标.png", 0.05, "点击阴界之门图标", "未检测到阴界之门图标")
                 if Find:
                     Find_Click_windows(Hwnd, "./pic/Shouliezhan/前往.png", 0.05, "点击前往图标", "未检测到前往图标")
