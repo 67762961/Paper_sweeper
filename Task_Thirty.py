@@ -48,8 +48,10 @@ def FullTask_Thirty():
         print("TASK- ----- 时间不在9:00-23:00之间 跳过")
 
     week_day = datetime.now().weekday()
-    if week_day < 5:
-        print("        INFO- ----- 今天是非周末 开始执行真蛇任务")
+    current_time = datetime.now()
+    if week_day < 5 and time(9, 0) <= current_time.time() <= time(23, 00):
+        print("        INFO- ----- 今天是非周末")
+        print("        INFO- ----- 当前时间在9:00-23:00之间 开始执行真蛇任务")
         MainTask_Real_Snake()
     print("TASK- ----- 寮三十任务已完成 ----------------------------------------------------------------")
 
