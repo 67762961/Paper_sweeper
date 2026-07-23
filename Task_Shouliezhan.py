@@ -65,12 +65,16 @@ def Task_Qilin(Hwnd, Account):
             case "庭院界面":
                 print("        INFO- ----- 前往麒麟界面")
                 Itface_daily(Hwnd)
-                Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/麒麟图标.png", 0.05, "点击麒麟图标", "未检测到麒麟图标")
-                if Find:
-                    Find_Click_windows(Hwnd, "./pic/Shouliezhan/前往.png", 0.05, "点击前往图标", "未检测到前往图标")
-                    print("        STEP- vvvvv 跳转麒麟界面")
-                    current_state = "麒麟界面"
-                else:
+                for Wait in range(5):
+                    Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/麒麟图标.png", 0.05, "点击麒麟图标", "未检测到麒麟图标")
+                    if Find:
+                        Find_Click_windows(Hwnd, "./pic/Shouliezhan/前往.png", 0.05, "点击前往图标", "未检测到前往图标")
+                        print("        STEP- vvvvv 跳转麒麟界面")
+                        current_state = "麒麟界面"
+                        break
+                    else:
+                        Scroll_print(Hwnd, -1)
+                if not Find:
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
 
