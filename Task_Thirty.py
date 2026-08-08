@@ -268,7 +268,8 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 Itface_Host(Hwnd[0])
                 Find = Find_Click_windows(Hwnd[0], "./pic/Thr/频道.png", 0.05, "点击频道图标", "未找到频道图标")
                 if Find:
-                    Find = Find_Click_windows(Hwnd[0], "./pic/Thr/阴阳寮频道.png", 0.05, "选择阴阳寮频道", "未找到阴阳寮频道选项 似乎已在其中")
+                    Find = Find_Click_windows(Hwnd[1], "./pic/Thr/阴阳寮频道0.png", 0.05, "选择阴阳寮频道0", "未找到阴阳寮频道选项0 似乎已在其中")
+                    Find = Find_Click_windows(Hwnd[0], "./pic/Thr/阴阳寮频道1.png", 0.05, "选择阴阳寮频道1", "未找到阴阳寮频道选项1 似乎已在其中")
                     print("        STEP- vvvvv 跳转创建队伍")
                     current_state = "创建队伍"
                 else:
@@ -452,7 +453,8 @@ def Real_Snake(current_state, Hwnd, Account):
                 Itface_Host(Hwnd[1])
                 Find = Find_Click_windows(Hwnd[1], "./pic/Thr/频道.png", 0.05, "点击频道图标", "未找到频道图标")
                 if Find:
-                    Find = Find_Click_windows(Hwnd[1], "./pic/Thr/阴阳寮频道.png", 0.05, "选择阴阳寮频道", "未找到阴阳寮频道选项 似乎已在其中")
+                    Find = Find_Click_windows(Hwnd[1], "./pic/Thr/阴阳寮频道0.png", 0.05, "选择阴阳寮频道0", "未找到阴阳寮频道选项0 似乎已在其中")
+                    Find = Find_Click_windows(Hwnd[1], "./pic/Thr/阴阳寮频道1.png", 0.05, "选择阴阳寮频道1", "未找到阴阳寮频道选项1 似乎已在其中")
                     print("        STEP- vvvvv 跳转创建队伍")
                     current_state = "创建队伍"
                 else:
