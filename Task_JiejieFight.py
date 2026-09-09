@@ -56,7 +56,7 @@ def FullTask_JiejieFight():
             Times_jiejieFight = check_lasttime(Account, "结界突破")
             current_time = datetime.now()
             # 当天未完成结界突破任务 则执行
-            if abs(current_time - Times_jiejieFight) >= timedelta(hours=6):
+            if abs(current_time - Times_jiejieFight) >= timedelta(hours=1):
                 Hwnd = Find_windows(Account)
                 if JiejieFight(Hwnd, Account):
                     # 更新配置 写入当前时间
