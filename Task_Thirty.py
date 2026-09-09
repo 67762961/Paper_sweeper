@@ -153,7 +153,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Img0 = "./pic/Thr/虚无副本图标0.png"
             Fuben_Img1 = "./pic/Thr/虚无副本图标1.png"
             Tuichutubiao = "./pic/Thr/退出0.png"
-            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标魂虚.png"
+            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标.png"
             Buff = 1
         case "魂王":
             print("        INFO- ----- 选择神罚副本", Times, "次")
@@ -165,7 +165,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Img0 = "./pic/Thr/神罚副本图标0.png"
             Fuben_Img1 = "./pic/Thr/神罚副本图标1.png"
             Tuichutubiao = "./pic/Thr/退出0.png"
-            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标魂虚.png"
+            Zidongzhandoutubiao = "./pic/Thr/自动战斗图标.png"
             Buff = 1
         case "魂海":
             print("        INFO- ----- 选择魂海四副本", Times, "次")
