@@ -214,7 +214,7 @@ def JiejieFight(Hwnd, Account):
                     if Range:
                         print("        INFO- ----- 出现再次挑战二次确认弹框 点击确认")
                         Find_Click_windows(Hwnd, "./pic/JiejieFight/今日不再提醒.png", 0.05, "点击今日不再提醒", "未检测到今日不再提醒")
-                        Find_Click_windows(Hwnd, "./pic/JiejieFight/确认.png", 0.05, "点击确认", "未检测到确认按钮")
+                        Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未检测到确定按钮")
                     else:
                         print("        INFO- ----- 未出现再次挑战二次确认弹框")
                 print("        INFO- ----- ", Num_tui, "次退出完成")

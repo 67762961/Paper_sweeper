@@ -55,14 +55,12 @@ class TaskCard(QFrame):
     def init_ui(self):
         # 设置卡片样式
         self.setFixedHeight(80)
-        self.setStyleSheet(
-            """
+        self.setStyleSheet("""
             QFrame {
                 background-color: white;
                 margin: 2px;
             }
-        """
-        )
+        """)
 
         # 创建卡片布局
         layout = QVBoxLayout()
@@ -184,8 +182,7 @@ class RightPanel(QFrame):
         """创建控制台输出文本框区域"""
         self.textbox = QTextEdit()
         self.textbox.setReadOnly(True)
-        self.textbox.setStyleSheet(
-            """
+        self.textbox.setStyleSheet("""
             QTextEdit {
                 background-color: white;
                 font-family: 'Consolas', 'Monaco', monospace;
@@ -193,8 +190,7 @@ class RightPanel(QFrame):
                 border: 1px solid #007BFF;
                 border-radius: 4px;
             }
-        """
-        )
+        """)
         parent_layout.addWidget(self.textbox, 1)  # 添加拉伸因子1，使文本框占据更多空间
 
     def create_button_area(self, parent_layout):
@@ -202,8 +198,7 @@ class RightPanel(QFrame):
         # 创建运行按钮
         self.run_button = QPushButton("完整运行")
         self.run_button.setFixedHeight(40)
-        self.run_button.setStyleSheet(
-            """
+        self.run_button.setStyleSheet("""
             QPushButton {
                 background-color: white;
                 color: #007acc;
@@ -218,8 +213,7 @@ class RightPanel(QFrame):
             QPushButton:pressed {
                 background-color: #B8DAFF;
             }
-        """
-        )
+        """)
 
         # 创建按钮容器，使按钮右对齐
         button_container = QFrame()
