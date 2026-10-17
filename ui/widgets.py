@@ -3,8 +3,8 @@
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QLabel, QVBoxLayout
-from qfluentwidgets import SimpleCardWidget, SwitchButton
+from PyQt6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QVBoxLayout
+from qfluentwidgets import BodyLabel, CaptionLabel, SimpleCardWidget, SwitchButton
 
 from . import theme
 from .icons import IconButton, StatusIcon
@@ -56,13 +56,21 @@ class TaskRow(SimpleCardWidget):
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(1)
 
-        self.name_label = QLabel(self.title)
+        # 用 Fluent 标签而不是裸 QLabel：文字颜色会随深浅色主题自动切换，
+        # 否则深色主题下仍是黑色文字，几乎看不见
+        self.name_label = BodyLabel(self.title, self)
         self.name_label.setFont(
             QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_TASK_NAME, QFont.Weight.Bold)
         )
+        self.name_label.setTextColor(
+            theme.light_color("COLOR_TEXT_PRIMARY"), theme.dark_color("COLOR_TEXT_PRIMARY")
+        )
 
-        self.time_label = QLabel("上次运行 暂无记录")
+        self.time_label = CaptionLabel("上次运行 暂无记录", self)
         self.time_label.setFont(QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_TASK_TIME))
+        self.time_label.setTextColor(
+            theme.light_color("COLOR_TEXT_TERTIARY"), theme.dark_color("COLOR_TEXT_TERTIARY")
+        )
 
         text_layout.addWidget(self.name_label)
         text_layout.addWidget(self.time_label)

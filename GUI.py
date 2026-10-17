@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from ui.icons import IconButton, StatusIcon
 from ui.panels import LeftPanel, RightPanel
-from ui.theme_manager import init_theme, save_theme
+from ui.theme_manager import apply_theme, init_theme, toggle_theme
 from ui.widgets import TaskRow, ToggleSwitch
 from ui.window import MainWindow, WorkerThread
 
