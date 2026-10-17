@@ -11,6 +11,7 @@ from qfluentwidgets import (
     InfoBarPosition,
     MSFluentWindow,
     NavigationItemPosition,
+    TransparentToolButton,
 )
 
 import config
@@ -23,8 +24,11 @@ from main import (
     read_task_switches,
     set_task_switch,
 )
+from . import prefs as ui_prefs
+from . import theme_manager
 from . import theme
 from .panels import LeftPanel, RightPanel
+from .settings_dialog import SettingsDialog
 
 
 class WorkerThread(QThread):
@@ -67,7 +71,7 @@ class MainWindow(MSFluentWindow):
         self.init_ui()
 
     def init_ui(self):
-        version = "1.2.0"
+        version = "1.3.0"
         self.setWindowTitle(f"Paper Sweeper - v{version}")
         self.resize(1240, 640)
         self.setMinimumSize(1100, 620)
@@ -89,11 +93,19 @@ class MainWindow(MSFluentWindow):
         self.addSubInterface(page, FluentIcon.HOME, "任务", NavigationItemPosition.TOP)
         self.navigationInterface.hide()
 
+        # 顶栏快捷主题切换按钮
+        self.theme_button = TransparentToolButton(FluentIcon.BRIGHTNESS, self)
+        self.theme_button.setToolTip("切换深浅色主题")
+        self.theme_button.clicked.connect(self.toggle_theme)
+        if hasattr(self.titleBar, "hBoxLayout"):
+            self.titleBar.hBoxLayout.insertWidget(4, self.theme_button)
+
         # 左侧行内交互：运行 / 配置（占位）/ 整跑开关
         self.left_panel.task_run_clicked.connect(self.on_task_run)
         self.left_panel.task_config_clicked.connect(self.on_task_config)
         self.left_panel.task_toggled.connect(self.on_task_toggled)
         self.right_panel.run_button_clicked.connect(self.run_button_clicked)
+        self.right_panel.settings_clicked.connect(self.open_settings)
 
     # ---- 左侧行交互 ----
 
@@ -130,6 +142,29 @@ class MainWindow(MSFluentWindow):
     def _task_title(task_key):
         return next((task.title for task in TASK_REGISTRY if task.key == task_key), task_key)
 
+    # ---- 主题与设置 ----
+
+    def toggle_theme(self):
+        """顶栏按钮：浅色 / 深色快速切换"""
+        mode = theme_manager.toggle_theme()
+        self._notify_theme(mode)
+
+    def open_settings(self):
+        """打开设置弹窗：主题、日志偏好与日志目录"""
+        dialog = SettingsDialog(self)
+        if not dialog.exec():
+            return
+        values = dialog.values()
+        merged = ui_prefs.load_prefs()
+        merged.update(values)
+        ui_prefs.save_prefs(merged)
+        theme_manager.apply_theme(values["theme"])
+        self.right_panel.apply_prefs(values)
+        self._notify_theme(values["theme"])
+
+    def _notify_theme(self, mode):
+        InfoBar.success("主题已切换", theme_manager.THEME_LABELS.get(mode, mode),
+                        parent=self, duration=1500, position=InfoBarPosition.TOP_RIGHT)
     # ---- 任务调度 ----
 
     def run_button_clicked(self):

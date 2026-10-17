@@ -13,11 +13,19 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import IndeterminateProgressBar, PushButton, TextEdit
+from qfluentwidgets import (
+    BodyLabel,
+    FluentIcon,
+    IndeterminateProgressBar,
+    PushButton,
+    TextEdit,
+    TransparentToolButton,
+)
 
 from main import TASK_REGISTRY, entry_done_today, latest_completion, read_completions, read_task_switches
+from . import prefs as ui_prefs
 from . import theme
-from .widgets import TaskRow
+from .widgets import TaskRow, ToggleSwitch
 
 # 日志行首关键字着色：深色/浅色主题下都保持可读
 LOG_LINE_COLORS = (
@@ -144,10 +152,13 @@ class RightPanel(QFrame):
     """右侧日志控制台面板"""
 
     run_button_clicked = pyqtSignal()
+    settings_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setStyleSheet("background-color: transparent;")
+        self.prefs = ui_prefs.load_prefs()
+        self.auto_scroll = self.prefs["log_auto_scroll"]
         self.textbox = None
         self.run_button = None
         self.progress = None
@@ -158,17 +169,46 @@ class RightPanel(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(theme.SPACE_LG)
 
+        self.create_header(layout)
         self.create_console_area(layout)
         self.create_progress(layout)
         self.create_button_area(layout)
 
         self.setLayout(layout)
 
+    def create_header(self, parent_layout):
+        """日志区顶部工具条：标题 / 清空 / 自动滚动 / 设置"""
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(theme.SPACE_SM)
+
+        header.addWidget(BodyLabel("运行日志", self))
+        header.addStretch()
+
+        self.clear_button = TransparentToolButton(FluentIcon.BROOM, self)
+        self.clear_button.setToolTip("清空日志")
+        self.clear_button.clicked.connect(self.clear_log)
+        header.addWidget(self.clear_button)
+
+        self.auto_scroll_switch = ToggleSwitch(self)
+        self.auto_scroll_switch.setOnText("")
+        self.auto_scroll_switch.setOffText("")
+        self.auto_scroll_switch.setToolTip("新日志自动滚动到底部")
+        self.auto_scroll_switch.setChecked(self.auto_scroll)
+        self.auto_scroll_switch.checkedChanged.connect(self.on_auto_scroll_changed)
+        header.addWidget(self.auto_scroll_switch)
+
+        self.settings_button = TransparentToolButton(FluentIcon.SETTING, self)
+        self.settings_button.setToolTip("设置")
+        self.settings_button.clicked.connect(self.settings_clicked)
+        header.addWidget(self.settings_button)
+
+        parent_layout.addLayout(header)
     def create_console_area(self, parent_layout):
         """创建控制台输出区域"""
         self.textbox = TextEdit()
         self.textbox.setReadOnly(True)
-        self.textbox.setFont(QFont(theme.FONT_FAMILY_LOG, theme.FONT_SIZE_LOG))
+        self.textbox.setFont(QFont(theme.FONT_FAMILY_LOG, self.prefs["log_font_size"]))
         self.textbox.setPlaceholderText("运行日志会显示在这里")
         parent_layout.addWidget(self.textbox, 1)
 
@@ -227,6 +267,31 @@ class RightPanel(QFrame):
             self.progress.stop()
             self.progress.setVisible(False)
 
+    def clear_log(self):
+        """清空日志区"""
+        self.textbox.clear()
+
+    def on_auto_scroll_changed(self, checked):
+        """自动滚动开关变化：立即生效并持久化"""
+        self.auto_scroll = bool(checked)
+        current = ui_prefs.load_prefs()
+        current["log_auto_scroll"] = self.auto_scroll
+        ui_prefs.save_prefs(current)
+
+    def set_log_font_size(self, size):
+        """更新日志字号"""
+        self.prefs["log_font_size"] = size
+        self.textbox.setFont(QFont(theme.FONT_FAMILY_LOG, size))
+
+    def apply_prefs(self, values):
+        """设置对话框保存后统一应用界面偏好"""
+        self.prefs.update(values)
+        self.auto_scroll = bool(values["log_auto_scroll"])
+        self.auto_scroll_switch.blockSignals(True)
+        self.auto_scroll_switch.setChecked(self.auto_scroll)
+        self.auto_scroll_switch.blockSignals(False)
+        self.set_log_font_size(values["log_font_size"])
+
     def append_separator(self, text):
         """在控制台插入一段分隔说明，便于区分多次运行"""
         self.update_console(f"\n{'=' * 60}\n{text}\n{'=' * 60}\n\n")
@@ -252,7 +317,7 @@ class RightPanel(QFrame):
             cursor.insertText(line, fmt)
 
         self.textbox.setTextCursor(cursor)
-        self.textbox.ensureCursorVisible()
-
-        scrollbar = self.textbox.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        if self.auto_scroll:
+            self.textbox.ensureCursorVisible()
+            scrollbar = self.textbox.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
