@@ -13,7 +13,7 @@
 - 日志双写（控制台 + `logs/<日期>/`），GUI 实时展示；
 - 当前任务域覆盖：签到收菜、结界养成、地域鬼王、寮三十与真蛇、结界突破、狩猎战/阴界、逢魔之时。
 
-当前代码版本：GUI 标题标注 `v1.1.0`。
+当前代码版本：GUI 标题标注 `v1.2.0`。
 
 ## 2. 顶层架构
 
@@ -66,7 +66,8 @@ flowchart LR
 ├── test.py / test_main.py         开发调试入口（已忽略，不参与交付）
 ├── config/                        运行配置（默认忽略）
 │   ├── Setting.yml                启动项、结界突破、寮三十副本表
-│   └── Last_times.yml             各账号各任务上次完成时间
+│   ├── Last_times.yml             各账号各任务上次完成时间
+│   └── Gui_state.yml              GUI 任务开关（是否参与完整运行，缺失默认全开）
 ├── pic/                           界面模板图
 │   ├── Main/                      庭院/弹窗/协作/返回等通用元素
 │   ├── Sign/                      签到与收菜
@@ -107,10 +108,12 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
   4) 状态机 + 模板匹配执行业务
   5) 成功则 write_config 更新 Last_times.yml
         ↓
-流程结束，恢复 stdout；GUI 对比运行前后的完成时间，回填卡片徽章
+流程结束，恢复 stdout；GUI 对比运行前后的完成时间并刷新行内时间与今日状态
 ```
 
 `Full_operation` 与 `Single_operation` 都通过 `main._log_stream` 统一安装/恢复日志流，区别只在日志文件名前缀（`console_output_` / `single_<key>_`）。
+
+`Full_operation` 在开始时读取 `config/Gui_state.yml` 的任务开关，关闭的任务打印 `SKIP- ----- 任务 <标题> 已在左侧关闭 跳过` 后跳过。
 
 ## 5. 入口函数说明
 
@@ -120,17 +123,31 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 
 - 设置 Windows DPI：`QT_QPA_PLATFORM=windows:dpiawareness=1`；
 - 安装全局异常钩子，未捕获异常写入 `app_crash.log`；
-- 左侧 7 张任务卡片（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「完整运行」按钮；
+- 左侧 7 行任务（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「完整运行」按钮；
 - `WorkerThread` 持有 `task_key`：`None` 时调用 `main.Full_operation`，否则调用 `main.Single_operation`；
-- 卡片单击即单独运行该任务，运行期间所有卡片与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥）；
-- 结束后刷新卡片「上次完成」时间，并按完成时间是否推进回填徽章：`已完成` / `未更新` / `异常`。
+- 运行期间所有行的交互控件与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥）；
+- 结束后刷新行内「上次运行」时间与今日状态图标。
+
+单行结构（从左到右）：
+
+| 区域 | 控件 | 说明 |
+| ---- | ---- | ---- |
+| 今日状态 | `StatusIcon` | 今日已完成 → 绿底 ✓；今日未完成 → 橙底 `!`；运行中 → 蓝底 ▶ |
+| 任务信息 | 名称 + 「上次运行 MM-DD HH:MM」 | 时间取该任务所有账号、所有状态键中的最新值 |
+| 配置 | `IconButton(kind="gear")` | 本期为**占位**：弹「配置功能暂未开放」，不写盘 |
+| 单跑 | `IconButton(kind="play")` | 点击只运行该任务（等价于 `Single_operation`） |
+| 开关 | `ToggleSwitch` | 开 → 参与「完整运行」；关 → 完整运行时跳过，并写入 `config/Gui_state.yml` |
+
+图标（✓ / ! / ▶ / 齿轮）全部用 `QPainter` 矢量绘制，不依赖字体字形与图片资源，避免换机器或打包后出现方块。
 
 交互约定：
 
 | 操作 | 行为 |
 | ---- | ---- |
-| 单击左侧卡片 | 只运行该卡片对应的顶层任务（对 `Last_times.yml` 全部账号），冷却与时间窗照旧生效 |
-| 单击「完整运行」 | 按 `TASK_REGISTRY` 顺序执行全部 7 项 |
+| 点击行内 ▶ | 只运行该行对应的顶层任务（对 `Last_times.yml` 全部账号），冷却与时间窗照旧生效 |
+| 点击行内齿轮 | 弹出占位提示，不写任何配置 |
+| 拨动行内开关 | 写入 `config/Gui_state.yml`；关闭时该行灰化，且在「完整运行」中被跳过 |
+| 点击「完整运行」 | 按 `TASK_REGISTRY` 顺序执行**开关开启**的任务 |
 | 运行中再次点击 | 被 `busy` 互斥拒绝，不会启动第二个线程 |
 | 运行中关闭窗口 | 弹确认框；确认后置位 `config.stop_thread` 并短暂等待线程 |
 
@@ -145,16 +162,16 @@ stop_thread = False
 调用形式：
 
 ```python
-Full_operation(console_signal=None)              # 完整运行
+Full_operation(console_signal=None)              # 完整运行（按开关跳过已关闭任务）
 Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key, ok, reason}
 ```
 
 职责：
 
-- 维护 `TASK_REGISTRY`：`(key, title, desc, entry, lasttime_keys)` 元组，是「卡片列表 / 完整运行顺序 / GUI 状态键」的唯一事实源；
+- 维护 `TASK_REGISTRY`：`TaskEntry(key, title, desc, entry, lasttime_keys, today_keys)`，是「左侧行列表 / 完整运行顺序 / GUI 状态键」的唯一事实源；
 - 创建日志文件：完整运行为 `logs/<YYYY-MM-DD>/console_output_<时间戳>.log`，单任务为 `logs/<YYYY-MM-DD>/single_<key>_<时间戳>.log`；
 - 用 `Tee` 把 stdout 同时写到原控制台、日志文件和 GUI 信号；
-- 完整运行按注册表顺序编排，单任务运行只调用一项；
+- 完整运行按注册表顺序编排并按任务开关跳过，单任务运行只调用一项且**不看开关**；
 - `_log_stream` 在 `finally` 中先恢复 `sys.stdout` 再尽力冲刷，避免无控制台环境（打包版 `GUI.exe` / `pythonw`）下 `sys.stdout is None` 造成收尾异常。
 
 `main.py` 同时定义 `Tee`：按行缓冲，保证 GUI 控制台按完整行更新；`files` 会过滤空流，写入/冲刷失败不中断任务。
@@ -165,23 +182,29 @@ Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key
 | ---- | ---- |
 | `get_task(key)` | 按 key 查注册表条目，未登记返回 `None` |
 | `read_completions()` | 一次性只读 `Last_times.yml`，返回 `{账号: {任务键: datetime}}`；不创建文件、不写盘 |
-| `latest_completion(entry, completions=None)` | 取该任务在所有账号、所有状态键中的最新完成时间 |
+| `latest_completion(entry, completions=None)` | 取该任务在所有账号、所有状态键中的最新完成时间（行内「上次运行」） |
 | `completion_snapshot(entries=None)` | 记录各任务当前完成时间快照 |
-| `completion_advanced(before, after)` | 对比快照，返回 `{key: 是否推进}`，用于卡片徽章判定 |
+| `completion_advanced(before, after)` | 对比快照，返回 `{key: 是否推进}`，用于运行结果摘要 |
+| `entry_done_today(entry, completions=None, today=None)` | 判定「今日已完成」：`check_keys` 中的每个键在所有账号上都要有今天的记录 |
+| `read_task_switches()` | 读取 `config/Gui_state.yml` 的任务开关，缺失默认全开，只读不建文件 |
+| `is_task_enabled(key, switches=None)` / `enabled_task_keys(switches=None)` | 判断/列出参与完整运行的任务 |
+| `set_task_switch(key, enabled)` | 写入单个任务开关，成功返回 `True` |
 
 ### 5.3 任务模块入口
 
 完整流程 `Full_operation` 当前顺序（即 `TASK_REGISTRY` 顺序；单任务运行复用同一入口）：
 
-| 顺序 | 注册表 key | 卡片标题 | 入口 | 模块 | 说明 |
-| ---- | ---- | ---- | ---- | ---- | ---- |
-| 1 | `signin` | 登录收菜 | `MainTask_Signin()` | `Task_SignIn.py` | 邮件、每日一签、福袋、纸人、免费礼包、友情点 |
-| 2 | `jiejieyangcheng` | 结界养成 | `MainTask_Jiejieyangcheng()` | `Task_Jiejieyangcheng.py` | 寮界面：工资/体力、寄养、结界卡、白达摩育成、食盒酒壶 |
-| 3 | `digui` | 地域鬼王 | `MainTask_Digui()` | `Task_Digui.py` | 经探索→六道进入地鬼，时间窗 12:00–23:50，当日冷却 |
-| 4 | `thirty` | 寮三十 / 真蛇 | `FullTask_Thirty()` | `Task_Thirty.py` | 寮三十协作刷本 + 非周末真蛇（周冷却） |
-| 5 | `FullTask_JiejieFight()` | `Task_JiejieFight.py` | 结界突破，时间窗 7:00–23:00，1 小时冷却 |
-| 6 | `MainTask_Shouliezhan()` | `Task_Shouliezhan.py` | 周四–周日阴界之门；其余日麒麟狩猎战（当日冷却） |
-| 7 | `MainTask_Fengmo()` | `Task_Fengmo.py` | 逢魔之时，时间窗 17:00–21:50，当日冷却 |
+| 顺序 | 注册表 key | 行标题 | 入口 | 模块 | 今日判定键（`today_keys`） | 说明 |
+| ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| 1 | `signin` | 登录收菜 | `MainTask_Signin()` | `Task_SignIn.py` | 邮件领取 / 每日一签 / 福袋纸人 / 免费礼包 / 送友情点（全部） | 邮件、每日一签、福袋、纸人、免费礼包、友情点 |
+| 2 | `jiejieyangcheng` | 结界养成 | `MainTask_Jiejieyangcheng()` | `Task_Jiejieyangcheng.py` | 结界养成 | 寮界面：工资/体力、寄养、结界卡、白达摩育成、食盒酒壶 |
+| 3 | `digui` | 地域鬼王 | `MainTask_Digui()` | `Task_Digui.py` | 地域鬼王 | 经探索→六道进入地鬼，时间窗 12:00–23:50，当日冷却 |
+| 4 | `thirty` | 寮三十 / 真蛇 | `FullTask_Thirty()` | `Task_Thirty.py` | 寮三十（真蛇为周更，不参与今日判定） | 寮三十协作刷本 + 非周末真蛇（周冷却） |
+| 5 | `jiejiefight` | 结界突破 | `FullTask_JiejieFight()` | `Task_JiejieFight.py` | 结界突破 | 结界突破，时间窗 7:00–23:00，1 小时冷却 |
+| 6 | `shouliezhan` | 狩猎战 / 阴界 | `MainTask_Shouliezhan()` | `Task_Shouliezhan.py` | 狩猎战 | 周四–周日阴界之门；其余日麒麟狩猎战（当日冷却） |
+| 7 | `fengmo` | 逢魔之时 | `MainTask_Fengmo()` | `Task_Fengmo.py` | 逢魔之时 | 逢魔之时，时间窗 17:00–21:50，当日冷却 |
+
+`today_keys` 为空表示与 `lasttime_keys` 相同（`TaskEntry.check_keys` 负责回落）。
 
 任务模块通用约定：
 
@@ -241,7 +264,29 @@ Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key
 
 `check_lasttime` 在键缺失时初始化为 `2000-01-01 00:00:00`。
 
-### 6.3 项目级 `config.py`
+### 6.3 `config/Gui_state.yml`（任务开关）
+
+结构：`任务开关 -> <注册表 key> -> true/false`，由 GUI 行内开关写入，决定该任务是否参与「完整运行」。
+
+```yaml
+任务开关:
+  signin: true
+  jiejieyangcheng: true
+  digui: true
+  thirty: true
+  jiejiefight: true
+  shouliezhan: true
+  fengmo: true
+```
+
+约定：
+
+- 文件不存在、或某个 key 缺失时**默认开启**（不破坏老用户配置）；
+- 只有用户拨动开关才写盘；读取开关不会创建文件；
+- 与 `Setting.yml`（任务参数）分离，避免 GUI 偏好混进用户手写配置；
+- 单击行内 ▶ 不受该开关影响，只有「完整运行」会跳过关闭的任务。
+
+### 6.4 项目级 `config.py`
 
 - 用途：GUI 线程停止标志（`config.stop_thread`）。
 - 状态：源码树中不存在该文件；属于运行时必需的本地模块。
@@ -338,13 +383,14 @@ MAIN- ===== 单任务运行结束：逢魔之时 ===============================
 
 1. 新增任务时，必须同时更新：
    - `Task_*.py` 业务模块；
-   - `main.TASK_REGISTRY`（key / 卡片标题 / 说明 / 入口 / 状态键），卡片列表与完整运行顺序都由它驱动；
+   - `main.TASK_REGISTRY`（key / 行标题 / 说明 / 入口 / `lasttime_keys` / `today_keys`），左侧行列表与完整运行顺序都由它驱动；
    - `Last_times.yml` 任务键与冷却策略；
    - `ARCHITECTURE.md` / `README.md` 中的功能与目录说明。
 2. 新增模板图必须放进对应 `pic/<业务>/`，路径使用 `./pic/...` 相对当前工作目录。
 3. 识别阈值、点击等待写在调用处，修改后需用真实窗口回归；调试可临时 `Flag_show=1` 弹出标注框。
 4. 时间窗、星期分支写在 `MainTask_*` 入口层，不要埋进底层 `Lib` 点击函数。
-5. 冷却成功写回、失败不写回；`Setting.yml` 只放用户可改的静态配置。
+5. 冷却成功写回、失败不写回；`Setting.yml` 只放用户可改的静态配置，GUI 偏好（任务开关）写 `Gui_state.yml`，两者不要混用。
 6. `config/`、`logs/`、`build/`、`dist/`、`GUI.exe`、调试脚本默认不入库；需要跟踪的新源码与文档请在 `.gitignore` 中显式排除忽略。
 7. 修改 `Lib.py` 公共匹配/点击/界面函数前，确认所有 `Task_*` 调用方语义不变，尤其是返回值 `1/0` 与 `Range/Matchs` 约定。
 8. 本项目通过公开 UI 自动化交互，不修改游戏文件；文档与注释避免暗示注入、外挂或协议破解能力。
+9. GUI 行内图标（✓ / ! / ▶ / 齿轮）统一用 `QPainter` 矢量绘制，不依赖字体字形，也不往 `pic/` 塞 UI 素材。

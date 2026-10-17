@@ -4,9 +4,21 @@ import sys
 if sys.platform == "win32":
     os.environ["QT_QPA_PLATFORM"] = "windows:dpiawareness=1"
 
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QScrollArea, QFrame, QLabel, QMessageBox
-from PyQt6.QtCore import QThread, pyqtSignal, Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QTextEdit,
+    QScrollArea,
+    QFrame,
+    QLabel,
+    QMessageBox,
+    QAbstractButton,
+)
+from PyQt6.QtCore import QThread, pyqtSignal, Qt, QSize, QRectF, QPointF
+from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QPolygonF
 from qt_material import apply_stylesheet
 from main import (
     Full_operation,
@@ -14,14 +26,15 @@ from main import (
     TASK_REGISTRY,
     completion_advanced,
     completion_snapshot,
+    entry_done_today,
     latest_completion,
     read_completions,
+    read_task_switches,
+    set_task_switch,
 )
 import config
 
-import traceback
 import logging
-import sys
 
 logging.basicConfig(filename="app_crash.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s", encoding="utf-8")
 
@@ -71,159 +84,342 @@ class WorkerThread(QThread):
             self.task_finished.emit({"key": self.task_key, "ok": False, "error": str(error)})
 
 
-class TaskCard(QFrame):
-    """单张任务卡片：点击即单独运行对应任务"""
+class StatusIcon(QWidget):
+    """行首的今日状态图标：已完成 ✓ / 今日未完成 ! / 运行中 ▶
 
-    clicked = pyqtSignal(str)
+    图标用 QPainter 矢量绘制，不依赖任何字体，避免换机器或打包后缺字形变成方块。
+    """
 
-    # 状态 -> (背景色, 边框色, 徽章背景色, 徽章文字色, 徽章文案)
     STATE_STYLES = {
-        "idle": ("#ffffff", "#e3e6ea", "#eef0f3", "#5f6368", "空闲"),
-        "running": ("#e8f2ff", "#007BFF", "#007BFF", "#ffffff", "运行中"),
-        "done": ("#eaf7ee", "#2e7d32", "#e6f4ea", "#1b5e20", "已完成"),
-        "skipped": ("#f7f8fa", "#c5c9cf", "#f1f3f5", "#6b7280", "未更新"),
-        "error": ("#fdecea", "#d93025", "#fce8e6", "#b3261e", "异常"),
+        "done": ("#e6f4ea", "#1b5e20", "check", "今日已完成"),
+        "pending": ("#fef3e2", "#b26a00", "alert", "今日尚未完成"),
+        "running": ("#007BFF", "#ffffff", "play", "正在运行"),
     }
 
-    def __init__(self, entry, parent=None):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.state = "pending"
+        self.setFixedSize(22, 22)
+        self.set_state("pending")
+
+    def set_state(self, state):
+        self.state = state if state in self.STATE_STYLES else "pending"
+        _, _, _, tooltip = self.STATE_STYLES[self.state]
+        self.setToolTip(tooltip)
+        self.update()
+
+    def paintEvent(self, event):
+        background, color, glyph, _ = self.STATE_STYLES[self.state]
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(background))
+        painter.drawEllipse(QRectF(0, 0, 22, 22))
+
+        pen = QPen(QColor(color))
+        pen.setWidthF(2.2)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(QColor(color))
+
+        if glyph == "check":
+            painter.drawLine(QPointF(6.2, 11.4), QPointF(9.8, 15.0))
+            painter.drawLine(QPointF(9.8, 15.0), QPointF(15.8, 7.4))
+        elif glyph == "alert":
+            painter.drawLine(QPointF(11, 5.8), QPointF(11, 12.4))
+            painter.drawEllipse(QRectF(9.9, 14.6, 2.2, 2.2))
+        else:  # play
+            painter.setBrush(QColor(color))
+            painter.drawPolygon(
+                QPolygonF([QPointF(8.4, 6.2), QPointF(8.4, 15.8), QPointF(15.6, 11.0)])
+            )
+        painter.end()
+
+
+class IconButton(QAbstractButton):
+    """行内圆形图标按钮（齿轮 / 运行），图形同样用 QPainter 绘制，不依赖字体与图片"""
+
+    def __init__(self, kind, tooltip, parent=None):
+        super().__init__(parent)
+        self.kind = kind
+        self.setToolTip(tooltip)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(26, 26)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+
+    def enterEvent(self, event):
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        hovered = self.underMouse() and self.isEnabled()
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        if hovered:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#e9ecef"))
+            painter.drawEllipse(QRectF(1, 1, 24, 24))
+
+        color = QColor("#1f2328") if hovered else QColor("#6b7280")
+        if not self.isEnabled():
+            color = QColor("#c8ccd2")
+
+        if self.kind == "gear":
+            self._paint_gear(painter, color)
+        else:
+            self._paint_play(painter, color)
+        painter.end()
+
+    @staticmethod
+    def _paint_play(painter, color):
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+        painter.drawPolygon(
+            QPolygonF([QPointF(9.6, 7.2), QPointF(9.6, 18.8), QPointF(18.4, 13.0)])
+        )
+
+    @staticmethod
+    def _paint_gear(painter, color):
+        """齿轮：环形 + 8 个轮齿 + 中心孔"""
+        center = QPointF(13, 13)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+        for index in range(8):
+            painter.save()
+            painter.translate(center)
+            painter.rotate(index * 45)
+            painter.drawRoundedRect(QRectF(-1.9, -10.4, 3.8, 4.4), 1.0, 1.0)
+            painter.restore()
+
+        ring_pen = QPen(color)
+        ring_pen.setWidthF(3.4)
+        painter.setPen(ring_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(center, 6.2, 6.2)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#ffffff"))
+        painter.drawEllipse(center, 2.2, 2.2)
+
+
+class ToggleSwitch(QAbstractButton):
+    """自绘开关：开启为蓝底白钮，关闭为灰底白钮（不引入图片资源）"""
+
+    WIDTH = 44
+    HEIGHT = 24
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(self.WIDTH, self.HEIGHT)
+
+    def sizeHint(self):
+        return QSize(self.WIDTH, self.HEIGHT)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        if not self.isEnabled():
+            track = QColor("#d8dbe0")
+        elif self.isChecked():
+            track = QColor("#007BFF")
+        else:
+            track = QColor("#c9ced6")
+
+        track_top = 3
+        track_height = self.HEIGHT - 6
+        painter.setBrush(track)
+        painter.drawRoundedRect(
+            QRectF(0, track_top, self.WIDTH, track_height),
+            track_height / 2,
+            track_height / 2,
+        )
+
+        knob_diameter = 16
+        knob_x = self.WIDTH - knob_diameter - 4 if self.isChecked() else 4
+        painter.setBrush(QColor("#ffffff"))
+        painter.drawEllipse(
+            QRectF(knob_x, (self.HEIGHT - knob_diameter) / 2, knob_diameter, knob_diameter)
+        )
+        painter.end()
+
+
+class TaskRow(QFrame):
+    """单行任务：今日状态 + 名称/上次运行时间 + 齿轮 + 运行 + 开关"""
+
+    run_clicked = pyqtSignal(str)
+    config_clicked = pyqtSignal(str)
+    switch_toggled = pyqtSignal(str, bool)
+
+    def __init__(self, entry, switch_on=True, parent=None):
         super().__init__(parent)
         self.key = entry.key
         self.title = entry.title
-        self.state = "idle"
-        # 高度与间距配合左侧面板可用高度，保证 7 张卡片在默认窗口下一屏可见
-        self.setFixedHeight(58)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # 让样式表 :hover 生效
+        self.entry = entry
+        self.switch_on = switch_on
+        self.running = False
+        self.today_done = False
+        self.setObjectName("TaskRow")
+        self.setFixedHeight(62)
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        self.init_ui(entry)
-        self.set_state("idle")
+        self.init_ui()
+        self.set_switch(switch_on)
+        self._apply_row_style()
 
-    def init_ui(self, entry):
-        """卡片内部布局：标题 + 状态徽章 / 业务说明 / 上次完成时间"""
-        layout = QVBoxLayout()
-        layout.setContentsMargins(12, 6, 12, 6)
-        layout.setSpacing(1)
+    def init_ui(self):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(8)
 
-        head_layout = QHBoxLayout()
-        head_layout.setSpacing(6)
+        # 最左：今日状态
+        self.status_icon = StatusIcon()
+        layout.addWidget(self.status_icon, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        # 中间：任务名 + 上次运行时间
+        text_layout = QVBoxLayout()
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(1)
 
         self.name_label = QLabel(self.title)
         self.name_label.setFont(QFont("Microsoft YaHei", 10, QFont.Weight.Bold))
 
-        self.state_label = QLabel("空闲")
-        self.state_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.state_label.setFixedHeight(18)
+        self.time_label = QLabel("上次运行 暂无记录")
 
-        head_layout.addWidget(self.name_label)
-        head_layout.addStretch()
-        head_layout.addWidget(self.state_label)
-        layout.addLayout(head_layout)
+        text_layout.addWidget(self.name_label)
+        text_layout.addWidget(self.time_label)
+        layout.addLayout(text_layout, 1)
 
-        self.desc_label = QLabel(entry.desc)
-        layout.addWidget(self.desc_label)
+        # 右侧：齿轮 / 运行 / 开关
+        self.config_button = IconButton("gear", "配置该任务（暂未开放）")
+        self.run_button = IconButton("play", "单独运行该任务")
+        self.switch = ToggleSwitch()
+        self.switch.setToolTip("开启后参与「完整运行」，关闭则完整运行时跳过")
 
-        self.time_label = QLabel("上次完成 暂无记录")
-        layout.addWidget(self.time_label)
+        layout.addWidget(self.config_button)
+        layout.addWidget(self.run_button)
+        layout.addWidget(self.switch)
 
-        # 文字颜色与字号显式管理：卡片启用/禁用时由 setEnabled 统一切换，
-        # 避免依赖 QFrame:disabled QLabel 这类会被主题样式覆盖的选择器
-        self._text_labels = (
-            (self.name_label, "#1f2328", "#b8bcc2", ""),
-            (self.desc_label, "#6b7280", "#b8bcc2", "font-size: 11px;"),
-            (self.time_label, "#8a9099", "#b8bcc2", "font-size: 11px;"),
-        )
-        self._apply_text_colors(True)
+        self.config_button.clicked.connect(lambda: self.config_clicked.emit(self.key))
+        self.run_button.clicked.connect(lambda: self.run_clicked.emit(self.key))
+        self.switch.toggled.connect(self.on_switch_toggled)
 
-        self.setLayout(layout)
+    # ---- 状态 ----
 
-    def _apply_text_colors(self, enabled):
-        """按启用状态设置三个文本标签的颜色（字号随标签固定，不随启用状态变化）"""
-        for label, normal_color, disabled_color, extra in self._text_labels:
-            color = normal_color if enabled else disabled_color
-            label.setStyleSheet(f"color: {color}; background: transparent; border: none; {extra}")
+    def set_today_done(self, done):
+        """刷新今日完成状态图标（运行中时保持运行图标）"""
+        self.today_done = bool(done)
+        if not self.running:
+            self.status_icon.set_state("done" if self.today_done else "pending")
 
-    def setEnabled(self, enabled):
-        """禁用时同时灰化文字，避免禁用态文字仍为深色造成误读"""
-        super().setEnabled(enabled)
-        self._apply_text_colors(enabled)
-
-    def mouseReleaseEvent(self, event):
-        """左键在卡片内抬起时触发点击；禁用状态下不响应（显式判断，避免事件直投时绕过 Qt 的派发过滤）"""
-        if not self.isEnabled():
-            super().mouseReleaseEvent(event)
-            return
-        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.position().toPoint()):
-            self.clicked.emit(self.key)
-        super().mouseReleaseEvent(event)
+    def set_running(self, running):
+        """切换运行中状态"""
+        self.running = bool(running)
+        if self.running:
+            self.status_icon.set_state("running")
+        else:
+            self.status_icon.set_state("done" if self.today_done else "pending")
+        self._apply_row_style()
 
     def set_last_time(self, moment):
-        """刷新上次完成时间，moment 为 None 表示尚无记录"""
+        """刷新上次运行时间，moment 为 None 表示尚无记录"""
         if moment is None:
-            self.time_label.setText("上次完成 暂无记录")
+            self.time_label.setText("上次运行 暂无记录")
         else:
-            self.time_label.setText(f"上次完成 {moment.strftime('%m-%d %H:%M')}")
+            self.time_label.setText(f"上次运行 {moment.strftime('%m-%d %H:%M')}")
 
-    def set_state(self, state):
-        """切换卡片状态并重绘样式"""
-        self.state = state if state in self.STATE_STYLES else "idle"
-        background, border, badge_background, badge_color, badge_text = self.STATE_STYLES[self.state]
+    def set_busy(self, busy):
+        """运行期间禁用该行的交互控件，状态与文字保持只读展示"""
+        self.config_button.setEnabled(not busy)
+        self.run_button.setEnabled(not busy)
+        self.switch.setEnabled(not busy)
+
+    # ---- 开关 ----
+
+    def set_switch(self, on):
+        """程序化设置开关状态（不触发写盘信号）"""
+        self.switch.blockSignals(True)
+        self.switch.setChecked(bool(on))
+        self.switch.blockSignals(False)
+        self.switch_on = bool(on)
+        self._apply_row_style()
+
+    def on_switch_toggled(self, checked):
+        """用户拨动开关：更新外观并通知外部持久化"""
+        self.switch_on = bool(checked)
+        self._apply_row_style()
+        self.switch_toggled.emit(self.key, self.switch_on)
+
+    # ---- 外观 ----
+
+    def _apply_row_style(self):
+        if self.running:
+            background, border = "#e8f2ff", "#007BFF"
+        elif self.switch_on:
+            background, border = "#ffffff", "#e3e6ea"
+        else:
+            background, border = "#f7f8fa", "#eceef1"
 
         self.setStyleSheet(f"""
-            QFrame {{
+            QFrame#TaskRow {{
                 background-color: {background};
                 border: 1px solid {border};
                 border-radius: 6px;
             }}
-            QFrame:hover:enabled {{
+            QFrame#TaskRow:hover {{
                 border-color: #007BFF;
-            }}
-            QFrame:disabled {{
-                background-color: #f7f8fa;
-                border-color: #e3e6ea;
             }}
         """)
 
-        self.state_label.setText(badge_text)
-        self.state_label.setStyleSheet(f"""
-            background-color: {badge_background};
-            color: {badge_color};
-            border-radius: 10px;
-            padding: 1px 8px;
-            font-size: 11px;
-        """)
+        # 关闭的任务整行文字变浅，明确表达「不参与完整运行」
+        name_color = "#1f2328" if self.switch_on else "#9aa0a6"
+        time_color = "#8a9099" if self.switch_on else "#b8bcc2"
+        self.name_label.setStyleSheet(
+            f"color: {name_color}; background: transparent; border: none;"
+        )
+        self.time_label.setStyleSheet(
+            f"color: {time_color}; background: transparent; border: none; font-size: 11px;"
+        )
 
 
 class LeftPanel(QFrame):
-    """左侧任务列表面板：7 张卡片对应 TASK_REGISTRY，单击即单独运行"""
+    """左侧任务列表面板：7 行对应 TASK_REGISTRY，行内提供单跑与整跑开关"""
 
-    task_clicked = pyqtSignal(str)
+    task_run_clicked = pyqtSignal(str)
+    task_config_clicked = pyqtSignal(str)
+    task_toggled = pyqtSignal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.cards = {}
+        self.rows = {}
         self.init_ui()
-        self.refresh_lasttimes()
+        self.refresh()
 
     def init_ui(self):
-        # 设置左侧面板样式
-        self.setFixedWidth(400)
+        self.setFixedWidth(488)
         self.setStyleSheet("background-color: #f8f9fa;")
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(4)
 
-        # 标题
         title_label = QLabel("任务列表")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet("font-size: 15px; font-weight: bold; margin: 4px;")
         layout.addWidget(title_label)
 
-        # 任务卡片滚动区域
         layout.addWidget(self.create_scroll_area())
 
-        # 操作提示
-        hint_label = QLabel("点击卡片单独运行 · 冷却与时间窗照旧生效")
+        hint_label = QLabel("运行按钮单独执行 · 齿轮为配置入口（暂未开放）· 开关决定是否参与完整运行")
         hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint_label.setStyleSheet("color: #8a9099; font-size: 11px;")
         layout.addWidget(hint_label)
@@ -231,7 +427,7 @@ class LeftPanel(QFrame):
         self.setLayout(layout)
 
     def create_scroll_area(self):
-        """按 TASK_REGISTRY 生成任务卡片，顺序与完整运行一致"""
+        """按 TASK_REGISTRY 生成任务行，顺序与完整运行一致"""
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -242,21 +438,28 @@ class LeftPanel(QFrame):
         scroll_layout.setContentsMargins(0, 0, 0, 0)
         scroll_layout.setSpacing(4)
 
-        for entry in TASK_REGISTRY:
-            card = TaskCard(entry)
-            card.clicked.connect(self.task_clicked)
-            scroll_layout.addWidget(card)
-            self.cards[entry.key] = card
+        try:
+            switches = read_task_switches()
+        except Exception as error:
+            logging.warning("读取任务开关失败，按全部开启处理: %s", error)
+            switches = {}
 
-        # 顶部对齐
+        for entry in TASK_REGISTRY:
+            row = TaskRow(entry, switch_on=switches.get(entry.key, True))
+            row.run_clicked.connect(self.task_run_clicked)
+            row.config_clicked.connect(self.task_config_clicked)
+            row.switch_toggled.connect(self.task_toggled)
+            scroll_layout.addWidget(row)
+            self.rows[entry.key] = row
+
         scroll_layout.addStretch()
         scroll_content.setLayout(scroll_layout)
         scroll_area.setWidget(scroll_content)
 
         return scroll_area
 
-    def refresh_lasttimes(self):
-        """读取 Last_times.yml 刷新各卡片的最近完成时间；只读，不创建配置文件"""
+    def refresh(self):
+        """刷新上次运行时间与今日状态；只读 Last_times.yml，不创建配置文件"""
         try:
             completions = read_completions()
         except Exception as error:
@@ -264,31 +467,36 @@ class LeftPanel(QFrame):
             completions = {}
 
         for entry in TASK_REGISTRY:
-            card = self.cards.get(entry.key)
-            if card is None:
+            row = self.rows.get(entry.key)
+            if row is None:
                 continue
-            card.set_last_time(latest_completion(entry, completions))
+            row.set_last_time(latest_completion(entry, completions))
+            try:
+                row.set_today_done(entry_done_today(entry, completions))
+            except Exception as error:
+                logging.warning("判定任务 %s 今日状态失败: %s", entry.key, error)
+                row.set_today_done(False)
 
     def set_busy(self, busy):
-        """运行期间禁用全部卡片，避免并发抢占键鼠"""
-        for card in self.cards.values():
-            card.setEnabled(not busy)
+        """运行期间禁用全部行的交互控件，避免并发抢占键鼠或中途改开关"""
+        for row in self.rows.values():
+            row.set_busy(busy)
 
-    def reset_states(self, running_key=None):
-        """开始新一轮运行：清空旧徽章，并把正在运行的任务标记为运行中"""
-        for entry in TASK_REGISTRY:
-            card = self.cards.get(entry.key)
-            if card is None:
-                continue
-            card.set_state("running" if entry.key == running_key else "idle")
+    def set_running(self, task_key):
+        """把指定任务行标记为运行中"""
+        for key, row in self.rows.items():
+            row.set_running(key == task_key)
 
-    def apply_results(self, states):
-        """运行结束后按 {任务key: 状态} 回填徽章，未列出的任务保持空闲"""
-        for entry in TASK_REGISTRY:
-            card = self.cards.get(entry.key)
-            if card is None or entry.key not in states:
-                continue
-            card.set_state(states[entry.key])
+    def clear_running(self):
+        """清除所有行的运行中标记"""
+        for row in self.rows.values():
+            row.set_running(False)
+
+    def set_switch_state(self, task_key, on):
+        """外部回写开关状态（写盘失败时用于回滚界面）"""
+        row = self.rows.get(task_key)
+        if row is not None:
+            row.set_switch(on)
 
 
 class RightPanel(QFrame):
@@ -403,7 +611,7 @@ class MainWindow(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        version = "1.1.0"
+        version = "1.2.0"
         self.setWindowTitle(f"Paper Sweeper - v{version}")
         self.setFixedSize(1200, 600)
 
@@ -412,26 +620,59 @@ class MainWindow(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
 
-        # 初始化左侧面板
         self.left_panel = LeftPanel()
         main_layout.addWidget(self.left_panel)
 
-        # 初始化右侧面板
         self.right_panel = RightPanel()
         main_layout.addWidget(self.right_panel, 1)
 
         self.setLayout(main_layout)
 
-        # 连接面板信号：卡片单击跑单个任务，按钮跑完整流程
-        self.left_panel.task_clicked.connect(self.on_card_clicked)
+        # 左侧行内交互：运行 / 配置（占位）/ 整跑开关
+        self.left_panel.task_run_clicked.connect(self.on_task_run)
+        self.left_panel.task_config_clicked.connect(self.on_task_config)
+        self.left_panel.task_toggled.connect(self.on_task_toggled)
         self.right_panel.run_button_clicked.connect(self.run_button_clicked)
 
-    def on_card_clicked(self, task_key):
-        """左侧卡片点击：单独运行该任务"""
+    # ---- 左侧行交互 ----
+
+    def on_task_run(self, task_key):
+        """点击行内 ▶：单独运行该任务"""
         self.start_job(task_key)
 
+    def on_task_config(self, task_key):
+        """点击行内齿轮：配置入口占位，暂不实现具体配置"""
+        title = self._task_title(task_key)
+        QMessageBox.information(
+            self,
+            "配置功能暂未开放",
+            f"「{title}」的配置功能将在后续版本提供。\n\n当前可在 config/Setting.yml 中调整该任务的参数。",
+        )
+
+    def on_task_toggled(self, task_key, enabled):
+        """拨动行内开关：写入 config/Gui_state.yml，决定是否参与完整运行"""
+        title = self._task_title(task_key)
+        if set_task_switch(task_key, enabled):
+            state_text = "参与" if enabled else "不参与"
+            self.right_panel.update_console(f"INFO- ----- 任务「{title}」已设置为{state_text}「完整运行」\n")
+            return
+
+        # 写盘失败：回滚界面并提示，避免界面与实际配置不一致
+        self.left_panel.set_switch_state(task_key, not enabled)
+        QMessageBox.warning(
+            self,
+            "保存失败",
+            f"无法保存「{title}」的开关状态，请检查 config 目录是否可写。",
+        )
+
+    @staticmethod
+    def _task_title(task_key):
+        return next((task.title for task in TASK_REGISTRY if task.key == task_key), task_key)
+
+    # ---- 任务调度 ----
+
     def run_button_clicked(self):
-        """完整运行按钮点击：按注册表顺序依次执行全部任务"""
+        """完整运行按钮点击：按注册表顺序依次执行已开启的任务"""
         self.start_job(None)
 
     def start_job(self, task_key):
@@ -445,16 +686,28 @@ class MainWindow(QWidget):
         # 运行前快照，结束后用它判断任务是否真正推进了完成时间
         self.before_snapshot = completion_snapshot()
 
-        self.left_panel.refresh_lasttimes()
-        self.left_panel.reset_states(task_key)
+        self.left_panel.refresh()
+        if task_key is None:
+            self.left_panel.clear_running()
+        else:
+            self.left_panel.set_running(task_key)
         self.left_panel.set_busy(True)
         self.right_panel.set_running(True)
 
         if task_key is None:
-            self.right_panel.append_separator("开始：完整运行")
+            try:
+                switches = read_task_switches()
+            except Exception:
+                switches = {}
+            disabled = [task.title for task in TASK_REGISTRY if not switches.get(task.key, True)]
+            if disabled:
+                self.right_panel.append_separator(
+                    f"开始：完整运行（已关闭 {len(disabled)} 项将跳过：{'、'.join(disabled)}）"
+                )
+            else:
+                self.right_panel.append_separator("开始：完整运行")
         else:
-            title = next((task.title for task in TASK_REGISTRY if task.key == task_key), task_key)
-            self.right_panel.append_separator(f"开始：单独运行 - {title}")
+            self.right_panel.append_separator(f"开始：单独运行 - {self._task_title(task_key)}")
 
         self.thread = WorkerThread(task_key)
         self.thread.console_output.connect(self.right_panel.update_console)
@@ -473,7 +726,7 @@ class MainWindow(QWidget):
             thread.deleteLater()
 
     def on_job_finished(self, payload):
-        """任务结束：恢复界面、刷新时间、按完成时间变化回填徽章"""
+        """任务结束：恢复界面、刷新时间与今日状态、输出本次结果摘要"""
         self.busy = False
 
         try:
@@ -483,27 +736,34 @@ class MainWindow(QWidget):
             logging.warning("任务完成后刷新状态失败: %s", error)
             advanced = {}
 
-        self.left_panel.refresh_lasttimes()
+        self.left_panel.clear_running()
+        self.left_panel.refresh()
         self.left_panel.set_busy(False)
         self.right_panel.set_running(False)
 
         task_key = payload.get("key")
 
         if not payload.get("ok", True):
-            states = {task_key: "error"} if task_key else {}
-            self.left_panel.apply_results(states)
             self.right_panel.append_separator(f"结束：异常 - {payload.get('error')}")
             return
 
-        if task_key is None:
-            # 完整运行：所有任务按完成时间是否推进回填
-            states = {key: ("done" if value else "skipped") for key, value in advanced.items()}
-        else:
-            states = {task_key: ("done" if advanced.get(task_key) else "skipped")}
+        try:
+            switches = read_task_switches()
+        except Exception:
+            switches = {}
+        enabled_keys = [task.key for task in TASK_REGISTRY if switches.get(task.key, True)]
+        disabled_count = len(TASK_REGISTRY) - len(enabled_keys)
 
-        self.left_panel.apply_results(states)
-        finished = sum(1 for value in states.values() if value == "done")
-        self.right_panel.append_separator(f"结束：完成 {finished} 项 / 共 {len(states)} 项（未更新详见控制台日志）")
+        if task_key is None:
+            finished = sum(1 for key in enabled_keys if advanced.get(key))
+            summary = f"结束：完成 {finished} 项 / 共 {len(enabled_keys)} 项"
+            if disabled_count:
+                summary += f"（另有 {disabled_count} 项已关闭跳过）"
+        else:
+            state_text = "完成" if advanced.get(task_key) else "未推进（详见控制台日志）"
+            summary = f"结束：{self._task_title(task_key)} {state_text}"
+
+        self.right_panel.append_separator(summary)
 
     def closeEvent(self, event):
         """运行中关闭窗口需要用户确认，避免中断正在抢占键鼠的任务"""

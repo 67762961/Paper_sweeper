@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from PyQt6.QtCore import QObject, pyqtSignal
-from Lib import Find_windows, read_config
+from Lib import Find_windows, read_config, write_config
 from Task_SignIn import MainTask_Signin
 from Task_Fengmo import MainTask_Fengmo
 from Task_Digui import MainTask_Digui
@@ -80,11 +80,17 @@ class TaskEntry:
     title: str                       # 卡片主标题
     desc: str                        # 卡片副标题，说明该任务覆盖的业务
     entry: Callable[[], None]        # 任务入口函数（与整跑一致）
-    lasttime_keys: tuple             # Last_times.yml 中对应的完成时间键
+    lasttime_keys: tuple             # Last_times.yml 中对应的完成时间键（取最新值展示）
+    today_keys: tuple = ()           # 判定「今日是否已完成」的键；为空表示与 lasttime_keys 相同
 
     @property
     def label(self):
         return f"{self.key}({self.title})"
+
+    @property
+    def check_keys(self):
+        """参与今日完成判定的状态键"""
+        return self.today_keys or self.lasttime_keys
 
 
 # 顺序即「完整运行」的执行顺序，新增任务必须登记到这里
@@ -116,6 +122,8 @@ TASK_REGISTRY = (
         "双账号协作刷本 + 非周末真蛇",
         FullTask_Thirty,
         ("寮三十", "真蛇"),
+        # 真蛇是周更，不参与「今日已完成」判定，只看寮三十
+        ("寮三十",),
     ),
     TaskEntry(
         "jiejiefight",
@@ -202,6 +210,69 @@ def completion_advanced(before, after):
     return advanced
 
 
+def entry_done_today(entry, completions=None, today=None):
+    """该任务参与今日判定的状态键，是否在所有账号上都已有今天的完成记录"""
+    completions = read_completions() if completions is None else completions
+    today = today or datetime.date.today()
+    keys = entry.check_keys
+    if not keys or not completions:
+        return False
+
+    for key in keys:
+        # 每个状态键都必须在每个账号上都有今天的记录，缺一个即视为今日未完成
+        for account_data in completions.values():
+            moment = account_data.get(key)
+            if moment is None or moment.date() != today:
+                return False
+    return True
+
+
+# ---- 任务开关（左侧行最右的开关，决定该任务是否参与「完整运行」）----
+
+GUI_STATE_PATH = "./config/Gui_state.yml"
+TASK_SWITCH_SECTION = "任务开关"
+
+
+def read_task_switches():
+    """读取任务开关；文件或键缺失时默认全部开启（只读，不创建文件）"""
+    config_data = read_config(GUI_STATE_PATH) or {}
+    section = config_data.get(TASK_SWITCH_SECTION)
+    if not isinstance(section, dict):
+        section = {}
+    return {task.key: bool(section.get(task.key, True)) for task in TASK_REGISTRY}
+
+
+def is_task_enabled(task_key, switches=None):
+    """判断某个任务是否参与「完整运行」"""
+    switches = read_task_switches() if switches is None else switches
+    return switches.get(task_key, True)
+
+
+def enabled_task_keys(switches=None):
+    """参与「完整运行」的任务 key，顺序与注册表一致"""
+    switches = read_task_switches() if switches is None else switches
+    return [task.key for task in TASK_REGISTRY if switches.get(task.key, True)]
+
+
+def set_task_switch(task_key, enabled):
+    """把单个任务开关写入 config/Gui_state.yml，写入成功返回 True"""
+    if get_task(task_key) is None:
+        return False
+    try:
+        os.makedirs(os.path.dirname(GUI_STATE_PATH), exist_ok=True)
+        config_data = read_config(GUI_STATE_PATH) or {}
+        section = config_data.get(TASK_SWITCH_SECTION)
+        if not isinstance(section, dict):
+            config_data[TASK_SWITCH_SECTION] = {}
+            section = config_data[TASK_SWITCH_SECTION]
+        section[task_key] = bool(enabled)
+        write_config(GUI_STATE_PATH, config_data)
+        return True
+    except Exception as error:
+        print("TASK- ----- 保存任务开关失败:", error)
+        return False
+
+
 @contextlib.contextmanager
 def _log_stream(console_signal, log_prefix):
     """把 stdout 同时重定向到原控制台、日志文件和 GUI 信号；退出时恢复并冲刷缓冲"""
@@ -230,12 +301,26 @@ def _log_stream(console_signal, log_prefix):
 
 
 def Full_operation(console_signal=None):
-    """完整运行：按 TASK_REGISTRY 顺序执行全部任务"""
+    """完整运行：按 TASK_REGISTRY 顺序执行未被左侧开关关闭的任务"""
     with _log_stream(console_signal, "console_output"):
         print("        ")
         print("MAIN- ===== 完整运行流程开始 ================================================================")
+        switches = read_task_switches()
+        executed = 0
+        skipped = 0
         for task in TASK_REGISTRY:
+            if not switches.get(task.key, True):
+                print("SKIP- ----- 任务", task.title, "已在左侧关闭 跳过")
+                skipped += 1
+                continue
             task.entry()
+            executed += 1
+
+        if skipped:
+            if executed == 0:
+                print("SKIP- ----- 所有任务均已在左侧关闭 本次完整运行没有执行任何任务")
+            else:
+                print(f"INFO- ----- 本次完整运行跳过 {skipped} 项已关闭任务 实际执行 {executed} 项")
         print("        ")
         print("MAIN- ===== 完整运行流程结束 ================================================================")
 
