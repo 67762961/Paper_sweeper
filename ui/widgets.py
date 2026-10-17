@@ -1,60 +1,26 @@
 # -*- coding: utf-8 -*-
-"""基础组件：整跑开关与任务行。"""
+"""基础组件：整跑开关与任务行（均已 Fluent 化）。"""
 
-from PyQt6.QtCore import Qt, QSize, QRectF, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter
-from PyQt6.QtWidgets import QAbstractButton, QFrame, QHBoxLayout, QLabel, QVBoxLayout
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QLabel, QVBoxLayout
+from qfluentwidgets import SimpleCardWidget, SwitchButton
 
 from . import theme
 from .icons import IconButton, StatusIcon
 
 
-class ToggleSwitch(QAbstractButton):
-    """自绘开关：开启为蓝底白钮，关闭为灰底白钮（不引入图片资源）"""
+class ToggleSwitch(SwitchButton):
+    """Fluent 开关包装：补齐 isCheckable()/click()，与旧代码的按钮语义保持一致"""
 
-    WIDTH = theme.SIZE_TOGGLE_WIDTH
-    HEIGHT = theme.SIZE_TOGGLE_HEIGHT
+    def isCheckable(self):
+        return True
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setCheckable(True)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedSize(self.WIDTH, self.HEIGHT)
-
-    def sizeHint(self):
-        return QSize(self.WIDTH, self.HEIGHT)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(Qt.PenStyle.NoPen)
-
-        if not self.isEnabled():
-            track = QColor(theme.COLOR_TRACK_DISABLED)
-        elif self.isChecked():
-            track = QColor(theme.COLOR_ACCENT)
-        else:
-            track = QColor(theme.COLOR_TRACK_OFF)
-
-        track_top = 3
-        track_height = self.HEIGHT - 6
-        painter.setBrush(track)
-        painter.drawRoundedRect(
-            QRectF(0, track_top, self.WIDTH, track_height),
-            track_height / 2,
-            track_height / 2,
-        )
-
-        knob_diameter = 16
-        knob_x = self.WIDTH - knob_diameter - 4 if self.isChecked() else 4
-        painter.setBrush(QColor(theme.COLOR_KNOB))
-        painter.drawEllipse(
-            QRectF(knob_x, (self.HEIGHT - knob_diameter) / 2, knob_diameter, knob_diameter)
-        )
-        painter.end()
+    def click(self):
+        self.setChecked(not self.isChecked())
 
 
-class TaskRow(QFrame):
+class TaskRow(SimpleCardWidget):
     """单行任务：今日状态 + 名称/上次运行时间 + 齿轮 + 运行 + 开关"""
 
     run_clicked = pyqtSignal(str)
@@ -71,14 +37,14 @@ class TaskRow(QFrame):
         self.today_done = False
         self.setObjectName("TaskRow")
         self.setFixedHeight(theme.HEIGHT_TASK_ROW)
-        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setBorderRadius(theme.RADIUS_CARD)
         self.init_ui()
         self.set_switch(switch_on)
         self._apply_row_style()
 
     def init_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(theme.SPACE_LG, theme.SPACE_SM, theme.SPACE_LG, theme.SPACE_SM)
+        layout.setContentsMargins(theme.SPACE_XL, theme.SPACE_SM, theme.SPACE_XL, theme.SPACE_SM)
         layout.setSpacing(theme.SPACE_MD)
 
         # 最左：今日状态
@@ -92,10 +58,11 @@ class TaskRow(QFrame):
 
         self.name_label = QLabel(self.title)
         self.name_label.setFont(
-            QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_BODY, QFont.Weight.Bold)
+            QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_TASK_NAME, QFont.Weight.Bold)
         )
 
         self.time_label = QLabel("上次运行 暂无记录")
+        self.time_label.setFont(QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_TASK_TIME))
 
         text_layout.addWidget(self.name_label)
         text_layout.addWidget(self.time_label)
@@ -105,6 +72,8 @@ class TaskRow(QFrame):
         self.config_button = IconButton("gear", "配置该任务（暂未开放）")
         self.run_button = IconButton("play", "单独运行该任务")
         self.switch = ToggleSwitch()
+        self.switch.setOnText("")
+        self.switch.setOffText("")
         self.switch.setToolTip("开启后参与「完整运行」，关闭则完整运行时跳过")
 
         layout.addWidget(self.config_button)
@@ -113,7 +82,7 @@ class TaskRow(QFrame):
 
         self.config_button.clicked.connect(lambda: self.config_clicked.emit(self.key))
         self.run_button.clicked.connect(lambda: self.run_clicked.emit(self.key))
-        self.switch.toggled.connect(self.on_switch_toggled)
+        self.switch.checkedChanged.connect(self.on_switch_toggled)
 
     # ---- 状态 ----
 
@@ -164,31 +133,12 @@ class TaskRow(QFrame):
     # ---- 外观 ----
 
     def _apply_row_style(self):
-        if self.running:
-            background, border = theme.COLOR_ROW_BG_RUNNING, theme.COLOR_ACCENT
-        elif self.switch_on:
-            background, border = theme.COLOR_CARD_BG, theme.COLOR_ROW_BORDER
-        else:
-            background, border = theme.COLOR_ROW_BG_OFF, theme.COLOR_ROW_BORDER_OFF
+        """关闭「完整运行」的任务整行半透明，直观表达不参与整跑"""
+        if not hasattr(self, "_opacity_effect"):
+            self._opacity_effect = QGraphicsOpacityEffect(self)
+            self.setGraphicsEffect(self._opacity_effect)
+        self._opacity_effect.setOpacity(1.0 if (self.switch_on or self.running) else 0.55)
 
-        self.setStyleSheet(f"""
-            QFrame#TaskRow {{
-                background-color: {background};
-                border: 1px solid {border};
-                border-radius: {theme.RADIUS_CARD}px;
-            }}
-            QFrame#TaskRow:hover {{
-                border-color: {theme.COLOR_ACCENT};
-            }}
-        """)
-
-        # 关闭的任务整行文字变浅，明确表达「不参与完整运行」
-        name_color = theme.COLOR_TEXT_PRIMARY if self.switch_on else theme.COLOR_TEXT_MUTED
-        time_color = theme.COLOR_TEXT_TERTIARY if self.switch_on else theme.COLOR_TEXT_DISABLED
-        self.name_label.setStyleSheet(
-            f"color: {name_color}; background: transparent; border: none;"
-        )
-        self.time_label.setStyleSheet(
-            f"color: {time_color}; background: transparent; border: none; "
-            f"font-size: {theme.FONT_SIZE_SMALL}px;"
-        )
+    def visual_opacity(self):
+        """当前行透明度（供测试断言使用）"""
+        return self._opacity_effect.opacity() if hasattr(self, "_opacity_effect") else 1.0

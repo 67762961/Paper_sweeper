@@ -1,23 +1,32 @@
 # -*- coding: utf-8 -*-
-"""面板：左侧任务列表与右侧日志控制台。"""
+"""面板：左侧任务列表与右侧日志控制台（Fluent 控件）。"""
 
 import logging
 
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QScrollArea,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
+from qfluentwidgets import IndeterminateProgressBar, PushButton, TextEdit
 
 from main import TASK_REGISTRY, entry_done_today, latest_completion, read_completions, read_task_switches
 from . import theme
 from .widgets import TaskRow
+
+# 日志行首关键字着色：深色/浅色主题下都保持可读
+LOG_LINE_COLORS = (
+    ("ERROR", "#c42b1c"),
+    ("错误", "#c42b1c"),
+    ("SKIP-", "#c77700"),
+    ("TASK-", "#0f6cbd"),
+    ("MAIN-", "#0f6cbd"),
+)
 
 
 class LeftPanel(QFrame):
@@ -29,32 +38,29 @@ class LeftPanel(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setStyleSheet("background-color: transparent;")
         self.rows = {}
         self.init_ui()
         self.refresh()
 
     def init_ui(self):
         self.setFixedWidth(theme.WIDTH_LEFT_PANEL)
-        self.setStyleSheet("background-color: transparent;")
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(theme.SPACE_LG, theme.SPACE_SM, theme.SPACE_LG, theme.SPACE_SM)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(theme.SPACE_XS)
 
         title_label = QLabel("任务列表")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet(
-            f"font-size: {theme.FONT_SIZE_TITLE}px; font-weight: bold; margin: {theme.SPACE_XS}px;"
-        )
+        title_label.setFont(QFont(theme.FONT_FAMILY_UI, 12, QFont.Weight.Bold))
         layout.addWidget(title_label)
 
         layout.addWidget(self.create_scroll_area())
 
         hint_label = QLabel("运行按钮单独执行 · 齿轮为配置入口（暂未开放）· 开关决定是否参与完整运行")
         hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hint_label.setStyleSheet(
-            f"color: {theme.COLOR_TEXT_TERTIARY}; font-size: {theme.FONT_SIZE_SMALL}px;"
-        )
+        hint_label.setFont(QFont(theme.FONT_FAMILY_UI, 9))
+        hint_label.setWordWrap(True)
         layout.addWidget(hint_label)
 
         self.setLayout(layout)
@@ -63,10 +69,12 @@ class LeftPanel(QFrame):
         """按 TASK_REGISTRY 生成任务行，顺序与完整运行一致"""
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("QScrollArea { background: transparent; border: none; }")
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
         scroll_layout = QVBoxLayout()
         scroll_layout.setContentsMargins(0, 0, 0, 0)
         scroll_layout.setSpacing(theme.SPACE_XS)
@@ -133,7 +141,7 @@ class LeftPanel(QFrame):
 
 
 class RightPanel(QFrame):
-    """右侧控制台面板"""
+    """右侧日志控制台面板"""
 
     run_button_clicked = pyqtSignal()
 
@@ -142,45 +150,47 @@ class RightPanel(QFrame):
         self.setStyleSheet("background-color: transparent;")
         self.textbox = None
         self.run_button = None
+        self.progress = None
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout()
-        layout.setContentsMargins(theme.SPACE_XXL, theme.SPACE_XXL, theme.SPACE_XXL, theme.SPACE_XXL)
-        layout.setSpacing(15)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(theme.SPACE_LG)
 
         self.create_console_area(layout)
+        self.create_progress(layout)
         self.create_button_area(layout)
 
         self.setLayout(layout)
 
     def create_console_area(self, parent_layout):
-        """创建控制台输出文本框区域"""
-        self.textbox = QTextEdit()
+        """创建控制台输出区域"""
+        self.textbox = TextEdit()
         self.textbox.setReadOnly(True)
-        self.textbox.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: {theme.COLOR_CARD_BG};
-                font-family: '{theme.FONT_FAMILY_LOG}', 'Monaco', monospace;
-                font-size: {theme.FONT_SIZE_LOG}px;
-                border: 1px solid {theme.COLOR_ACCENT};
-                border-radius: {theme.RADIUS_LOG_BOX}px;
-            }}
-        """)
+        self.textbox.setFont(QFont(theme.FONT_FAMILY_LOG, theme.FONT_SIZE_LOG))
+        self.textbox.setPlaceholderText("运行日志会显示在这里")
         parent_layout.addWidget(self.textbox, 1)
 
+    def create_progress(self, parent_layout):
+        """运行中的不确定进度条，默认隐藏"""
+        self.progress = IndeterminateProgressBar(self)
+        self.progress.setVisible(False)
+        parent_layout.addWidget(self.progress)
+
     def create_button_area(self, parent_layout):
-        """创建按钮区域"""
-        self.run_button = QPushButton("完整运行")
+        """创建主操作按钮"""
+        self.run_button = PushButton("完整运行")
         self.run_button.setFixedHeight(theme.SIZE_RUN_BUTTON_HEIGHT)
         self.run_button.setStyleSheet(f"""
             QPushButton {{
-                background-color: {theme.COLOR_CARD_BG};
-                color: {theme.COLOR_ACCENT_TEXT};
-                border-color: {theme.COLOR_ACCENT};
+                background-color: transparent;
+                color: {theme.COLOR_ACCENT};
+                border: 1px solid {theme.COLOR_ACCENT};
                 border-radius: {theme.RADIUS_CARD}px;
                 font-size: {theme.FONT_SIZE_RUN_BUTTON}px;
                 font-weight: bold;
+                padding: 0 {theme.SPACE_XXL}px;
             }}
             QPushButton:hover {{
                 background-color: #E6F2FF;
@@ -188,11 +198,16 @@ class RightPanel(QFrame):
             QPushButton:pressed {{
                 background-color: #B8DAFF;
             }}
+            QPushButton:disabled {{
+                color: {theme.COLOR_TEXT_DISABLED};
+                border-color: {theme.COLOR_ROW_BORDER};
+            }}
         """)
 
         button_container = QFrame()
+        button_container.setStyleSheet("background: transparent;")
         button_layout = QHBoxLayout()
-        button_layout.setContentsMargins(5, 5, 5, 5)
+        button_layout.setContentsMargins(0, theme.SPACE_MD, 0, 0)
         button_layout.addStretch()
         button_layout.addWidget(self.run_button)
         button_container.setLayout(button_layout)
@@ -202,19 +217,40 @@ class RightPanel(QFrame):
         self.run_button.clicked.connect(self.run_button_clicked)
 
     def set_running(self, running):
-        """运行期间禁用完整运行按钮并提示状态"""
+        """运行期间禁用完整运行按钮、显示进度条"""
         self.run_button.setEnabled(not running)
         self.run_button.setText("运行中…" if running else "完整运行")
+        if running:
+            self.progress.setVisible(True)
+            self.progress.start()
+        else:
+            self.progress.stop()
+            self.progress.setVisible(False)
 
     def append_separator(self, text):
         """在控制台插入一段分隔说明，便于区分多次运行"""
-        self.update_console(f"\n{'=' * 78}\n{text}\n{'=' * 78}\n\n")
+        self.update_console(f"\n{'=' * 60}\n{text}\n{'=' * 60}\n\n")
+
+    @staticmethod
+    def color_for(line):
+        """按日志前缀返回着色，返回 None 表示使用主题默认文字颜色"""
+        for keyword, color in LOG_LINE_COLORS:
+            if keyword in line:
+                return color
+        return None
 
     def update_console(self, message):
-        """更新控制台显示"""
+        """更新控制台显示：逐行着色并自动滚动到底部"""
         cursor = self.textbox.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        cursor.insertText(message)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+
+        for line in message.splitlines(keepends=True):
+            fmt = QTextCharFormat()
+            color = self.color_for(line)
+            if color:
+                fmt.setForeground(QColor(color))
+            cursor.insertText(line, fmt)
+
         self.textbox.setTextCursor(cursor)
         self.textbox.ensureCursorVisible()
 

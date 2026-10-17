@@ -5,7 +5,13 @@ import logging
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QMessageBox, QWidget
-from qfluentwidgets import FluentIcon, MSFluentWindow, NavigationItemPosition
+from qfluentwidgets import (
+    FluentIcon,
+    InfoBar,
+    InfoBarPosition,
+    MSFluentWindow,
+    NavigationItemPosition,
+)
 
 import config
 from main import (
@@ -199,7 +205,9 @@ class MainWindow(MSFluentWindow):
         task_key = payload.get("key")
 
         if not payload.get("ok", True):
-            self.right_panel.append_separator(f"结束：异常 - {payload.get('error')}")
+            error_text = str(payload.get("error"))
+            self.right_panel.append_separator(f"结束：异常 - {error_text}")
+            self.show_error_bar("任务执行异常", error_text)
             return
 
         try:
@@ -219,6 +227,20 @@ class MainWindow(MSFluentWindow):
             summary = f"结束：{self._task_title(task_key)} {state_text}"
 
         self.right_panel.append_separator(summary)
+
+        # Fluent 结果提示：完整运行与单任务分别用不同文案
+        content = summary.replace("结束：", "")
+        if task_key is None:
+            InfoBar.success("完整运行结束", content, parent=self, duration=4000,
+                            position=InfoBarPosition.TOP_RIGHT)
+        else:
+            InfoBar.success("单任务结束", content, parent=self, duration=3000,
+                            position=InfoBarPosition.TOP_RIGHT)
+
+    def show_error_bar(self, title, content):
+        """统一的错误提示（任务线程异常时使用）"""
+        InfoBar.error(title, content, parent=self, duration=6000,
+                      position=InfoBarPosition.TOP_RIGHT)
 
     def closeEvent(self, event):
         """运行中关闭窗口需要用户确认，避免中断正在抢占键鼠的任务"""
