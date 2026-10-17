@@ -12,6 +12,7 @@ from qfluentwidgets import (
     MSFluentWindow,
     NavigationItemPosition,
     TransparentToolButton,
+    qconfig,
 )
 
 import config
@@ -106,6 +107,10 @@ class MainWindow(MSFluentWindow):
         self.left_panel.task_toggled.connect(self.on_task_toggled)
         self.right_panel.run_button_clicked.connect(self.run_button_clicked)
         self.right_panel.settings_clicked.connect(self.open_settings)
+
+        # 主题切换后重新着色日志区已有文本；行内状态图标在 ui/icons.py 内自行重绘，
+        # 文字类标签由 Fluent 自动切换浅色 / 深色两套取值
+        qconfig.themeChangedFinished.connect(self.right_panel.apply_theme)
 
     # ---- 左侧行交互 ----
 

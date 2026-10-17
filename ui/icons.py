@@ -3,12 +3,13 @@
 
 今日状态图标用 QPainter 直接绘制（对勾 / 感叹号 / 播放三角），不依赖字体字形，
 在任意 DPI 下都清晰；齿轮与运行按钮使用 FluentIcon。
+自绘颜色按当前主题从 ``ui/theme.py`` 取，深色主题下自动换成更亮的取值。
 """
 
 from PyQt6.QtCore import Qt, QPointF, QSize
 from PyQt6.QtGui import QColor, QPainter, QPen, QPolygonF
 from PyQt6.QtWidgets import QWidget
-from qfluentwidgets import FluentIcon, TransparentToolButton
+from qfluentwidgets import FluentIcon, TransparentToolButton, qconfig
 
 from . import theme
 
@@ -16,10 +17,11 @@ from . import theme
 class StatusIcon(QWidget):
     """行首的今日状态图标：已完成 check / 今日未完成 alert / 运行中 play"""
 
+    # 状态 → (颜色 token, 图形, 提示语)
     STATE_STYLES = {
-        "done": ("#2e7d32", "check", "今日已完成"),
-        "pending": ("#b26a00", "alert", "今日尚未完成"),
-        "running": (theme.COLOR_ACCENT, "play", "正在运行"),
+        "done": ("COLOR_STATUS_DONE", "check", "今日已完成"),
+        "pending": ("COLOR_STATUS_PENDING", "alert", "今日尚未完成"),
+        "running": ("COLOR_STATUS_RUNNING", "play", "正在运行"),
     }
 
     def __init__(self, parent=None):
@@ -27,6 +29,8 @@ class StatusIcon(QWidget):
         self.state = "pending"
         self.setFixedSize(theme.SIZE_STATUS_ICON - 2, theme.SIZE_STATUS_ICON - 2)
         self.set_state("pending")
+        # 深浅色切换后重绘，避免深色主题下仍是浅色的深绿 / 深橙
+        qconfig.themeChangedFinished.connect(self.update)
 
     def set_state(self, state):
         self.state = state if state in self.STATE_STYLES else "pending"
@@ -35,13 +39,14 @@ class StatusIcon(QWidget):
         self.update()
 
     def paintEvent(self, event):
-        color, glyph, _ = self.STATE_STYLES[self.state]
+        token, glyph, _ = self.STATE_STYLES[self.state]
+        color = QColor(theme.color(token))
         side = float(self.width())
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        pen = QPen(QColor(color))
+        pen = QPen(color)
         pen.setWidthF(2.4)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
@@ -57,7 +62,7 @@ class StatusIcon(QWidget):
             )
         elif glyph == "alert":
             painter.drawLine(QPointF(side * 0.5, side * 0.18), QPointF(side * 0.5, side * 0.62))
-            painter.setBrush(QColor(color))
+            painter.setBrush(color)
             painter.drawEllipse(QPointF(side * 0.5, side * 0.82), 1.4, 1.4)
         else:  # play
             painter.setBrush(Qt.BrushStyle.NoBrush)

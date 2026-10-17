@@ -135,7 +135,7 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 
 | 模块 | 职责 |
 | ---- | ---- |
-| `ui/theme.py` | 设计 token：颜色、间距、圆角、字号；所有界面取值统一来自这里 |
+| `ui/theme.py` | 设计 token：颜色、间距、圆角、字号；`COLOR_*` 为浅色取值、深色覆盖在 `_DARK_COLORS`，组件用 `theme.color()` / `light_color()` / `dark_color()` 取色 |
 | `ui/icons.py` | `StatusIcon`（QPainter 绘制对勾/感叹号/播放三角）、`IconButton`（FluentIcon 图标按钮） |
 | `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`） |
 | `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 主按钮） |
@@ -156,19 +156,22 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 - 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果；
 - 顶栏右侧提供深浅色主题快捷切换按钮，右侧日志区提供「清空 / 自动滚动 / 设置」工具条；
 - 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号，并提供「打开日志目录」入口；
-- 界面偏好写入 `config/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `Setting.yml` / `Gui_state.yml`。
+- 界面偏好写入 `config/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `Setting.yml` / `Gui_state.yml`；
+- 深浅色主题各有独立配色：文字类控件用 Fluent 标签（浅色 / 深色两套文字色由库自动切换），
+  自绘状态图标、日志行着色与轮廓按钮在切换后按当前主题重新取色；主强调色是比原 `#007BFF`
+  深一档的蓝（浅色 `#0d6bc2`，深色 `#3d8bd6`），避免浅色下过艳、深色下发灰看不清。
 
 单行结构（从左到右）：
 
 | 区域 | 控件 | 说明 |
 | ---- | ---- | ---- |
-| 今日状态 | `StatusIcon` | 今日已完成 → 绿色对勾；今日未完成 → 橙色 `!`；运行中 → 蓝色播放三角（均为 QPainter 绘制，无底色圆圈） |
+| 今日状态 | `StatusIcon` | 今日已完成 → 绿色对勾；今日未完成 → 橙色 `!`；运行中 → 蓝色播放三角（均为 QPainter 绘制，无底色圆圈；深色主题下自动换成更亮的绿 / 橙 / 蓝） |
 | 任务信息 | 名称 + 「上次运行 MM-DD HH:MM」 | 时间取该任务所有账号、所有状态键中的最新值 |
 | 配置 | `IconButton(kind="gear")` | `FluentIcon.SETTING`；本期为**占位**：弹「配置功能暂未开放」，不写盘 |
 | 单跑 | `IconButton(kind="play")` | `FluentIcon.PLAY`；点击只运行该任务（等价于 `Single_operation`） |
 | 开关 | `ToggleSwitch` | Fluent `SwitchButton`（不显示 On/Off 文案）；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `config/Gui_state.yml` |
 
-图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为轮廓按钮（主色描边 + 主色文字，悬停浅蓝底），不使用实心主色块。
+图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为轮廓按钮（主色描边 + 主色文字，悬停同色系浅底），不使用实心主色块；轮廓按钮用 Fluent 的「浅色 / 深色两套自定义样式」注册，主题切换后不会退回默认实心按钮。
 
 交互约定：
 
@@ -338,6 +341,7 @@ Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key
 
 - 文件缺失或字段非法时回落默认值（浅色、自动滚动、12 pt），不阻塞启动；
 - `qconfig` 只负责运行时主题状态，不再托管配置文件，避免被覆写；
+- 主题切换后日志区按新主题重新着色、自绘状态图标同步重绘，Fluent 控件由库自动换肤；
 - 与 `Setting.yml`（任务参数）、`Gui_state.yml`（任务开关）互不干扰。
 
 ### 6.5 项目级 `config.py`
@@ -402,7 +406,8 @@ for step in range(30):
 
 GUI 崩溃日志：`app_crash.log`（`logging` + `sys.excepthook`）。
 
-右侧日志面板按行首关键字着色：`ERROR` / `错误` → 红，`SKIP-` → 橙，`TASK-` / `MAIN-` → 蓝，其余使用主题默认文字颜色；
+右侧日志面板按行首关键字着色：`ERROR` / `错误` → 红，`SKIP-` → 橙，`TASK-` / `MAIN-` → 蓝，其余使用正文色；
+深浅色各有一套取值，切换主题后会重新着色已有日志；
 运行期间面板下方显示不确定进度条，结束后用 `InfoBar` 提示本次结果。
 
 日志区顶部工具条提供「清空日志」按钮与「自动滚动」开关（关闭后新日志不再强制滚到底部）；
