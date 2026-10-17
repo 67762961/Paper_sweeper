@@ -26,6 +26,7 @@
 - 注释统一使用中文；修改任务流程后，按实际改动同步 ARCHITECTURE.md 中的入口顺序、冷却策略或目录说明。
 - GUI 左侧 7 行任务与「完整运行」顺序都由 `main.TASK_REGISTRY` 驱动：新增/改名顶层任务入口时，必须同步登记注册表（key / 标题 / 说明 / 入口 / `lasttime_keys` / `today_keys`），不要另写一份任务列表。
 - 左侧行结构固定为「今日状态图标 + 名称/上次运行时间 + 齿轮（占位） + ▶ 单跑 + 整跑开关」；不要恢复整行点击运行，也不要加三点菜单。
+- 界面代码只放 `ui/` 包，单向依赖 `theme → icons → widgets → panels → window`；`GUI.py` 仅保留入口（环境变量、日志、异常钩子）并转出组件，不要在入口里写界面逻辑。
 - 今日状态由 `main.entry_done_today` 判定（`check_keys` 全部为今天才 ✓）；它只读 `Last_times.yml`，因此「被冷却/时间窗跳过」的任务仍显示 `!`。
 - 行内图标（✓ / ! / ▶ / 齿轮）一律用 `QPainter` 矢量绘制，不依赖字体字形、不引入图片资源、不往 `pic/` 塞 UI 素材。
 - `Full_operation` 与 `Single_operation` 共用 `main._log_stream`；日志收尾必须先恢复 `sys.stdout` 再冲刷，避免打包版（`console=False`，`sys.stdout` 为 `None`）下抛出异常导致 GUI 卡在「运行中」。

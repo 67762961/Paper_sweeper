@@ -50,10 +50,16 @@ flowchart LR
 ├── README.md                      使用说明
 ├── requirements.txt               Python 依赖
 ├── .gitignore                     忽略虚拟环境/配置/日志/打包产物/调试脚本
-├── GUI.py                         PyQt6 图形入口（左侧 7 张任务卡片 + 右侧控制台）
+├── GUI.py                         PyQt6 图形入口（环境变量/日志/异常钩子 + 转出 ui 组件）
 ├── GUI.spec                       PyInstaller 打包配置
 ├── build_exe.py                   本地打包脚本（调用 GUI.spec，产物输出到根目录）
 ├── GUI.exe                        打包产物（默认忽略）
+├── ui/                            界面层（单向依赖 theme→icons→widgets→panels→window）
+│   ├── theme.py                   设计 token：颜色/间距/圆角/字号
+│   ├── icons.py                   今日状态图标与齿轮/运行按钮（QPainter 绘制）
+│   ├── widgets.py                 整跑开关、任务行
+│   ├── panels.py                  左侧任务列表、右侧日志控制台
+│   └── window.py                  主窗口与任务线程
 ├── main.py                        任务注册表 + 完整/单任务运行编排 + Tee 日志
 ├── Lib.py                         公共自动化库（识别/点击/界面/配置/编队）
 ├── Task_SignIn.py                 登录收菜：邮件/签到/福袋/纸人/礼包/友情点
@@ -117,12 +123,22 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 
 ## 5. 入口函数说明
 
-### 5.1 `GUI.py`
+### 5.1 `GUI.py` 与 `ui/` 包
 
-职责：
+`GUI.py` 只作为入口：设置 Windows DPI（`QT_QPA_PLATFORM=windows:dpiawareness=1`）、安装全局异常钩子（写入 `app_crash.log`）、创建 `QApplication` 并应用主题，最后转出 `ui/` 中的组件供脚本/测试使用。
 
-- 设置 Windows DPI：`QT_QPA_PLATFORM=windows:dpiawareness=1`；
-- 安装全局异常钩子，未捕获异常写入 `app_crash.log`；
+界面实现位于 `ui/` 包，依赖方向固定为 `theme → icons → widgets → panels → window`，禁止反向引用：
+
+| 模块 | 职责 |
+| ---- | ---- |
+| `ui/theme.py` | 设计 token：颜色、间距、圆角、字号；所有界面取值统一来自这里 |
+| `ui/icons.py` | `StatusIcon`、`IconButton`（QPainter 矢量绘制，不依赖字体/图片） |
+| `ui/widgets.py` | `ToggleSwitch`、`TaskRow` |
+| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（日志控制台） |
+| `ui/window.py` | `WorkerThread`、`MainWindow`（组装 + 线程调度） |
+
+主体职责：
+
 - 左侧 7 行任务（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「完整运行」按钮；
 - `WorkerThread` 持有 `task_key`：`None` 时调用 `main.Full_operation`，否则调用 `main.Single_operation`；
 - 运行期间所有行的交互控件与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥）；
