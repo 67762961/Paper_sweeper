@@ -5,6 +5,7 @@ import logging
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QMessageBox, QWidget
+from qfluentwidgets import FluentIcon, MSFluentWindow, NavigationItemPosition
 
 import config
 from main import (
@@ -47,8 +48,8 @@ class WorkerThread(QThread):
             self.task_finished.emit({"key": self.task_key, "ok": False, "error": str(error)})
 
 
-class MainWindow(QWidget):
-    """主窗口：组装左右面板并统一调度任务线程"""
+class MainWindow(MSFluentWindow):
+    """主窗口：Fluent 外壳 + 双栏内容（左侧任务列表 / 右侧日志控制台）"""
 
     def __init__(self):
         super().__init__()
@@ -62,11 +63,16 @@ class MainWindow(QWidget):
     def init_ui(self):
         version = "1.2.0"
         self.setWindowTitle(f"Paper Sweeper - v{version}")
-        self.setFixedSize(1200, 600)
+        self.resize(1240, 640)
+        self.setMinimumSize(1100, 620)
 
-        main_layout = QHBoxLayout()
-        main_layout.setContentsMargins(theme.SPACE_XXL, theme.SPACE_XXL, theme.SPACE_XXL, theme.SPACE_XXL)
-        main_layout.setSpacing(theme.SPACE_XXL)
+        # 双栏内容作为唯一子界面加入 Fluent 外壳；当前版本不使用左侧导航
+        page = QWidget()
+        page.setObjectName("mainPage")
+
+        main_layout = QHBoxLayout(page)
+        main_layout.setContentsMargins(theme.SPACE_XXL, theme.SPACE_LG, theme.SPACE_XXL, theme.SPACE_LG)
+        main_layout.setSpacing(theme.SPACE_LG)
 
         self.left_panel = LeftPanel()
         main_layout.addWidget(self.left_panel)
@@ -74,7 +80,8 @@ class MainWindow(QWidget):
         self.right_panel = RightPanel()
         main_layout.addWidget(self.right_panel, 1)
 
-        self.setLayout(main_layout)
+        self.addSubInterface(page, FluentIcon.HOME, "任务", NavigationItemPosition.TOP)
+        self.navigationInterface.hide()
 
         # 左侧行内交互：运行 / 配置（占位）/ 整跑开关
         self.left_panel.task_run_clicked.connect(self.on_task_run)
