@@ -13,7 +13,7 @@
 - 日志双写（控制台 + `logs/<日期>/`），GUI 实时展示；
 - 当前任务域覆盖：签到收菜、结界养成、地域鬼王、寮三十与真蛇、结界突破、狩猎战/阴界、逢魔之时。
 
-当前代码版本：GUI 标题标注 `v1.2.0`。
+当前代码版本：GUI 标题标注 `v1.3.0`。
 
 ## 2. 顶层架构
 
@@ -56,7 +56,9 @@ flowchart LR
 ├── GUI.exe                        打包产物（默认忽略）
 ├── ui/                            界面层（单向依赖 theme→icons→widgets→panels→window）
 │   ├── theme.py                   设计 token：颜色/间距/圆角/字号
-│   ├── theme_manager.py           Fluent 主题初始化与 qconfig 持久化
+│   ├── theme_manager.py           Fluent 主题初始化与深浅色切换
+│   ├── prefs.py                   界面偏好读写（config/gui.json）
+│   ├── settings_dialog.py         设置弹窗（主题 / 日志偏好 / 日志目录）
 │   ├── icons.py                   今日状态图标与齿轮/运行按钮（QPainter 绘制）
 │   ├── widgets.py                 整跑开关、任务行
 │   ├── panels.py                  左侧任务列表、右侧日志控制台
@@ -75,7 +77,7 @@ flowchart LR
 │   ├── Setting.yml                启动项、结界突破、寮三十副本表
 │   ├── Last_times.yml             各账号各任务上次完成时间
 │   ├── Gui_state.yml              GUI 任务开关（是否参与完整运行，缺失默认全开）
-│   └── gui.json                   界面偏好（主题等，qconfig 管理）
+│   └── gui.json                   界面偏好（主题 / 日志自动滚动 / 日志字号）
 ├── pic/                           界面模板图
 │   ├── Main/                      庭院/弹窗/协作/返回等通用元素
 │   ├── Sign/                      签到与收菜
@@ -137,7 +139,9 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 | `ui/icons.py` | `StatusIcon`（QPainter 绘制对勾/感叹号/播放三角）、`IconButton`（FluentIcon 图标按钮） |
 | `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`） |
 | `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 主按钮） |
-| `ui/theme_manager.py` | Fluent 主题初始化、`qconfig` 持久化（`config/gui.json`） |
+| `ui/theme_manager.py` | Fluent 主题初始化与深浅色切换（主题偏好存 `config/gui.json`） |
+| `ui/prefs.py` | 界面偏好读写（`config/gui.json`：主题 / 日志自动滚动 / 日志字号） |
+| `ui/settings_dialog.py` | 设置弹窗：主题、日志偏好与「打开日志目录」 |
 | `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + `InfoBar` 结果提示） |
 
 窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
@@ -149,7 +153,10 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 - 左侧 7 行任务（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「完整运行」按钮；
 - `WorkerThread` 持有 `task_key`：`None` 时调用 `main.Full_operation`，否则调用 `main.Single_operation`；
 - 运行期间所有行的交互控件与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥），并显示不确定进度条；
-- 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果。
+- 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果；
+- 顶栏右侧提供深浅色主题快捷切换按钮，右侧日志区提供「清空 / 自动滚动 / 设置」工具条；
+- 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号，并提供「打开日志目录」入口；
+- 界面偏好写入 `config/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `Setting.yml` / `Gui_state.yml`。
 
 单行结构（从左到右）：
 
@@ -311,8 +318,27 @@ Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key
 
 ### 6.4 `config/gui.json`（界面偏好）
 
-由 `qfluentwidgets` 的 `qconfig` 管理，保存主题模式（浅色/深色/跟随系统）等界面偏好。
-文件缺失时使用浅色主题；与 `Setting.yml`（任务参数）、`Gui_state.yml`（任务开关）互不干扰。
+由 `ui/prefs.py` 自管（普通 JSON，非 qconfig 配置文件），保存界面偏好：
+
+```json
+{
+  "theme": "light",
+  "log_auto_scroll": true,
+  "log_font_size": 12
+}
+```
+
+| 键 | 含义 |
+| ---- | ---- |
+| `theme` | `light` / `dark` / `auto`（跟随系统） |
+| `log_auto_scroll` | 新日志是否自动滚动到底部 |
+| `log_font_size` | 日志字号，取值 11 / 12 / 13 / 14 |
+
+约定：
+
+- 文件缺失或字段非法时回落默认值（浅色、自动滚动、12 pt），不阻塞启动；
+- `qconfig` 只负责运行时主题状态，不再托管配置文件，避免被覆写；
+- 与 `Setting.yml`（任务参数）、`Gui_state.yml`（任务开关）互不干扰。
 
 ### 6.5 项目级 `config.py`
 
@@ -378,6 +404,9 @@ GUI 崩溃日志：`app_crash.log`（`logging` + `sys.excepthook`）。
 
 右侧日志面板按行首关键字着色：`ERROR` / `错误` → 红，`SKIP-` → 橙，`TASK-` / `MAIN-` → 蓝，其余使用主题默认文字颜色；
 运行期间面板下方显示不确定进度条，结束后用 `InfoBar` 提示本次结果。
+
+日志区顶部工具条提供「清空日志」按钮与「自动滚动」开关（关闭后新日志不再强制滚到底部）；
+日志字号可在设置弹窗中调整为 11～14 pt，偏好保存在 `config/gui.json`。
 
 单任务运行在 `MAIN-` 起止行中带任务标题，例如：
 

@@ -19,7 +19,7 @@
 - 公共能力集中在 `Lib.py`：识别、点击、界面状态机、配置读写、队伍预设等；任务模块只编排业务，不重复实现底层匹配。
 - 界面跳转优先写状态机（`current_state` + `match case`），轮次上限约 30，异常路径统一 `Itface_Host` 回庭院。
 - 控制台日志使用固定前缀：`TASK-` / `STEP-` / `INFO-` / `WAIT-` / `SKIP-` / `TIME-` / `MOVE-` / `QUIT-` / `MAIN-`。
-- 任务冷却写入 `./config/Last_times.yml`；静态配置写在 `./config/Setting.yml`；GUI 偏好（左侧任务开关）写 `./config/Gui_state.yml`，三者不要混用。配置目录默认不入库。
+- 任务冷却写入 `./config/Last_times.yml`；静态配置写在 `./config/Setting.yml`；任务开关写 `./config/Gui_state.yml`；界面偏好（主题 / 日志自动滚动 / 日志字号）由 `ui/prefs.py` 写入 `./config/gui.json`。四者不要混用，配置目录默认不入库。
 - 模板图片按业务分子目录放在 `./pic/`（Main / Sign / Sis / Team / Thr / Mail / Digui / Fengmo / JiejieFight / Shouliezhan）。阈值与搜索逻辑写在任务代码中，不散落魔法值到无关模块。
 - 点击优先在识别框中心 1/4～3/4 区域内随机落点；全局替代硬编码坐标仅保留极少数界面（如卷轴）。
 - `import config` 所需的项目级 `config.py` 当前不在源码树中；若要本地跑 GUI，需自备 `config.py`，至少提供 `stop_thread = False`。
