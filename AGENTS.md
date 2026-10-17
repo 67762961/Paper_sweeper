@@ -2,7 +2,7 @@
 - 本项目是《阴阳师》桌面端（MuMu 模拟器）每日任务自动化助手，项目名 Paper Sweeper（纸人扫地工）。
 - 基于 Python 3.11 + OpenCV 模板匹配 + Win32 窗口句柄控制，不修改任何游戏文件，仅通过截图识别与鼠标键盘操作完成日常流程。
 - GUI 使用 PyQt6 + qt-material；配置与任务冷却使用 YAML（ruamel.yaml / PyYAML）。
-- 依赖见 `requirements.txt`；打包入口为 PyInstaller（`GUI.spec`）。
+- 依赖见 `requirements.txt`；打包入口为 PyInstaller（`GUI.spec`），本地一键打包用 `python build_exe.py`。
 
 ### 核心命令
 - 先思考再编码；如有歧义，先确认需求再修改。

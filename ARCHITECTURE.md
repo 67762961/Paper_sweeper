@@ -46,6 +46,7 @@ flowchart LR
 ├── .gitignore                     忽略虚拟环境/配置/日志/打包产物/调试脚本
 ├── GUI.py                         PyQt6 图形入口
 ├── GUI.spec                       PyInstaller 打包配置
+├── build_exe.py                   本地打包脚本（调用 GUI.spec，产物输出到根目录）
 ├── GUI.exe                        打包产物（默认忽略）
 ├── main.py                        完整运行编排 + Tee 日志
 ├── Lib.py                         公共自动化库（识别/点击/界面/配置/编队）
@@ -72,7 +73,7 @@ flowchart LR
 │   ├── JiejieFight/               结界突破
 │   └── Shouliezhan/               狩猎战/阴界
 ├── logs/<YYYY-MM-DD>/             运行日志
-└── build/ dist/ __pycache__/ .venv/   构建与环境产物
+└── build/ __pycache__/ .venv/     构建与环境产物（GUI.exe 直接生成在根目录）
 ```
 
 ## 4. 数据 / 控制流向
@@ -213,6 +214,7 @@ Full_operation(console_signal=None)
 - 用途：GUI 线程停止标志（`config.stop_thread`）。
 - 状态：源码树中不存在该文件；属于运行时必需的本地模块。
 - 最小内容：`stop_thread = False`。
+- 生成方式：可手写，也可执行 `python build_exe.py` 时由脚本自动生成（已存在则不改动）。
 
 ## 7. 关键模块与算法
 
@@ -276,7 +278,8 @@ GUI 崩溃日志：`app_crash.log`（`logging` + `sys.excepthook`）。
 ├── logs/<YYYY-MM-DD>/console_output_<timestamp>.log   任务日志
 ├── app_crash.log                                      未捕获异常
 ├── config/Last_times.yml                              任务冷却状态（本地）
-├── build/ dist/ GUI.exe                               PyInstaller 产物
+├── build/                                             PyInstaller 中间产物
+├── GUI.exe                                            打包产物（直接在根目录，默认忽略）
 └── __pycache__/                                       字节码缓存
 ```
 
@@ -287,6 +290,7 @@ GUI 崩溃日志：`app_crash.log`（`logging` + `sys.excepthook`）。
 | GUI | `python GUI.py` | 点击「完整运行」执行编排 |
 | 脚本 | 调用 `main.Full_operation()` | 无 GUI，输出到控制台与日志 |
 | 调试 | `test.py` / `test_main.py` | 单点验证模板/任务，已 gitignore |
+| 打包 | `python build_exe.py` | 调用 `GUI.spec`，产物 `GUI.exe` 直接输出到项目根目录 |
 
 ## 9. 实施约束
 

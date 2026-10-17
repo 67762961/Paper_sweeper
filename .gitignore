@@ -7,6 +7,7 @@ txt.txt
 build
 dist
 config
+config.py
 GUI.exe
 logs
 Backup
