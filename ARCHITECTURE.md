@@ -134,11 +134,11 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 | 模块 | 职责 |
 | ---- | ---- |
 | `ui/theme.py` | 设计 token：颜色、间距、圆角、字号；所有界面取值统一来自这里 |
-| `ui/icons.py` | `StatusIcon`、`IconButton`（QPainter 矢量绘制，不依赖字体/图片） |
-| `ui/widgets.py` | `ToggleSwitch`、`TaskRow` |
-| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（日志控制台） |
+| `ui/icons.py` | `StatusIcon`（FluentIcon + 语义色圆底）、`IconButton`（FluentIcon 图标按钮） |
+| `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`） |
+| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 主按钮） |
 | `ui/theme_manager.py` | Fluent 主题初始化、`qconfig` 持久化（`config/gui.json`） |
-| `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度） |
+| `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + `InfoBar` 结果提示） |
 
 窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
 `mainPage` 加入后**隐藏左侧导航**，因此保留参考项目的 Fluent 观感与无边框窗口，
@@ -148,20 +148,21 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 
 - 左侧 7 行任务（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「完整运行」按钮；
 - `WorkerThread` 持有 `task_key`：`None` 时调用 `main.Full_operation`，否则调用 `main.Single_operation`；
-- 运行期间所有行的交互控件与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥）；
-- 结束后刷新行内「上次运行」时间与今日状态图标。
+- 运行期间所有行的交互控件与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥），并显示不确定进度条；
+- 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果。
 
 单行结构（从左到右）：
 
 | 区域 | 控件 | 说明 |
 | ---- | ---- | ---- |
-| 今日状态 | `StatusIcon` | 今日已完成 → 绿底 ✓；今日未完成 → 橙底 `!`；运行中 → 蓝底 ▶ |
+| 今日状态 | `StatusIcon` | 今日已完成 → 绿底 `FluentIcon.ACCEPT`；今日未完成 → 橙底 `!`；运行中 → 蓝底 `FluentIcon.PLAY` |
 | 任务信息 | 名称 + 「上次运行 MM-DD HH:MM」 | 时间取该任务所有账号、所有状态键中的最新值 |
-| 配置 | `IconButton(kind="gear")` | 本期为**占位**：弹「配置功能暂未开放」，不写盘 |
-| 单跑 | `IconButton(kind="play")` | 点击只运行该任务（等价于 `Single_operation`） |
-| 开关 | `ToggleSwitch` | 开 → 参与「完整运行」；关 → 完整运行时跳过，并写入 `config/Gui_state.yml` |
+| 配置 | `IconButton(kind="gear")` | `FluentIcon.SETTING`；本期为**占位**：弹「配置功能暂未开放」，不写盘 |
+| 单跑 | `IconButton(kind="play")` | `FluentIcon.PLAY`；点击只运行该任务（等价于 `Single_operation`） |
+| 开关 | `ToggleSwitch` | Fluent `SwitchButton`；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `config/Gui_state.yml` |
 
-图标（✓ / ! / ▶ / 齿轮）全部用 `QPainter` 矢量绘制，不依赖字体字形与图片资源，避免换机器或打包后出现方块。
+图标：齿轮、运行、今日完成使用 `FluentIcon`；「今日未完成」的感叹号因 FluentIcon 无对应图标而用
+`QPainter` 绘制；不再维护整套自绘图标。
 
 交互约定：
 
@@ -375,6 +376,9 @@ for step in range(30):
 | `MAIN-` | 完整流程 / 单任务运行起止 |
 
 GUI 崩溃日志：`app_crash.log`（`logging` + `sys.excepthook`）。
+
+右侧日志面板按行首关键字着色：`ERROR` / `错误` → 红，`SKIP-` → 橙，`TASK-` / `MAIN-` → 蓝，其余使用主题默认文字颜色；
+运行期间面板下方显示不确定进度条，结束后用 `InfoBar` 提示本次结果。
 
 单任务运行在 `MAIN-` 起止行中带任务标题，例如：
 
