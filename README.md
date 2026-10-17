@@ -125,6 +125,22 @@ MainTask_Signin()
 
 开发用脚本 `test.py` / `test_main.py` 不在版本库跟踪范围，可按需在本地改写，用于验证单张模板或单个状态机。
 
+### 方式四：打包为 exe
+
+项目自带打包脚本 `build_exe.py`，基于 `GUI.spec`（PyInstaller，单文件、无控制台窗口）。
+产物**直接输出到项目根目录**，与 `pic/`、`config/` 同级，打包完即可双击运行：
+
+```powershell
+python build_exe.py            # 打包，产物为项目根目录的 GUI.exe
+python build_exe.py --fresh    # 先删除 build/ 与残留 dist/，做全新构建
+```
+
+脚本会依次检查 Python 版本（需 3.11+）与 PyInstaller 是否安装、核对 `GUI.spec` 与 `GUI.py`，
+并在缺少 `config.py` 时自动生成最小版本（`stop_thread = False`）。单次构建约 30～60 秒。
+
+> 注意：`pic/` 与 `config/` 是运行期外部资源，**不会**打进 exe。请把 `GUI.exe` 与这两个目录放在同一目录下运行，
+> 否则模板图与配置的相对路径会失效。根目录 `GUI.exe` 正在运行时会被锁定，打包前请先关闭程序。
+
 ---
 
 ## 使用注意
@@ -147,6 +163,8 @@ MainTask_Signin()
 ```
 Paper_sweeper/
 ├── GUI.py                 # 图形界面入口
+├── GUI.spec               # PyInstaller 打包配置
+├── build_exe.py           # 一键打包脚本（调用 GUI.spec，产物输出到根目录）
 ├── main.py                # 完整流程编排与日志 Tee
 ├── Lib.py                 # 识别、点击、界面状态机、配置、编队
 ├── Task_SignIn.py         # 登录收菜
