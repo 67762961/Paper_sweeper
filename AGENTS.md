@@ -24,3 +24,5 @@
 - 点击优先在识别框中心 1/4～3/4 区域内随机落点；全局替代硬编码坐标仅保留极少数界面（如卷轴）。
 - `import config` 所需的项目级 `config.py` 当前不在源码树中；若要本地跑 GUI，需自备 `config.py`，至少提供 `stop_thread = False`。
 - 注释统一使用中文；修改任务流程后，按实际改动同步 ARCHITECTURE.md 中的入口顺序、冷却策略或目录说明。
+- GUI 左侧 7 张任务卡片与「完整运行」顺序都由 `main.TASK_REGISTRY` 驱动：新增/改名顶层任务入口时，必须同步登记注册表（key / 标题 / 说明 / 入口 / 状态键），不要另写一份任务列表。
+- `Full_operation` 与 `Single_operation` 共用 `main._log_stream`；日志收尾必须先恢复 `sys.stdout` 再冲刷，避免打包版（`console=False`，`sys.stdout` 为 `None`）下抛出异常导致 GUI 卡在「运行中」。

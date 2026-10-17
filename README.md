@@ -101,18 +101,27 @@ python GUI.py
 ```
 
 1. 确认两个游戏窗口已打开，且窗口标题匹配 `Setting.yml` 中的账号名。
-2. 点击右侧 **「完整运行」**。
-3. 右侧控制台会实时打印识别与任务日志；同一份日志也会写入 `logs/<日期>/`。
+2. 左侧列表面板会按任务顺序显示 7 张卡片，并带上「上次完成」时间与状态徽章。
+3. **单独运行某个任务**：直接单击左侧对应卡片（例如「逢魔之时」），只会执行这一项。
+   卡片点击**不会绕过**任务自身的时间窗与冷却，条件不满足时仍会在控制台打印 `SKIP-` 并显示徽章「未更新」。
+4. **运行全套日常**：点击右侧 **「完整运行」**，按卡片顺序依次执行全部任务。
+5. 运行期间所有卡片与按钮会一起禁用，避免并发抢占键鼠；结束后自动刷新「上次完成」时间。
+6. 右侧控制台会实时打印识别与任务日志；同一份日志也会写入 `logs/<日期>/`
+   （完整运行为 `console_output_*.log`，单任务为 `single_<key>_*.log`）。
 
 打包版可使用同目录下的 `GUI.exe`（若存在），行为与 `python GUI.py` 一致。
 
 ### 方式二：代码入口
 
 ```python
-from main import Full_operation
+from main import Full_operation, Single_operation
 
-Full_operation()  # 控制台 + logs/ 文件
+Full_operation()                  # 完整运行：控制台 + logs/ 文件
+Single_operation("fengmo")        # 只跑「逢魔之时」，日志写 logs/<日期>/single_fengmo_*.log
 ```
+
+`Single_operation` 的 key 与左侧卡片一一对应：`signin` / `jiejieyangcheng` / `digui` /
+`thirty` / `jiejiefight` / `shouliezhan` / `fengmo`（完整列表见 `main.TASK_REGISTRY`）。
 
 ### 方式三：单任务调试
 
@@ -152,7 +161,8 @@ python build_exe.py --fresh    # 先删除 build/ 与残留 dist/，做全新构
 5. **协作与弹窗**：脚本会尝试自动关闭协作邀请与常见弹窗；若布局变化导致误判，优先检查 `pic/Main` 中相关模板。
 6. **硬编码坐标**：极少数界面（如庭院卷轴）仍使用绝对坐标，窗口位置/分辨率变化后可能失效。
 7. **日志排查**：
-   - 运行日志：`logs/<YYYY-MM-DD>/console_output_*.log`
+   - 完整运行日志：`logs/<YYYY-MM-DD>/console_output_*.log`
+   - 单任务运行日志：`logs/<YYYY-MM-DD>/single_<key>_*.log`
    - GUI 崩溃：`app_crash.log`
    - 控制台匹配得分（`INFO- 0.0xx ...`）可辅助判断阈值是否过严/过松。
 
@@ -162,10 +172,10 @@ python build_exe.py --fresh    # 先删除 build/ 与残留 dist/，做全新构
 
 ```
 Paper_sweeper/
-├── GUI.py                 # 图形界面入口
+├── GUI.py                 # 图形界面入口（7 张可点击任务卡片 + 控制台）
 ├── GUI.spec               # PyInstaller 打包配置
 ├── build_exe.py           # 一键打包脚本（调用 GUI.spec，产物输出到根目录）
-├── main.py                # 完整流程编排与日志 Tee
+├── main.py                # 任务注册表、完整/单任务运行编排与日志 Tee
 ├── Lib.py                 # 识别、点击、界面状态机、配置、编队
 ├── Task_SignIn.py         # 登录收菜
 ├── Task_Jiejieyangcheng.py# 结界养成
@@ -198,7 +208,10 @@ A：检查游戏是否已启动、窗口标题是否包含 `Setting.yml` 中的�
 A：多为模板图与当前 UI 不符或阈值过严。用临时调试脚本对目标模板 `Flag_show=1` 查看红框是否命中，再替换 `pic/` 下对应图片。
 
 **Q：任务全部 SKIP？**  
-A：多半是冷却未到。查看 `config/Last_times.yml`，或确认当前时间是否落在任务时间窗内。
+A：多半是冷却未到。查看 `config/Last_times.yml`，或确认当前时间是否落在任务时间窗内。单击卡片单独运行同样受这些限制，不会强制重跑。
+
+**Q：点了卡片没反应 / 只有一行提示？**  
+A：先看控制台是否出现 `SKIP-`。单任务运行沿用与完整运行一致的冷却和时间窗判断；若卡片徽章显示「未更新」，通常就是条件未满足或该任务本次未成功。
 
 **Q：能否按分辨率自动适配？**  
 A：当前版本依赖人工维护模板图与少量坐标，没有自动缩放适配层。
