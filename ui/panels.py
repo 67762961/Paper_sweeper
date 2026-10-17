@@ -35,7 +35,7 @@ class LeftPanel(QFrame):
 
     def init_ui(self):
         self.setFixedWidth(theme.WIDTH_LEFT_PANEL)
-        self.setStyleSheet(f"background-color: {theme.COLOR_PANEL_BG};")
+        self.setStyleSheet("background-color: transparent;")
 
         layout = QVBoxLayout()
         layout.setContentsMargins(theme.SPACE_LG, theme.SPACE_SM, theme.SPACE_LG, theme.SPACE_SM)
@@ -139,7 +139,7 @@ class RightPanel(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setStyleSheet(f"background-color: {theme.COLOR_PANEL_BG};")
+        self.setStyleSheet("background-color: transparent;")
         self.textbox = None
         self.run_button = None
         self.init_ui()

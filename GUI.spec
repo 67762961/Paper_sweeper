@@ -1,22 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+# 说明：qfluentwidgets 的图标资源内嵌在 Python 包里，无需收集 datas；
+# 但它的子模块由内部动态导入，PyInstaller 静态分析可能漏掉，需显式声明 hiddenimports。
+
 a = Analysis(
     ['GUI.py'],
     binaries=[],
-    # datas 部分：打包资源文件 [1,2](@ref)
-    # 格式: [('源路径1', '目标路径1'), ('源路径2', '目标路径2')]
-    datas=[
-        # 示例：如果您有 images 文件夹或 qt_material 的主题文件，在此添加
-        # (join(PROJECT_PATH, 'images'), 'images'),
-        # (join(PROJECT_PATH, 'styles'), 'styles'),
-    ],
-    # hiddenimports 部分：显式声明隐藏的依赖 [1,6,8](@ref)
+    datas=[],
     hiddenimports=[
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.QtWidgets',
-        'qt_material',
-        # 如果您的 'main' 模块或其依赖有未自动检测到的，也加在这里
+        # Fluent 界面组件库及其拆分出的子包
+        'qfluentwidgets',
+        'qfluentwidgets.common',
+        'qfluentwidgets.components',
+        'qfluentwidgets.window',
+        'qframelesswindow',
+        'darkdetect',
     ],
     hookspath=[],
     runtime_hooks=[],
@@ -43,5 +44,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None  # 您可以在此处指定程序图标路径，例如 'icon.ico'
+    icon=None  # 您可以在此指定程序图标路径，例如 'icon.ico'
 )

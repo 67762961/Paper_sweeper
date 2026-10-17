@@ -77,6 +77,11 @@ def check_environment():
     if importlib.util.find_spec("PyInstaller") is None:
         fail("未安装 PyInstaller，请先执行: pip install -r requirements.txt")
 
+    # 界面依赖自检：qfluentwidgets 由动态导入，缺失时打包出的 exe 会启动即崩
+    for module in ("qfluentwidgets", "qframelesswindow"):
+        if importlib.util.find_spec(module) is None:
+            fail(f"缺少界面依赖 {module}，请先执行: pip install -r requirements.txt")
+
     if os.path.basename(sys.executable).lower() == "pythonw.exe":
         log("提示: 当前用 pythonw.exe 运行，构建输出不可见，建议改用 python.exe")
 

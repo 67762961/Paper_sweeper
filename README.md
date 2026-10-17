@@ -45,7 +45,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-主要依赖：`opencv-python`、`numpy`、`pywin32`、`PyAutoGUI`、`PyDirectInput`、`PyQt6`、`qt-material`、`ruamel.yaml`、`PyYAML`。完整列表见 `requirements.txt`。
+主要依赖：`opencv-python`、`numpy`、`pywin32`、`PyAutoGUI`、`PyDirectInput`、`PyQt6`、`PyQt6-Fluent-Widgets`、`ruamel.yaml`、`PyYAML`。完整列表见 `requirements.txt`。
 
 ### 必需的本地文件
 

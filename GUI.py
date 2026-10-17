@@ -3,25 +3,18 @@
 
 界面实现位于 ``ui/`` 包，本文件只负责：
 
-1. Windows 高 DPI 环境变量；
-2. 日志与未捕获异常钩子；
-3. 创建 QApplication、应用主题并显示主窗口；
-4. 为兼容旧脚本/测试而转出主要界面类。
+1. 日志与未捕获异常钩子；
+2. 创建 QApplication、初始化 Fluent 主题并显示主窗口；
+3. 为兼容旧脚本/测试而转出主要界面类。
 """
-
-import os
-import sys
-
-if sys.platform == "win32":
-    os.environ["QT_QPA_PLATFORM"] = "windows:dpiawareness=1"
 
 import logging
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from qt_material import apply_stylesheet
 
 from ui.icons import IconButton, StatusIcon
 from ui.panels import LeftPanel, RightPanel
+from ui.theme_manager import init_theme, save_theme
 from ui.widgets import TaskRow, ToggleSwitch
 from ui.window import MainWindow, WorkerThread
 
@@ -35,6 +28,8 @@ logging.basicConfig(
 
 def handle_exception(exc_type, exc_value, exc_traceback):
     """处理未捕获的异常"""
+    import sys
+
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
@@ -46,13 +41,19 @@ def handle_exception(exc_type, exc_value, exc_traceback):
         pass
 
 
-sys.excepthook = handle_exception
+def main():
+    """创建应用、初始化主题并显示主窗口"""
+    import sys
+
+    sys.excepthook = handle_exception
+
+    app = QApplication(sys.argv)
+    init_theme()
+
+    window = MainWindow()
+    window.show()
+    return app.exec()
 
 
 if __name__ == "__main__":
-    app = QApplication([])
-    apply_stylesheet(app, theme="light_blue.xml")
-    window = MainWindow()
-    window.resize(800, 500)
-    window.show()
-    app.exec()
+    raise SystemExit(main())
