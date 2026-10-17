@@ -182,7 +182,7 @@ def Task_Yingjiezhimen(Hwnd, Account):
                 Sleep_print(2)
                 Find_Click_windows(Hwnd, "./pic/Shouliezhan/挑战.png", 0.05, "点击挑战图标", "未检测到挑战图标")
                 Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/Thr/真蛇确定.png", 0.05, "点击确定图标", "未检测到确定图标")
+                Find_Click_windows(Hwnd, "./pic/main/Queding.png", 0.05, "点击确定图标", "未检测到确定图标")
                 Sleep_print(2)
                 print("        STEP- vvvvv 跳转组队界面")
                 current_state = "组队界面"
