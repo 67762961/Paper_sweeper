@@ -22,6 +22,9 @@ flowchart LR
     GUI["GUI.py\nPyQt6 界面\n左侧 7 张任务卡片 + 右侧控制台"] --> WT["WorkerThread\nQThread"]
     WT -->|完整运行| FO["main.Full_operation\n按 TASK_REGISTRY 顺序编排"]
     WT -->|单击卡片| SO["main.Single_operation\n只跑指定任务"]
+    WT -->|中断运行| STOP["Lib.request_stop\n置位停止请求"]
+    STOP -.检查点抛 TaskStopped.-> FO
+    STOP -.检查点抛 TaskStopped.-> SO
     REG["main.TASK_REGISTRY\n任务注册表（唯一事实源）"] --> GUI
     REG --> FO
     REG --> SO
@@ -138,11 +141,11 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 | `ui/theme.py` | 设计 token：颜色、间距、圆角、字号；`COLOR_*` 为浅色取值、深色覆盖在 `_DARK_COLORS`，组件用 `theme.color()` / `light_color()` / `dark_color()` 取色 |
 | `ui/icons.py` | `StatusIcon`（QPainter 绘制对勾/感叹号/播放三角）、`IconButton`（FluentIcon 图标按钮） |
 | `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`） |
-| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 主按钮） |
+| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 「中断运行 / 完整运行」按钮组） |
 | `ui/theme_manager.py` | Fluent 主题初始化与深浅色切换（主题偏好存 `config/gui.json`） |
 | `ui/prefs.py` | 界面偏好读写（`config/gui.json`：主题 / 日志自动滚动 / 日志字号） |
 | `ui/settings_dialog.py` | 设置弹窗：主题、日志偏好与「打开日志目录」 |
-| `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + `InfoBar` 结果提示） |
+| `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + 中断入口 + `InfoBar` 结果提示） |
 
 窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
 `mainPage` 加入后**隐藏左侧导航**，因此保留参考项目的 Fluent 观感与无边框窗口，
@@ -150,9 +153,10 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 
 主体职责：
 
-- 左侧 7 行任务（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「完整运行」按钮；
-- `WorkerThread` 持有 `task_key`：`None` 时调用 `main.Full_operation`，否则调用 `main.Single_operation`；
-- 运行期间所有行的交互控件与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥），并显示不确定进度条；
+- 左侧 7 行任务（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「中断运行 + 完整运行」按钮组；
+- `WorkerThread` 持有 `task_key`：`None` 时调用 `main.Full_operation`，否则调用 `main.Single_operation`；返回值里的 `stopped` 会带进 `task_finished` 的 payload；
+- 运行期间所有行的交互控件与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥），仅「中断运行」可用，并显示不确定进度条；
+- 点「中断运行」→ `request_stop()` + 按钮变「中断中…」→ 线程在检查点退出 → `on_job_finished` 按 `stopped` 走「已中断」收尾（不报错、不统计完成数），界面回到待机；
 - 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果；
 - 顶栏右侧提供深浅色主题快捷切换按钮，右侧日志区提供「清空 / 自动滚动 / 设置」工具条；
 - 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号，并提供「打开日志目录」入口；
@@ -171,7 +175,7 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 | 单跑 | `IconButton(kind="play")` | `FluentIcon.PLAY`；点击只运行该任务（等价于 `Single_operation`） |
 | 开关 | `ToggleSwitch` | Fluent `SwitchButton`（不显示 On/Off 文案）；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `config/Gui_state.yml` |
 
-图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为轮廓按钮（主色描边 + 主色文字，悬停同色系浅底），不使用实心主色块；轮廓按钮用 Fluent 的「浅色 / 深色两套自定义样式」注册，主题切换后不会退回默认实心按钮。
+图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为**主色**轮廓按钮（主色描边 + 主色文字，悬停同色系浅底），其左侧「中断运行」为**次要色**轮廓按钮（带 `FluentIcon.PAUSE`），都不使用实心主色块；轮廓按钮用 Fluent 的「浅色 / 深色两套自定义样式」注册，主题切换后不会退回默认实心按钮。
 
 交互约定：
 
@@ -181,8 +185,11 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 | 点击行内齿轮 | 弹出占位提示，不写任何配置 |
 | 拨动行内开关 | 写入 `config/Gui_state.yml`；关闭时该行灰化，且在「完整运行」中被跳过 |
 | 点击「完整运行」 | 按 `TASK_REGISTRY` 顺序执行**开关开启**的任务 |
+| 点击「中断运行」 | 立即置位停止请求；任务在下一个检查点抛 `TaskStopped` 退出，界面回到待机。**不做断点续跑**，下次运行即新的一轮 |
 | 运行中再次点击 | 被 `busy` 互斥拒绝，不会启动第二个线程 |
-| 运行中关闭窗口 | 弹确认框；确认后置位 `config.stop_thread` 并短暂等待线程 |
+| 运行中关闭窗口 | 弹确认框；确认后同样走 `request_stop()` 并等待线程收尾 |
+
+「中断运行」按钮位于「完整运行」左侧，为次要色轮廓按钮，**仅运行中可点**；点击后按钮变「中断中…」并禁用，防止连点。中断不处理游戏内状态（不拉回庭院、不做收尾操作），任务停在哪就是哪。
 
 注意：`GUI.py` / `test_main.py` 会 `import config`。仓库中当前没有 `config.py` 源文件；本地运行前需在项目根目录自备，至少包含：
 
@@ -196,7 +203,12 @@ stop_thread = False
 
 ```python
 Full_operation(console_signal=None)              # 完整运行（按开关跳过已关闭任务）
-Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key, ok, reason}
+Single_operation(task_key, console_signal=None)  # 单任务运行
+
+# 返回值（PR5 起）
+# Full_operation  → {"stopped": bool, "executed": int, "skipped": int}
+# Single_operation → {"key": str, "ok": bool, "reason": str|None, "stopped": bool}
+# 被中断时 stopped 为 True；单任务的 ok 随之为 False（这是正常收尾，不是异常）
 ```
 
 职责：
@@ -205,7 +217,10 @@ Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key
 - 创建日志文件：完整运行为 `logs/<YYYY-MM-DD>/console_output_<时间戳>.log`，单任务为 `logs/<YYYY-MM-DD>/single_<key>_<时间戳>.log`；
 - 用 `Tee` 把 stdout 同时写到原控制台、日志文件和 GUI 信号；
 - 完整运行按注册表顺序编排并按任务开关跳过，单任务运行只调用一项且**不看开关**；
+- 捕获 `TaskStopped` 统一收尾（打印 `QUIT-` 与中断结束行），任务之间也会 `check_stop()`，因此上一步结束后按下的中断同样生效；
 - `_log_stream` 在 `finally` 中先恢复 `sys.stdout` 再尽力冲刷，避免无控制台环境（打包版 `GUI.exe` / `pythonw`）下 `sys.stdout is None` 造成收尾异常。
+
+中断相关名称从 `main` 重新导出（`TaskStopped` / `request_stop` / `reset_stop` / `stop_requested` / `check_stop`），GUI 层只依赖 `main`。
 
 `main.py` 同时定义 `Tee`：按行缓冲，保证 GUI 控制台按完整行更新；`files` 会过滤空流，写入/冲刷失败不中断任务。
 
@@ -260,6 +275,31 @@ Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key
 | 界面 | `Itface_Quit` / `Itface_scroll` / `Itface_guild` / `Itface_daily` / `Itface_explore` | 退出界面、卷轴、阴阳寮、日常外显入口、探索/六道 |
 | 编队 | `Team_Preset` | 式神录→预设编组→队伍→应用御魂预设 |
 | 配置 | `read_config` / `write_config` / `check_lasttime` | YAML 读写；`Last_times.yml` 时间读取与缺失初始化 |
+| 中断 | `TaskStopped` / `request_stop` / `reset_stop` / `stop_requested` / `check_stop` / `_sleep_with_stop` | 中断信号与检查点：`check_stop` 在已请求时抛 `TaskStopped`；`_sleep_with_stop` 按 0.2s 切片睡眠 |
+
+### 5.5 中断机制（协作式）
+
+GUI 的「中断运行」走**协作式中断**，不用 `QThread.terminate()`（会留下键鼠、焦点和半写配置文件的状态）：
+
+1. `MainWindow.interrupt_job()` 调 `Lib.request_stop()`，同时置 `config.stop_thread = True`；
+2. `Lib` 在公共原语的固定检查点调 `check_stop()`，已请求则抛 `TaskStopped`；
+3. 异常一路上抛（**任务层禁止捕获 `TaskStopped`**），由 `main.Full_operation` / `main.Single_operation` 统一收尾；
+4. 收尾打印 `QUIT-` 与「完整运行被中断 / 单任务运行被中断」结束行，返回值带 `stopped=True`；
+5. `WorkerThread` 把 `stopped` 带进 `task_finished` payload，GUI 按「已中断」复位到待机。
+
+检查点分布（`Lib.py` 内，因此 8 个 `Task_*.py` 无需改动）：
+
+| 位置 | 作用 |
+| ---- | ---- |
+| `_sleep_with_stop` | 所有等待/点击后延时的睡眠改走它，最长每 0.2 s 一次检查，暂停响应上限约 0.2 s |
+| `Match_model` / `Find_in_windows_Matchs` / `Find_in_windows_Range` / `Find_multiple_in_windows_Matchs` / `Find_in_screen_Matchs` / `Find_Click_windows` | 截图匹配前后检查，避免大图匹配期间不可中断 |
+| `Move_to_range`（点击前）/ `Click` | 中断后不再多移动或多点一下 |
+| `Itface_Host` 状态机循环 / `Itface_Quit` / `Itface_scroll` / `Itface_guild` / `Itface_explore` / `Team_Preset` | 界面跳转循环每轮检查 |
+| `Log_in` | 25 s 启动等待与 100 轮适龄提示循环改走切片睡眠 |
+
+约定：**`Lib.py` 内除 `_sleep_with_stop` 外不应再出现裸 `time.sleep`**；长等待一律走 `_sleep_with_stop`，否则会卡住中断响应。
+
+中断**不做**断点续跑：下次「完整运行」就是新的一轮，已完成任务靠 `Last_times.yml` 冷却/时间窗自动跳过，被中断的任务会重跑。中断也不处理游戏内状态（不拉回庭院）。
 
 模板匹配阈值约定：`Match_model` 使用 `cv2.TM_SQDIFF_NORMED`，**数值越小越相似**；`min_val > Threshold` 视为未命中。任务代码中的阈值多在 `0.01～0.07`。
 
@@ -346,9 +386,10 @@ Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key
 
 ### 6.5 项目级 `config.py`
 
-- 用途：GUI 线程停止标志（`config.stop_thread`）。
+- 用途：运行期开关，目前只有 `config.stop_thread`（中断请求的兼容通道）。
 - 状态：源码树中不存在该文件；属于运行时必需的本地模块。
 - 最小内容：`stop_thread = False`。
+- 中断语义：`stop_thread = True` 会被 `Lib.stop_requested()` 消费，与 `Lib.request_stop()` 等价；GUI 的「中断运行」与「运行中关闭窗口」两条路径都会置位。
 - 生成方式：可手写，也可执行 `python build_exe.py` 时由脚本自动生成（已存在则不改动）。
 
 ## 7. 关键模块与算法
@@ -401,8 +442,8 @@ for step in range(30):
 | `WAIT-` | 等待 |
 | `SKIP-` | 冷却未到或时间窗外跳过 |
 | `TIME-` | 上次/本次任务时间 |
-| `MOVE-` / `QUIT-` | 滚轮、Esc 等操作 |
-| `MAIN-` | 完整流程 / 单任务运行起止 |
+| `MOVE-` / `QUIT-` | 滚轮、Esc 等操作；`QUIT-` 也用于「收到中断指令」 |
+| `MAIN-` | 完整流程 / 单任务运行起止；被中断时结束行改为「被中断 |
 
 GUI 崩溃日志：`app_crash.log`（`logging` + `sys.excepthook`）。
 
@@ -419,6 +460,13 @@ GUI 崩溃日志：`app_crash.log`（`logging` + `sys.excepthook`）。
 MAIN- ===== 单任务运行开始：逢魔之时 ================================================
 ...
 MAIN- ===== 单任务运行结束：逢魔之时 ================================================
+```
+
+被「中断运行」中断时的日志形态（完整运行为例）：
+
+```
+QUIT- ----- 收到中断指令 已停止当前任务 回到待机
+MAIN- ===== 完整运行被中断 已完成 2 项 ========================================
 ```
 
 ## 8. 输出与运行产物
@@ -440,7 +488,7 @@ MAIN- ===== 单任务运行结束：逢魔之时 ===============================
 
 | 方式 | 命令/入口 | 说明 |
 | ---- | ---- | ---- |
-| GUI | `python GUI.py` | 单击左侧卡片跑单个任务；「完整运行」按注册表顺序跑全套 |
+| GUI | `python GUI.py` | 单击左侧卡片跑单个任务；「完整运行」按注册表顺序跑全套；运行中点「中断运行」立即停止并回待机 |
 | 脚本 | 调用 `main.Full_operation()` | 无 GUI，输出到控制台与日志 |
 | 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<日期>/single_<key>_*.log` |
 | 调试 | `test.py` / `test_main.py` | 单点验证模板/任务，已 gitignore |

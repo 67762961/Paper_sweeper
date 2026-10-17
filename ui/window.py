@@ -20,9 +20,12 @@ from main import (
     Full_operation,
     Single_operation,
     TASK_REGISTRY,
+    TaskStopped,
     completion_advanced,
     completion_snapshot,
     read_task_switches,
+    request_stop,
+    reset_stop,
     set_task_switch,
 )
 from . import prefs as ui_prefs
@@ -46,17 +49,21 @@ class WorkerThread(QThread):
         # 异常必须在线程内捕获，否则 Qt 线程静默退出且界面一直停留在运行中
         try:
             if self.task_key is None:
-                Full_operation(self.console_output)
+                result = Full_operation(self.console_output)
             else:
-                Single_operation(self.task_key, self.console_output)
-            self.task_finished.emit({"key": self.task_key, "ok": True, "error": None})
+                result = Single_operation(self.task_key, self.console_output)
+            stopped = bool((result or {}).get("stopped"))
+            self.task_finished.emit({"key": self.task_key, "ok": True, "error": None, "stopped": stopped})
+        except TaskStopped:
+            # 兜底：中断异常正常应在 main 层收尾，漏到这里也按「已中断」而非异常处理
+            self.task_finished.emit({"key": self.task_key, "ok": True, "error": None, "stopped": True})
         except Exception as error:
             logging.critical("任务线程异常:", exc_info=True)
             try:
                 print(f"TASK- ----- 任务执行出现未捕获异常: {error}")
             except Exception:
                 pass
-            self.task_finished.emit({"key": self.task_key, "ok": False, "error": str(error)})
+            self.task_finished.emit({"key": self.task_key, "ok": False, "error": str(error), "stopped": False})
 
 
 class MainWindow(MSFluentWindow):
@@ -106,6 +113,7 @@ class MainWindow(MSFluentWindow):
         self.left_panel.task_config_clicked.connect(self.on_task_config)
         self.left_panel.task_toggled.connect(self.on_task_toggled)
         self.right_panel.run_button_clicked.connect(self.run_button_clicked)
+        self.right_panel.interrupt_clicked.connect(self.interrupt_job)
         self.right_panel.settings_clicked.connect(self.open_settings)
 
         # 主题切换后重新着色日志区已有文本；行内状态图标在 ui/icons.py 内自行重绘，
@@ -183,6 +191,7 @@ class MainWindow(MSFluentWindow):
 
         self.busy = True
         config.stop_thread = False
+        reset_stop()  # 清除上一次的中断请求，避免新任务刚开始就被停掉
 
         # 运行前快照，结束后用它判断任务是否真正推进了完成时间
         self.before_snapshot = completion_snapshot()
@@ -226,6 +235,25 @@ class MainWindow(MSFluentWindow):
         if thread is not None:
             thread.deleteLater()
 
+    def interrupt_job(self):
+        """「中断运行」：请求中断当前任务，任务在下一个检查点退出后回到待机"""
+        if not self.busy:
+            return
+
+        # 置位停止请求（同时保留 config.stop_thread，关闭窗口那条路径语义一致）
+        request_stop()
+        config.stop_thread = True
+
+        self.right_panel.append_separator("中断：已请求停止，正在结束当前任务")
+        self.right_panel.set_interrupting()
+        InfoBar.warning(
+            "正在中断",
+            "已请求中断当前任务，稍候自动回到待机",
+            parent=self,
+            duration=2500,
+            position=InfoBarPosition.TOP_RIGHT,
+        )
+
     def on_job_finished(self, payload):
         """任务结束：恢复界面、刷新时间与今日状态、输出本次结果摘要"""
         self.busy = False
@@ -248,6 +276,19 @@ class MainWindow(MSFluentWindow):
             error_text = str(payload.get("error"))
             self.right_panel.append_separator(f"结束：异常 - {error_text}")
             self.show_error_bar("任务执行异常", error_text)
+            return
+
+        # 用户主动中断：正常收尾，不报错也不统计完成数
+        if payload.get("stopped"):
+            title = "完整运行" if task_key is None else self._task_title(task_key)
+            self.right_panel.append_separator(f"结束：已中断（{title}）")
+            InfoBar.warning(
+                "已中断运行",
+                "当前任务已停止，界面回到待机",
+                parent=self,
+                duration=3000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
             return
 
         try:
@@ -299,8 +340,9 @@ class MainWindow(MSFluentWindow):
             event.ignore()
             return
 
-        # 置位停止标志（当前任务层尚未消费，保留给后续中断支持），并短暂等待线程收尾
+        # 置位停止请求并短暂等待线程收尾；检查点按 0.2 秒切片，通常很快退出
+        request_stop()
         config.stop_thread = True
         if self.thread is not None and self.thread.isRunning():
-            self.thread.wait(2000)
+            self.thread.wait(3000)
         event.accept()
