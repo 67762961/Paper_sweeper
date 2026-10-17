@@ -56,6 +56,7 @@ flowchart LR
 ├── GUI.exe                        打包产物（默认忽略）
 ├── ui/                            界面层（单向依赖 theme→icons→widgets→panels→window）
 │   ├── theme.py                   设计 token：颜色/间距/圆角/字号
+│   ├── theme_manager.py           Fluent 主题初始化与 qconfig 持久化
 │   ├── icons.py                   今日状态图标与齿轮/运行按钮（QPainter 绘制）
 │   ├── widgets.py                 整跑开关、任务行
 │   ├── panels.py                  左侧任务列表、右侧日志控制台
@@ -73,7 +74,8 @@ flowchart LR
 ├── config/                        运行配置（默认忽略）
 │   ├── Setting.yml                启动项、结界突破、寮三十副本表
 │   ├── Last_times.yml             各账号各任务上次完成时间
-│   └── Gui_state.yml              GUI 任务开关（是否参与完整运行，缺失默认全开）
+│   ├── Gui_state.yml              GUI 任务开关（是否参与完整运行，缺失默认全开）
+│   └── gui.json                   界面偏好（主题等，qconfig 管理）
 ├── pic/                           界面模板图
 │   ├── Main/                      庭院/弹窗/协作/返回等通用元素
 │   ├── Sign/                      签到与收菜
@@ -135,7 +137,12 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 | `ui/icons.py` | `StatusIcon`、`IconButton`（QPainter 矢量绘制，不依赖字体/图片） |
 | `ui/widgets.py` | `ToggleSwitch`、`TaskRow` |
 | `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（日志控制台） |
-| `ui/window.py` | `WorkerThread`、`MainWindow`（组装 + 线程调度） |
+| `ui/theme_manager.py` | Fluent 主题初始化、`qconfig` 持久化（`config/gui.json`） |
+| `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度） |
+
+窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
+`mainPage` 加入后**隐藏左侧导航**，因此保留参考项目的 Fluent 观感与无边框窗口，
+信息架构仍然是「左侧任务列表 + 右侧日志控制台」两栏。
 
 主体职责：
 
@@ -302,7 +309,12 @@ Single_operation(task_key, console_signal=None)  # 单任务运行，返回 {key
 - 与 `Setting.yml`（任务参数）分离，避免 GUI 偏好混进用户手写配置；
 - 单击行内 ▶ 不受该开关影响，只有「完整运行」会跳过关闭的任务。
 
-### 6.4 项目级 `config.py`
+### 6.4 `config/gui.json`（界面偏好）
+
+由 `qfluentwidgets` 的 `qconfig` 管理，保存主题模式（浅色/深色/跟随系统）等界面偏好。
+文件缺失时使用浅色主题；与 `Setting.yml`（任务参数）、`Gui_state.yml`（任务开关）互不干扰。
+
+### 6.5 项目级 `config.py`
 
 - 用途：GUI 线程停止标志（`config.stop_thread`）。
 - 状态：源码树中不存在该文件；属于运行时必需的本地模块。
@@ -380,6 +392,8 @@ MAIN- ===== 单任务运行结束：逢魔之时 ===============================
 ├── logs/<YYYY-MM-DD>/single_<key>_<timestamp>.log     单任务运行日志
 ├── app_crash.log                                      未捕获异常
 ├── config/Last_times.yml                              任务冷却状态（本地）
+├── config/Gui_state.yml                               任务开关（本地）
+├── config/gui.json                                    界面偏好（本地）
 ├── build/                                             PyInstaller 中间产物
 ├── GUI.exe                                            打包产物（直接在根目录，默认忽略）
 └── __pycache__/                                       字节码缓存
@@ -405,8 +419,9 @@ MAIN- ===== 单任务运行结束：逢魔之时 ===============================
 2. 新增模板图必须放进对应 `pic/<业务>/`，路径使用 `./pic/...` 相对当前工作目录。
 3. 识别阈值、点击等待写在调用处，修改后需用真实窗口回归；调试可临时 `Flag_show=1` 弹出标注框。
 4. 时间窗、星期分支写在 `MainTask_*` 入口层，不要埋进底层 `Lib` 点击函数。
-5. 冷却成功写回、失败不写回；`Setting.yml` 只放用户可改的静态配置，GUI 偏好（任务开关）写 `Gui_state.yml`，两者不要混用。
+5. 冷却成功写回、失败不写回；`Setting.yml` 只放用户可改的静态配置，GUI 偏好分别写 `Gui_state.yml`（任务开关）与 `gui.json`（主题），三者不要混用。
 6. `config/`、`logs/`、`build/`、`dist/`、`GUI.exe`、调试脚本默认不入库；需要跟踪的新源码与文档请在 `.gitignore` 中显式排除忽略。
 7. 修改 `Lib.py` 公共匹配/点击/界面函数前，确认所有 `Task_*` 调用方语义不变，尤其是返回值 `1/0` 与 `Range/Matchs` 约定。
-8. 本项目通过公开 UI 自动化交互，不修改游戏文件；文档与注释避免暗示注入、外挂或协议破解能力。
-9. GUI 行内图标（✓ / ! / ▶ / 齿轮）统一用 `QPainter` 矢量绘制，不依赖字体字形，也不往 `pic/` 塞 UI 素材。
+8. 新增界面依赖（如 Fluent 组件库）时，必须同步 `requirements.txt` 与 `GUI.spec` 的 `hiddenimports`，并用 `python build_exe.py` 验证打包产物可启动。
+9. 本项目通过公开 UI 自动化交互，不修改游戏文件；文档与注释避免暗示注入、外挂或协议破解能力。
+10. GUI 行内图标（✓ / ! / ▶ / 齿轮）统一用 `QPainter` 矢量绘制，不依赖字体字形，也不往 `pic/` 塞 UI 素材。
