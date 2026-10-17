@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import IndeterminateProgressBar, PrimaryPushButton, TextEdit
+from qfluentwidgets import IndeterminateProgressBar, PushButton, TextEdit
 
 from main import TASK_REGISTRY, entry_done_today, latest_completion, read_completions, read_task_switches
 from . import theme
@@ -156,7 +156,7 @@ class RightPanel(QFrame):
     def init_ui(self):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(theme.SPACE_SM)
+        layout.setSpacing(theme.SPACE_LG)
 
         self.create_console_area(layout)
         self.create_progress(layout)
@@ -180,13 +180,34 @@ class RightPanel(QFrame):
 
     def create_button_area(self, parent_layout):
         """创建主操作按钮"""
-        self.run_button = PrimaryPushButton("完整运行")
+        self.run_button = PushButton("完整运行")
         self.run_button.setFixedHeight(theme.SIZE_RUN_BUTTON_HEIGHT)
+        self.run_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {theme.COLOR_ACCENT};
+                border: 1px solid {theme.COLOR_ACCENT};
+                border-radius: {theme.RADIUS_CARD}px;
+                font-size: {theme.FONT_SIZE_RUN_BUTTON}px;
+                font-weight: bold;
+                padding: 0 {theme.SPACE_XXL}px;
+            }}
+            QPushButton:hover {{
+                background-color: #E6F2FF;
+            }}
+            QPushButton:pressed {{
+                background-color: #B8DAFF;
+            }}
+            QPushButton:disabled {{
+                color: {theme.COLOR_TEXT_DISABLED};
+                border-color: {theme.COLOR_ROW_BORDER};
+            }}
+        """)
 
         button_container = QFrame()
         button_container.setStyleSheet("background: transparent;")
         button_layout = QHBoxLayout()
-        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setContentsMargins(0, theme.SPACE_MD, 0, 0)
         button_layout.addStretch()
         button_layout.addWidget(self.run_button)
         button_container.setLayout(button_layout)

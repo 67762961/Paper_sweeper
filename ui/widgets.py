@@ -58,11 +58,11 @@ class TaskRow(SimpleCardWidget):
 
         self.name_label = QLabel(self.title)
         self.name_label.setFont(
-            QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_BODY, QFont.Weight.Bold)
+            QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_TASK_NAME, QFont.Weight.Bold)
         )
 
         self.time_label = QLabel("上次运行 暂无记录")
-        self.time_label.setFont(QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_SMALL))
+        self.time_label.setFont(QFont(theme.FONT_FAMILY_UI, theme.FONT_SIZE_TASK_TIME))
 
         text_layout.addWidget(self.name_label)
         text_layout.addWidget(self.time_label)
@@ -72,6 +72,8 @@ class TaskRow(SimpleCardWidget):
         self.config_button = IconButton("gear", "配置该任务（暂未开放）")
         self.run_button = IconButton("play", "单独运行该任务")
         self.switch = ToggleSwitch()
+        self.switch.setOnText("")
+        self.switch.setOffText("")
         self.switch.setToolTip("开启后参与「完整运行」，关闭则完整运行时跳过")
 
         layout.addWidget(self.config_button)

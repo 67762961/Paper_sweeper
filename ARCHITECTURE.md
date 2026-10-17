@@ -134,7 +134,7 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 | 模块 | 职责 |
 | ---- | ---- |
 | `ui/theme.py` | 设计 token：颜色、间距、圆角、字号；所有界面取值统一来自这里 |
-| `ui/icons.py` | `StatusIcon`（FluentIcon + 语义色圆底）、`IconButton`（FluentIcon 图标按钮） |
+| `ui/icons.py` | `StatusIcon`（QPainter 绘制对勾/感叹号/播放三角）、`IconButton`（FluentIcon 图标按钮） |
 | `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`） |
 | `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 主按钮） |
 | `ui/theme_manager.py` | Fluent 主题初始化、`qconfig` 持久化（`config/gui.json`） |
@@ -155,14 +155,13 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 
 | 区域 | 控件 | 说明 |
 | ---- | ---- | ---- |
-| 今日状态 | `StatusIcon` | 今日已完成 → 绿底 `FluentIcon.ACCEPT`；今日未完成 → 橙底 `!`；运行中 → 蓝底 `FluentIcon.PLAY` |
+| 今日状态 | `StatusIcon` | 今日已完成 → 绿色对勾；今日未完成 → 橙色 `!`；运行中 → 蓝色播放三角（均为 QPainter 绘制，无底色圆圈） |
 | 任务信息 | 名称 + 「上次运行 MM-DD HH:MM」 | 时间取该任务所有账号、所有状态键中的最新值 |
 | 配置 | `IconButton(kind="gear")` | `FluentIcon.SETTING`；本期为**占位**：弹「配置功能暂未开放」，不写盘 |
 | 单跑 | `IconButton(kind="play")` | `FluentIcon.PLAY`；点击只运行该任务（等价于 `Single_operation`） |
-| 开关 | `ToggleSwitch` | Fluent `SwitchButton`；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `config/Gui_state.yml` |
+| 开关 | `ToggleSwitch` | Fluent `SwitchButton`（不显示 On/Off 文案）；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `config/Gui_state.yml` |
 
-图标：齿轮、运行、今日完成使用 `FluentIcon`；「今日未完成」的感叹号因 FluentIcon 无对应图标而用
-`QPainter` 绘制；不再维护整套自绘图标。
+图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为轮廓按钮（主色描边 + 主色文字，悬停浅蓝底），不使用实心主色块。
 
 交互约定：
 

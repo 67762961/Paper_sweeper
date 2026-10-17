@@ -63,8 +63,10 @@ SPACE_XXL = 20
 # ---- 字体 ----
 FONT_FAMILY_UI = "Microsoft YaHei"
 FONT_SIZE_TITLE = 15
-FONT_SIZE_BODY = 10                 # 任务名
-FONT_SIZE_SMALL = 11                # 说明与时间
+FONT_SIZE_BODY = 10                 # 通用正文
+FONT_SIZE_SMALL = 11                # 说明文字
+FONT_SIZE_TASK_NAME = 12            # 任务行标题（比时间更醒目）
+FONT_SIZE_TASK_TIME = 9             # 任务行「上次运行」时间（弱化）
 FONT_FAMILY_LOG = "Consolas"
 FONT_SIZE_LOG = 12
 FONT_SIZE_RUN_BUTTON = 14
