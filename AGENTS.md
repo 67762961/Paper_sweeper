@@ -19,8 +19,13 @@
 - 公共能力集中在 `Lib.py`：识别、点击、界面状态机、配置读写、队伍预设等；任务模块只编排业务，不重复实现底层匹配。
 - 界面跳转优先写状态机（`current_state` + `match case`），轮次上限约 30，异常路径统一 `Itface_Host` 回庭院。
 - 控制台日志使用固定前缀：`TASK-` / `STEP-` / `INFO-` / `WAIT-` / `SKIP-` / `TIME-` / `MOVE-` / `QUIT-` / `MAIN-`。
-- 任务冷却写入 `./config/Last_times.yml`；静态配置写在 `./config/Setting.yml`。配置目录默认不入库。
+- 任务冷却写入 `./config/Last_times.yml`；静态配置写在 `./config/Setting.yml`；GUI 偏好（左侧任务开关）写 `./config/Gui_state.yml`，三者不要混用。配置目录默认不入库。
 - 模板图片按业务分子目录放在 `./pic/`（Main / Sign / Sis / Team / Thr / Mail / Digui / Fengmo / JiejieFight / Shouliezhan）。阈值与搜索逻辑写在任务代码中，不散落魔法值到无关模块。
 - 点击优先在识别框中心 1/4～3/4 区域内随机落点；全局替代硬编码坐标仅保留极少数界面（如卷轴）。
 - `import config` 所需的项目级 `config.py` 当前不在源码树中；若要本地跑 GUI，需自备 `config.py`，至少提供 `stop_thread = False`。
 - 注释统一使用中文；修改任务流程后，按实际改动同步 ARCHITECTURE.md 中的入口顺序、冷却策略或目录说明。
+- GUI 左侧 7 行任务与「完整运行」顺序都由 `main.TASK_REGISTRY` 驱动：新增/改名顶层任务入口时，必须同步登记注册表（key / 标题 / 说明 / 入口 / `lasttime_keys` / `today_keys`），不要另写一份任务列表。
+- 左侧行结构固定为「今日状态图标 + 名称/上次运行时间 + 齿轮（占位） + ▶ 单跑 + 整跑开关」；不要恢复整行点击运行，也不要加三点菜单。
+- 今日状态由 `main.entry_done_today` 判定（`check_keys` 全部为今天才 ✓）；它只读 `Last_times.yml`，因此「被冷却/时间窗跳过」的任务仍显示 `!`。
+- 行内图标（✓ / ! / ▶ / 齿轮）一律用 `QPainter` 矢量绘制，不依赖字体字形、不引入图片资源、不往 `pic/` 塞 UI 素材。
+- `Full_operation` 与 `Single_operation` 共用 `main._log_stream`；日志收尾必须先恢复 `sys.stdout` 再冲刷，避免打包版（`console=False`，`sys.stdout` 为 `None`）下抛出异常导致 GUI 卡在「运行中」。
