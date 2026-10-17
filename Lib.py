@@ -10,31 +10,87 @@ from datetime import datetime
 import os
 import ruamel.yaml
 import subprocess
+import threading
 import yaml
+
+
+# ---- 中断机制（GUI「中断运行」按钮）----
+# 任务层不允许捕获 TaskStopped，让它一路抛到 main.py 统一收尾。
+# 检查点放在本文件的公共原语里，因此所有 Task_*.py 无需改动。
+
+class TaskStopped(Exception):
+    """任务被用户中断：由 check_stop() 抛出，只允许在 main.py 收尾"""
+
+
+_stop_event = threading.Event()
+_STOP_SLICE = 0.2  # 长睡眠的切片长度，决定暂停的响应延迟上限
+
+
+def request_stop():
+    """请求中断当前任务（GUI 中断按钮 / 关闭窗口时调用）"""
+    _stop_event.set()
+
+
+def reset_stop():
+    """清除中断请求（每次开始执行任务前调用）"""
+    _stop_event.clear()
+
+
+def stop_requested():
+    """是否已请求中断：本模块的标志或项目级 config.stop_thread 任一为真"""
+    if _stop_event.is_set():
+        return True
+    # 延迟导入避免与 GUI 入口循环依赖；config 缺失时按未请求处理
+    try:
+        import config
+        return bool(getattr(config, "stop_thread", False))
+    except Exception:
+        return False
+
+
+def check_stop():
+    """检查点：已请求中断则抛 TaskStopped，否则立即返回"""
+    if stop_requested():
+        raise TaskStopped("用户中断运行")
+
+
+def _sleep_with_stop(seconds):
+    """可中断睡眠：按 _STOP_SLICE 切片，避免长等待把暂停卡住"""
+    remaining = float(seconds)
+    while remaining > 0:
+        check_stop()
+        chunk = _STOP_SLICE if remaining > _STOP_SLICE else remaining
+        time.sleep(chunk)
+        remaining -= chunk
+    # 最后一个切片期间收到的中断也要生效
+    check_stop()
 
 
 def Sleep_print(Wait_time):
     if Wait_time <= 1:
         print("        WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
-        time.sleep(Wait_time)
+        _sleep_with_stop(Wait_time)
     else:
         Sleep_print_long(Wait_time)
 
 
 def Scroll_print(Hwnd, length):
+    check_stop()
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
-    time.sleep(0.1)
+    _sleep_with_stop(0.1)
     for i in range(abs(length)):
+        check_stop()
         pyautogui.scroll(int(length / abs(length)))
-        time.sleep(0.01)
+        _sleep_with_stop(0.01)
     print("        MOVE- mmmmm 滚轮滚动{Length}".format(Length=length))
 
 
 def Esc_print(Hwnd):
+    check_stop()
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
-    time.sleep(0.1)
+    _sleep_with_stop(0.1)
     pydirectinput.press("esc")
-    time.sleep(0.1)
+    _sleep_with_stop(0.1)
     print("        QUIT- ccccc 按Esc退出")
     return Itface_Quit(Hwnd)
 
@@ -52,6 +108,7 @@ def Find_windows(title):
             hwnds.append(hwnd)
         return True
 
+    check_stop()
     hwnds = []
     win32gui.EnumWindows(callback, hwnds)
     if hwnds:
@@ -63,15 +120,17 @@ def Find_windows(title):
 
 
 def Log_in(title):
+    check_stop()
     with open("./config/Setting.yml", "r", encoding="utf-8") as f:
         config = read_config("./config/Setting.yml")
         launch_cmd = config["启动项"][title]["启动命令"]
     subprocess.Popen(launch_cmd, shell=True)
     print("        INFO- -----", title, "正在启动")
-    time.sleep(25)
+    _sleep_with_stop(25)
     Hwnd = Find_windows(title)
 
     for Wait in range(100):
+        check_stop()
         Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/适龄提示标.png", 0.03, 0)
         if Range:
             Sleep_print(1)
@@ -109,6 +168,7 @@ def Match_model(Img, Img_model_path, Threshold, Flag_show, search_range=None, is
     :param is_window_match: 是否为窗口匹配（用于控制是否显示内部点击区域）
     :return: 匹配结果和匹配得分
     """
+    check_stop()
     # 加载图像模板
     Img_model = Img_read_ch(Img_model_path)
     if Img_model is None:
@@ -198,6 +258,7 @@ def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     """
     窗口内截图并找到与模板匹配的图片区域
     """
+    check_stop()
     # 获取窗口位置和大小
     window_rect = win32gui.GetWindowRect(Hwnd)
     left, top, right, bottom = window_rect
@@ -216,6 +277,7 @@ def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):
     """
     在窗口内的指定区域内进行模板匹配
     """
+    check_stop()
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     # 获取窗口位置和大小
     window_rect = win32gui.GetWindowRect(Hwnd)
@@ -242,6 +304,7 @@ def Find_multiple_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show, max_
     窗口内截图并找到多个与模板匹配的图片区域
     通过重复调用Match_model实现 每次找到后蒙版盖住再找下一个
     """
+    check_stop()
     # 获取窗口位置和大小
     window_rect = win32gui.GetWindowRect(Hwnd)
     left, top, right, bottom = window_rect
@@ -260,6 +323,7 @@ def Find_multiple_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show, max_
 
     # 循环查找多个匹配
     for i in range(max_matches):
+        check_stop()
         # 调用现有的Match_model函数
         return1, return2 = Match_model(Img_working, Model_path, Threshold, False, None, True)
 
@@ -283,7 +347,7 @@ def Find_multiple_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show, max_
         # 用蒙版盖住已匹配区域（避免重复检测）
         cv2.rectangle(Img_working, Left_up, Right_down, (0, 0, 0), -1)
 
-        time.sleep(0.05)
+        _sleep_with_stop(0.05)
 
     # 显示结果（如果启用）
     if Flag_show and positions:
@@ -319,6 +383,8 @@ def Move_to_range(Hwnd, Loc):
     :param Loc: 坐标元组 格式为[(左上x,左上y), (右下x,右下y)]
     :return: 移动到的目标坐标 (x, y) 或 0 当Loc为空时
     """
+    # 移动鼠标前检查：避免用户按下中断后还多点/多移动一下
+    check_stop()
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     # 检测Loc是否为空
     if not Loc or len(Loc) < 2:
@@ -362,11 +428,12 @@ def Click(Hwnd, Loc, Wait):
     else:
         # 执行点击操作
         pyautogui.click(button="left")
-        time.sleep(Wait)
+        _sleep_with_stop(Wait)
         return 1
 
 
 def Find_Click_windows(Hwnd, Model_path, Threshold, message_F, message_C):
+    check_stop()
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     Range, Matchs = Find_in_windows_Matchs(Hwnd, Model_path, Threshold, 0)
     if not Matchs:
@@ -388,6 +455,7 @@ def Find_in_screen_Matchs(Img_model_path, Threshold, Flag_show):
     """
     全屏截图并找到与模板匹配的图片区域
     """
+    check_stop()
     # 截取屏幕
     Screenshot = pyautogui.screenshot()
 
@@ -414,7 +482,7 @@ def Find_Click_screen(Model_path, Threshold, message_F, message_C):
 def Sleep_print_long(Wait_time):
 
     print("        WAIT- sssss 等待{Time}秒钟".format(Time=Wait_time))
-    time.sleep(Wait_time)
+    _sleep_with_stop(Wait_time)
 
     # 拒绝协作
     if Wait_time > 1:
@@ -553,8 +621,9 @@ def Itface_Quit(Hwnd):
     :param Hwnd:    窗口句柄
     :return: None
     """
+    check_stop()
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
-    time.sleep(0.5)
+    _sleep_with_stop(0.5)
     # 注：此处退出界面条件可以极为苛刻 一般识别取值为0.006
     Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Tuichuyouxi.png", 0.01, 0)
     if Range:
@@ -575,6 +644,7 @@ def Itface_Host(Hwnd):
 
     def Host_check(Hwnd, Wait):
         for i in range(Wait):
+            check_stop()
             ctypes.windll.user32.SetForegroundWindow(Hwnd)
             Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
             if Range:
@@ -600,6 +670,7 @@ def Itface_Host(Hwnd):
     current_state = "庭院界面"
     Wait = 3
     for step in range(30):
+        check_stop()
         match current_state:
             case "庭院界面":
                 Check = Host_check(Hwnd, Wait)
@@ -695,6 +766,7 @@ def Itface_scroll(Hwnd):
     @param Hwnd:    窗口句柄
     @return:        1正常0异常
     """
+    check_stop()
     # 检测是否位于庭院主界面
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     Itface_Host(Hwnd)
@@ -724,6 +796,7 @@ def Itface_guild(Hwnd):
     @param Hwnd:    窗口句柄
     @return:        1正常0异常
     """
+    check_stop()
     # 确保卷轴打开
     Itface_scroll(Hwnd)
 
@@ -732,7 +805,7 @@ def Itface_guild(Hwnd):
     if Range:
         Click(Hwnd, Range, 1)
         print("        INFO-", Matchs, "进入阴阳寮")
-        time.sleep(1)
+        _sleep_with_stop(1)
         return 1
     else:
         print("        INFO-", Matchs, "进入阴阳寮失败")
@@ -772,6 +845,7 @@ def Itface_explore(Hwnd):
     Itface_scroll(Hwnd)
     current_state = "庭院界面"
     for step in range(30):
+        check_stop()
         Sleep_print(1)
         match current_state:
             case "庭院界面":
@@ -825,6 +899,7 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
     Itface_scroll(Hwnd)
     current_state = "庭院卷轴界面"
     for step in range(30):
+        check_stop()
         Sleep_print(1)
         match current_state:
             case "庭院卷轴界面":

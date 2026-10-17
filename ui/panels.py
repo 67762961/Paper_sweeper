@@ -77,6 +77,35 @@ def run_button_qss(dark):
     """
 
 
+def interrupt_button_qss(dark):
+    """「中断运行」轮廓按钮样式：次要色描边，与主色的完整运行按钮拉开层次"""
+    text = theme.dark_color("COLOR_TEXT_SECONDARY") if dark else theme.light_color("COLOR_TEXT_SECONDARY")
+    border = theme.dark_color("COLOR_ROW_BORDER") if dark else theme.light_color("COLOR_ROW_BORDER")
+    hover = theme.dark_color("COLOR_HOVER_BG") if dark else theme.light_color("COLOR_HOVER_BG")
+    pressed = theme.dark_color("COLOR_PRESSED_BG") if dark else theme.light_color("COLOR_PRESSED_BG")
+    disabled = theme.dark_color("COLOR_TEXT_DISABLED") if dark else theme.light_color("COLOR_TEXT_DISABLED")
+    return f"""
+        QPushButton {{
+            background-color: transparent;
+            color: {text};
+            border: 1px solid {border};
+            border-radius: {theme.RADIUS_CARD}px;
+            font-size: {theme.FONT_SIZE_RUN_BUTTON}px;
+            padding: 0 {theme.SPACE_XL}px;
+        }}
+        QPushButton:hover {{
+            background-color: {hover};
+        }}
+        QPushButton:pressed {{
+            background-color: {pressed};
+        }}
+        QPushButton:disabled {{
+            color: {disabled};
+            border-color: {border};
+        }}
+    """
+
+
 class LeftPanel(QFrame):
     """左侧任务列表面板：7 行对应 TASK_REGISTRY，行内提供单跑与整跑开关"""
 
@@ -201,6 +230,7 @@ class RightPanel(QFrame):
     """右侧日志控制台面板"""
 
     run_button_clicked = pyqtSignal()
+    interrupt_clicked = pyqtSignal()
     settings_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -210,6 +240,7 @@ class RightPanel(QFrame):
         self.auto_scroll = self.prefs["log_auto_scroll"]
         self.textbox = None
         self.run_button = None
+        self.interrupt_button = None
         self.progress = None
         self.init_ui()
 
@@ -269,7 +300,7 @@ class RightPanel(QFrame):
         parent_layout.addWidget(self.progress)
 
     def create_button_area(self, parent_layout):
-        """创建主操作按钮"""
+        """创建主操作按钮：左侧「中断运行」，右侧「完整运行」"""
         self.run_button = PushButton("完整运行")
         self.run_button.setFixedHeight(theme.SIZE_RUN_BUTTON_HEIGHT)
         # 用 Fluent 的「浅色 / 深色两套自定义样式」而不是一次性 setStyleSheet：
@@ -280,28 +311,48 @@ class RightPanel(QFrame):
             run_button_qss(dark=True),
         )
 
+        self.interrupt_button = PushButton("中断运行", self, FluentIcon.PAUSE)
+        self.interrupt_button.setFixedHeight(theme.SIZE_RUN_BUTTON_HEIGHT)
+        self.interrupt_button.setToolTip("立即中断当前任务并回到待机（不会从断点继续）")
+        self.interrupt_button.setEnabled(False)  # 仅运行中可点
+        setCustomStyleSheet(
+            self.interrupt_button,
+            interrupt_button_qss(dark=False),
+            interrupt_button_qss(dark=True),
+        )
+
         button_container = QFrame()
         button_container.setStyleSheet("background: transparent;")
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, theme.SPACE_MD, 0, 0)
+        button_layout.setSpacing(theme.SPACE_SM)
         button_layout.addStretch()
+        button_layout.addWidget(self.interrupt_button)
         button_layout.addWidget(self.run_button)
         button_container.setLayout(button_layout)
 
         parent_layout.addWidget(button_container)
 
         self.run_button.clicked.connect(self.run_button_clicked)
+        self.interrupt_button.clicked.connect(self.interrupt_clicked)
 
     def set_running(self, running):
-        """运行期间禁用完整运行按钮、显示进度条"""
+        """运行期间禁用完整运行按钮、启用中断按钮、显示进度条"""
         self.run_button.setEnabled(not running)
         self.run_button.setText("运行中…" if running else "完整运行")
+        self.interrupt_button.setEnabled(running)
+        self.interrupt_button.setText("中断运行")
         if running:
             self.progress.setVisible(True)
             self.progress.start()
         else:
             self.progress.stop()
             self.progress.setVisible(False)
+
+    def set_interrupting(self):
+        """已发出中断请求：禁用中断按钮防连点，等线程收尾后由 set_running(False) 复位"""
+        self.interrupt_button.setEnabled(False)
+        self.interrupt_button.setText("中断中…")
 
     def clear_log(self):
         """清空日志区"""

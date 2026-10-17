@@ -33,3 +33,5 @@
 - 配色统一从 `ui/theme.py` 取：`COLOR_*` 是浅色取值、深色覆盖在 `_DARK_COLORS`；组件取色用 `theme.color()` / `light_color()` / `dark_color()`，不要在组件里写死十六进制。
 - 会随主题变化的元素不要用裸 `QLabel` 承载文字（深色下会变黑看不清）：文字用 Fluent 标签并 `setTextColor(浅色, 深色)`；轮廓按钮用 `setCustomStyleSheet(light_qss, dark_qss)` 注册；自绘控件连接 `qconfig.themeChangedFinished` 后重绘。
 - `Full_operation` 与 `Single_operation` 共用 `main._log_stream`；日志收尾必须先恢复 `sys.stdout` 再冲刷，避免打包版（`console=False`，`sys.stdout` 为 `None`）下抛出异常导致 GUI 卡在「运行中」。
+- 中断是协作式的：GUI「中断运行」→ `Lib.request_stop()` → 各检查点 `check_stop()` 抛 `TaskStopped` → `main` 统一收尾 → 返回 `stopped=True` → GUI 回待机。**任务层禁止捕获 `TaskStopped`**，让它一路抛到 `main.py`。
+- `Lib.py` 里除 `_sleep_with_stop` 之外不要写裸 `time.sleep`；长等待一律走 `_sleep_with_stop`（0.2 s 切片），否则会卡住中断响应。新增耗时的公共原语时，入口加 `check_stop()`、循环体每轮加一次。

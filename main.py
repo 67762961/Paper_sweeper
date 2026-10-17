@@ -6,7 +6,18 @@ from dataclasses import dataclass
 from typing import Callable
 
 from PyQt6.QtCore import QObject, pyqtSignal
-from Lib import Find_windows, read_config, write_config
+# 中断相关的 request_stop / reset_stop / stop_requested 在此重新导出，
+# 供 GUI 层只依赖 main 而不必直接 import Lib
+from Lib import (
+    Find_windows,
+    TaskStopped,
+    check_stop,
+    read_config,
+    reset_stop,
+    stop_requested,
+    request_stop,
+    write_config,
+)
 from Task_SignIn import MainTask_Signin
 from Task_Fengmo import MainTask_Fengmo
 from Task_Digui import MainTask_Digui
@@ -301,28 +312,41 @@ def _log_stream(console_signal, log_prefix):
 
 
 def Full_operation(console_signal=None):
-    """完整运行：按 TASK_REGISTRY 顺序执行未被左侧开关关闭的任务"""
+    """完整运行：按 TASK_REGISTRY 顺序执行未被左侧开关关闭的任务
+
+    返回 {"stopped": 是否被用户中断, "executed": 实际执行数, "skipped": 跳过数}。
+    中断由 Lib 的检查点抛出 TaskStopped，这里统一收尾，任务层不感知。
+    """
+    result = {"stopped": False, "executed": 0, "skipped": 0}
     with _log_stream(console_signal, "console_output"):
         print("        ")
         print("MAIN- ===== 完整运行流程开始 ================================================================")
         switches = read_task_switches()
-        executed = 0
-        skipped = 0
-        for task in TASK_REGISTRY:
-            if not switches.get(task.key, True):
-                print("SKIP- ----- 任务", task.title, "已在左侧关闭 跳过")
-                skipped += 1
-                continue
-            task.entry()
-            executed += 1
+        try:
+            for task in TASK_REGISTRY:
+                # 任务之间也检查一次：上一步收尾后用户可能已按下中断
+                check_stop()
+                if not switches.get(task.key, True):
+                    print("SKIP- ----- 任务", task.title, "已在左侧关闭 跳过")
+                    result["skipped"] += 1
+                    continue
+                task.entry()
+                result["executed"] += 1
+        except TaskStopped:
+            result["stopped"] = True
+            print("QUIT- ----- 收到中断指令 已停止当前任务 回到待机")
 
-        if skipped:
-            if executed == 0:
+        if result["skipped"]:
+            if result["executed"] == 0 and not result["stopped"]:
                 print("SKIP- ----- 所有任务均已在左侧关闭 本次完整运行没有执行任何任务")
-            else:
-                print(f"INFO- ----- 本次完整运行跳过 {skipped} 项已关闭任务 实际执行 {executed} 项")
+            elif not result["stopped"]:
+                print(f"INFO- ----- 本次完整运行跳过 {result['skipped']} 项已关闭任务 实际执行 {result['executed']} 项")
         print("        ")
-        print("MAIN- ===== 完整运行流程结束 ================================================================")
+        if result["stopped"]:
+            print(f"MAIN- ===== 完整运行被中断 已完成 {result['executed']} 项 ========================================")
+        else:
+            print("MAIN- ===== 完整运行流程结束 ================================================================")
+    return result
 
 
 def Single_operation(task_key, console_signal=None):
@@ -330,13 +354,21 @@ def Single_operation(task_key, console_signal=None):
     task = get_task(task_key)
     if task is None:
         print("TASK- ----- 未登记的任务", task_key, "已忽略")
-        return {"key": task_key, "ok": False, "reason": "unknown_task"}
+        return {"key": task_key, "ok": False, "reason": "unknown_task", "stopped": False}
 
+    stopped = False
     with _log_stream(console_signal, f"single_{task.key}"):
         print("        ")
         print(f"MAIN- ===== 单任务运行开始：{task.title} ================================================")
-        task.entry()
+        try:
+            task.entry()
+        except TaskStopped:
+            stopped = True
+            print("QUIT- ----- 收到中断指令 已停止当前任务 回到待机")
         print("        ")
-        print(f"MAIN- ===== 单任务运行结束：{task.title} ================================================")
+        if stopped:
+            print(f"MAIN- ===== 单任务运行被中断：{task.title} ================================================")
+        else:
+            print(f"MAIN- ===== 单任务运行结束：{task.title} ================================================")
 
-    return {"key": task.key, "ok": True, "reason": None}
+    return {"key": task.key, "ok": not stopped, "reason": None, "stopped": stopped}
