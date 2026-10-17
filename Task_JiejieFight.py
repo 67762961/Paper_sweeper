@@ -195,7 +195,7 @@ def JiejieFight(Hwnd, Account):
                         Sleep_print(0.5)
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        Find = Find_Click_windows(Hwnd, "./pic/JiejieFight/确认.png", 0.05, "点击确认", "未检测到确认按钮")
+                        Find = Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未检测到确定按钮")
                         if Find:
                             break
 
