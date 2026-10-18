@@ -6,7 +6,7 @@ import pydirectinput
 import time
 import numpy as np
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import ruamel.yaml
 import subprocess
@@ -613,6 +613,69 @@ def check_lasttime(Account, Times_name):
             print("保存配置失败: ", e)
 
         return Initial_time
+
+
+# ---- 任务准入策略（供 run_accounts_task 使用）----
+# 每个策略接收 (上次完成时间, 当前时间)，返回 True 表示本次可以执行。
+
+def read_accounts():
+    """读取 Last_times.yml 中的账号列表，保持文件中的顺序"""
+    config_data = read_config("./config/Last_times.yml")
+    return list(config_data.keys())
+
+
+def ready_daily(last_time, now):
+    """当日未完成才执行：上次完成时间不是今天"""
+    return last_time.date() != now.date()
+
+
+def ready_weekly(last_time, now):
+    """本周未完成才执行：按 ISO 周比较"""
+    return last_time.isocalendar()[1] != now.isocalendar()[1]
+
+
+def ready_after(hours):
+    """距上次完成满 N 小时才执行（工厂函数）
+
+    :param hours: 冷却小时数
+    :return:      准入判断函数，带 hours 属性供 skip_text 生成文案
+    """
+    def check(last_time, now):
+        return abs(now - last_time) >= timedelta(hours=hours)
+
+    check.hours = hours
+    return check
+
+
+def skip_text(name, ready):
+    """按准入策略生成 SKIP 日志文案
+
+    :param name:  任务名
+    :param ready: 准入判断函数（ready_daily / ready_weekly / ready_after 的产物）
+    """
+    if ready is ready_daily:
+        return "        SKIP- ----- 今日已完成" + name + "任务 跳过"
+    if ready is ready_weekly:
+        return "        SKIP- ----- 本周已完成" + name + "任务 跳过"
+    hours = getattr(ready, "hours", None)
+    if hours:
+        hours_cn = {1: "一小时", 6: "六小时"}.get(hours, str(hours) + "小时")
+        return "        SKIP- ----- " + name + "任务时间间隔未满" + hours_cn + " 跳过"
+    return "        SKIP- ----- " + name + "任务未到执行时间 跳过"
+
+
+def write_task_time(Account, Times_name):
+    """把某账号某任务的成功时间写回 Last_times.yml
+
+    :param Account:    账号名（Last_times.yml 的顶层键）
+    :param Times_name: 任务键（如「逢魔之时」「邮件领取」）
+    :return:           写入的时间字符串，便于调用方打印 TIME- 日志
+    """
+    config = read_config("./config/Last_times.yml")
+    Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    config[Account][Times_name] = Now
+    write_config("./config/Last_times.yml", config)
+    return Now
 
 
 def Itface_Quit(Hwnd):
