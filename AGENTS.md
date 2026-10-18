@@ -16,6 +16,13 @@
 
 ### 编码规范
 - 任务模块统一 `Task_*.py` 前缀，主入口函数命名为 `MainTask_*`；完整流程变体可用 `FullTask_*`。
+- **单账号任务入口必须用 `Lib.run_accounts_task`**，双账号协作任务（寮三十）用 `Lib.run_shared_task`；不要在任务模块里手写「分隔线 → 时间窗 → 遍历账号 → 冷却判断 → 写回时间」这套控制流，也不要在任务模块里逐条 `print` 开始/结束/读取时间/成功/失败/SKIP 日志——这些文案由任务名与时间窗自动生成。
+  - 签名：`run_accounts_task(name, ready, work, window=None, write_back=True)`
+  - `name` 同时是 `Last_times.yml` 的任务键
+  - `ready` 用 `ready_daily` / `ready_weekly` / `ready_after(hours)`；传 `None` 表示硬跑（跳过冷却与时间窗）
+  - 不写回时间的任务（如纸人奖励）传 `write_back=False`
+  - 分隔线统一为 84 字符（`Lib.TASK_LINE_WIDTH`），不要手写破折号数量
+- `FullTask_*` 仅用于**编排多个任务**（目前只有 `FullTask_Thirty`：先跑寮三十、再按星期跑真蛇），不要用它表达"另一种冷却策略"——那种差异用 `ready` 参数表达。
 - 公共能力集中在 `Lib.py`：识别、点击、界面状态机、配置读写、队伍预设等；任务模块只编排业务，不重复实现底层匹配。
 - 界面跳转优先写状态机（`current_state` + `match case`），轮次上限约 30，异常路径统一 `Itface_Host` 回庭院。
 - 控制台日志使用固定前缀：`TASK-` / `STEP-` / `INFO-` / `WAIT-` / `SKIP-` / `TIME-` / `MOVE-` / `QUIT-` / `MAIN-`。
