@@ -76,6 +76,8 @@ flowchart LR
 ├── Task_Shouliezhan.py            狩猎战（麒麟）与阴界之门
 ├── Task_Fengmo.py                 逢魔之时
 ├── test.py / test_main.py         开发调试入口（已忽略，不参与交付）
+├── tools/                         开发辅助脚本（不参与打包）
+│   └── check_pics.py              模板图引用检查：失效引用 / 大小写不一致 / 死图
 ├── config/                        运行配置（默认忽略）
 │   ├── Setting.yml                启动项、结界突破、寮三十副本表
 │   ├── Last_times.yml             各账号各任务上次完成时间
@@ -518,7 +520,29 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | 脚本 | 调用 `main.Full_operation()` | 无 GUI，输出到控制台与日志 |
 | 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<日期>/single_<key>_*.log` |
 | 调试 | `test.py` / `test_main.py` | 单点验证模板/任务，已 gitignore |
+| 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.1） |
 | 打包 | `python build_exe.py` | 调用 `GUI.spec`，产物 `GUI.exe` 直接输出到项目根目录 |
+
+### 8.1 模板图引用检查（`tools/check_pics.py`）
+
+改动 `pic/` 或任务代码里的模板路径后运行，可自动发现三类问题：
+
+```powershell
+python tools/check_pics.py            # 完整报告
+python tools/check_pics.py --quiet    # 只输出错误（适合接 CI / pre-commit）
+```
+
+| 级别 | 检查项 | 说明 |
+| ---- | ---- | ---- |
+| **错误** | 引用了不存在的图片 | 运行到该步骤必然失败，必须修 |
+| **错误** | 路径大小写与磁盘不一致 | Windows 不敏感，但 Linux / 打包工具 / 大小写敏感文件系统会失败 |
+| 提示 | 未被任何源码引用的图片 | 可能是保留素材，需人工确认后再删 |
+| 信息 | 动态拼接的路径（f-string） | 无法静态校验，需人工确认 |
+
+**注意**：`Team/` 目录下的编队图由 `Team_Preset()` 动态拼接（`f"./pic/Team/{Preset_name}.png"`），
+工具会跳过该目录的死图判定，只列出动态拼接位置。
+
+退出码：`0` = 无错误（提示项不阻断），`1` = 发现错误，`2` = 找不到 `pic/` 目录。
 
 ## 9. 实施约束
 

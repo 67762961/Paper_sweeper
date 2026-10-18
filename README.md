@@ -174,6 +174,18 @@ python build_exe.py --fresh    # 先删除 build/ 与残留 dist/，做全新构
 > 注意：`pic/` 与 `config/` 是运行期外部资源，**不会**打进 exe。请把 `GUI.exe` 与这两个目录放在同一目录下运行，
 > 否则模板图与配置的相对路径会失效。根目录 `GUI.exe` 正在运行时会被锁定，打包前请先关闭程序。
 
+### 方式五：检查模板图引用
+
+改动 `pic/` 下的图片或任务代码里的模板路径后，运行检查工具确认没有写错：
+
+```powershell
+python tools/check_pics.py            # 完整报告
+python tools/check_pics.py --quiet    # 只输出错误
+```
+
+会检查四项：引用了不存在的图片（错误）、路径大小写与磁盘不一致（错误）、
+未被引用的图片（提示）、动态拼接的路径（信息）。退出码 `0` 表示无错误。
+
 ---
 
 ## 使用注意
@@ -213,6 +225,8 @@ Paper_sweeper/
 ├── Task_Shouliezhan.py    # 狩猎战 / 阴界
 ├── Task_Fengmo.py         # 逢魔之时
 ├── pic/                   # 界面模板图（按业务分子目录）
+├── tools/                 # 开发辅助脚本（不参与打包）
+│   └── check_pics.py      # 模板图引用检查
 ├── config/                # Setting.yml / Last_times.yml / Gui_state.yml / gui.json（本地）
 ├── logs/                  # 运行日志
 ├── requirements.txt
