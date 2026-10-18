@@ -23,7 +23,7 @@ from Task_Fengmo import MainTask_Fengmo
 from Task_Digui import MainTask_Digui
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
 from Task_Thirty import FullTask_Thirty
-from Task_JiejieFight import MainTask_JiejieFight, FullTask_JiejieFight
+from Task_JiejieFight import MainTask_JiejieFight
 from Task_Shouliezhan import MainTask_Shouliezhan
 
 
@@ -140,7 +140,7 @@ TASK_REGISTRY = (
         "jiejiefight",
         "结界突破",
         "按勋章阈值开打·支持退出次数",
-        FullTask_JiejieFight,
+        MainTask_JiejieFight,
         ("结界突破",),
     ),
     TaskEntry(

@@ -13,6 +13,8 @@ from Lib import (
     Sleep_print,
     Move_to_range,
     Click,
+    run_accounts_task,
+    ready_after,
 )
 
 
@@ -20,32 +22,10 @@ def MainTask_Jiejieyangcheng():
     """
     结界养成主任务
     """
-    print("        ")
-    print("TASK- ----- 开始结界养成任务 ----------------------------------------------------------------")
-    current_time = datetime.now()
-    config_data = read_config("./config/Last_times.yml")
-    headers = list(config_data.keys())
-    for Account in headers:
-        print("    切换到 ", Account, " 账号")
-        print("        TIME- ----- 读取上次账号", Account, "完成结界养成任务时间")
-        Times_jiejieyangcheng = check_lasttime(Account, "结界养成")
-        current_time = datetime.now()
-        if abs(current_time - Times_jiejieyangcheng) >= timedelta(hours=6):
-            Hwnd = Find_windows(Account)
-            if Jiejieyangcheng("庭院界面", Hwnd):
-                # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.yml")
-                Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                config[Account]["结界养成"] = Now
-                write_config("./config/Last_times.yml", config)
-                print("        TIME- ----- 本次结界养成完成时间")
-                print("        TIME- ----- ", Now)
-                print("        TASK- ----- 结界养成任务完成")
-            else:
-                print("        TASK- ----- 结界养成任务执行过程中出现错误 中断任务")
-        else:
-            print("        SKIP- ----- 结界养成任务时间间隔未满六小时 跳过")
-    print("TASK- ----- 结界养成任务结束 ----------------------------------------------------------------")
+    run_accounts_task(
+        "结界养成", ready_after(6),
+        work=lambda Account: Jiejieyangcheng("庭院界面", Find_windows(Account)),
+    )
 
 
 def Jiejieyangcheng(current_state, Hwnd):

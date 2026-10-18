@@ -1,41 +1,16 @@
 from datetime import datetime, time
-from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_daily, read_config, write_config, check_lasttime, Esc_print, Sleep_print
+from Lib import Find_windows, Find_in_windows_Matchs, Find_Click_windows, Itface_daily, read_config, write_config, check_lasttime, Esc_print, Sleep_print, run_accounts_task, ready_daily
 
 
 def MainTask_Fengmo():
     """
     逢魔之时主任务
     """
-    print("        ")
-    print("TASK- ----- 开始逢魔之时任务 ----------------------------------------------------------------")
-    current_time = datetime.now()
-    if time(17, 0) <= current_time.time() <= time(21, 50):
-        print("TASK- ----- 当前时间在17:00-21:50之间 开始执行逢魔之时任务")
-        config_data = read_config("./config/Last_times.yml")
-        headers = list(config_data.keys())
-        for Account in headers:
-            print("    切换到 ", Account, " 账号")
-            print("        TIME- ----- 读取上次账号", Account, "完成逢魔之时任务时间")
-            Times_fengmozhishi = check_lasttime(Account, "逢魔之时")
-            current_time = datetime.now()
-            if Times_fengmozhishi.date() != current_time.date():
-                Hwnd = Find_windows(Account)
-                if Task_Fengmo(Hwnd, Account):
-                    # 更新配置，写入当前时间
-                    config = read_config("./config/Last_times.yml")
-                    Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    config[Account]["逢魔之时"] = Now
-                    write_config("./config/Last_times.yml", config)
-                    print("        TIME- ----- 本次逢魔之时完成时间")
-                    print("        TIME- ----- ", Now)
-                    print("        TASK- ----- 结界逢魔之时任务完成")
-                else:
-                    print("        TASK- ----- 逢魔之时任务执行过程中出现错误 中断任务")
-            else:
-                print("        SKIP- ----- 今日已完成逢魔之时任务 跳过")
-    else:
-        print("TASK- ----- 当前时间不在17:00-21:50之间 跳过")
-    print("TASK- ----- 逢魔之时任务结束 ----------------------------------------------------------------")
+    run_accounts_task(
+        "逢魔之时", ready_daily,
+        work=lambda Account: Task_Fengmo(Find_windows(Account), Account),
+        window=(time(17, 0), time(21, 50)),
+    )
 
 
 def Task_Fengmo(Hwnd, Account):
