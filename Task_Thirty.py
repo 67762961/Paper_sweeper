@@ -124,7 +124,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Group_card = "./pic/thirty/御魂组别选项.png"
             Fuben_Img0 = "./pic/thirty/虚无副本图标0.png"
             Fuben_Img1 = "./pic/thirty/虚无副本图标1.png"
-            Tuichutubiao = "./pic/thirty/退出0.png"
+            Tuichutubiao = "./pic/thirty/退出.png"
             Zidongzhandoutubiao = "./pic/thirty/自动战斗图标.png"
             Buff = 1
         case "魂王":
@@ -136,7 +136,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Group_card = "./pic/thirty/御魂组别选项.png"
             Fuben_Img0 = "./pic/thirty/神罚副本图标0.png"
             Fuben_Img1 = "./pic/thirty/神罚副本图标1.png"
-            Tuichutubiao = "./pic/thirty/退出0.png"
+            Tuichutubiao = "./pic/thirty/退出.png"
             Zidongzhandoutubiao = "./pic/thirty/自动战斗图标.png"
             Buff = 1
         case "魂海":
@@ -148,7 +148,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Group_card = "./pic/thirty/永生之海组别选项.png"
             Fuben_Img0 = "./pic/thirty/永生之海四副本图标0.png"
             Fuben_Img1 = "./pic/thirty/永生之海四副本图标1.png"
-            Tuichutubiao = "./pic/thirty/退出00.png"
+            Tuichutubiao = "./pic/thirty/退出2.png"
             Zidongzhandoutubiao = "./pic/thirty/自动战斗图标魂海.png"
             Buff = 0
         case "日蚀":
@@ -160,7 +160,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
             Fuben_Group_card = "./pic/thirty/日轮之陨组别选项.png"
             Fuben_Img0 = "./pic/thirty/日蚀副本图标0.png"
             Fuben_Img1 = "./pic/thirty/日蚀副本图标1.png"
-            Tuichutubiao = "./pic/thirty/退出0.png"
+            Tuichutubiao = "./pic/thirty/退出.png"
             Zidongzhandoutubiao = "./pic/thirty/自动战斗图标.png"
             Buff = 0
     for step in range(30):
@@ -300,7 +300,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                         Find, Matchs = Find_in_windows_Range(Hwnd[i], Range, "./pic/thirty/加成开启按钮.png", 0.05, 0)
                         Click(Hwnd[i], Find, 1)
                         print("        INFO-", Matchs, "打开加成")
-                        Find_Click_windows(Hwnd[i], "./pic/thirty/加成1.png", 0.05, "关闭加成面板", "关闭加成面板失败")
+                        Find_Click_windows(Hwnd[i], "./pic/thirty/加成2.png", 0.05, "关闭加成面板", "关闭加成面板失败")
                     else:
                         Find_Click_windows(Hwnd[i], "./pic/thirty/加成.png", 0.05, "点击加成", "未找到加成图标")
                 if Range:
@@ -475,7 +475,7 @@ def Real_Snake(current_state, Hwnd, Account):
                 print("        INFO- ----- 开始等待战斗")
                 Sleep_print(100)
                 for Wait in range(20):
-                    Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/digui/Zhandoujiangli.png", 0.05, 0)
+                    Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/digui/战斗奖励.png", 0.05, 0)
                     if not Range:
                         Range, Match = Find_in_windows_Matchs(Hwnd[0], "./pic/thirty/真蛇确定.png", 0.05, 0)
                     if Range:
@@ -496,7 +496,7 @@ def Real_Snake(current_state, Hwnd, Account):
 
                 for i in range(2):
                     print("    切换到 ", Account[i], " 账号")
-                    Find = Find_Click_windows(Hwnd[i], "./pic/digui/Zhandoujiangli.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
+                    Find = Find_Click_windows(Hwnd[i], "./pic/digui/战斗奖励.png", 0.05, "点击战斗奖励", "未检测到战斗奖励图标")
 
                 if Find:
                     print("        STEP- vvvvv 跳转结束界面")

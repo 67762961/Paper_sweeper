@@ -1087,7 +1087,7 @@ def Itface_explore(Hwnd):
                 Sleep_print(1)
                 Range = [(20, 105), (91, 175)]
                 Click(Hwnd, Range, 1)
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/digui/Diguitubiao.png", 0.05, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/digui/地鬼图标.png", 0.05, 0)
                 if Range:
                     print("        INFO-", Matchs, "检测到地鬼入口 已进入探索界面")
                     return 1
@@ -1122,7 +1122,7 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
             case "式神录界面":
-                Find = Find_Click_windows(Hwnd, "./pic/team/Yushexuanxiang.png", 0.05, "点击预设选项", "未检测到预设选项")
+                Find = Find_Click_windows(Hwnd, "./pic/team/预设选项.png", 0.05, "点击预设选项", "未检测到预设选项")
                 if Find:
                     print("        STEP- vvvvv 跳转队伍预设")
                     current_state = "队伍预设"

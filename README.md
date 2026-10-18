@@ -224,7 +224,7 @@ Paper_sweeper/
 ├── Task_JiejieFight.py    # 结界突破
 ├── Task_Shouliezhan.py    # 狩猎战 / 阴界
 ├── Task_Fengmo.py         # 逢魔之时
-├── pic/                   # 界面模板图（按业务分子目录）
+├── pic/                   # 界面模板图（目录英文、文件名中文，详见 pic/README.md）
 ├── tools/                 # 开发辅助脚本（不参与打包）
 │   └── check_pics.py      # 模板图引用检查
 ├── config/                # Setting.yml / Last_times.yml / Gui_state.yml / gui.json（本地）

@@ -62,7 +62,7 @@ def Task_Qilin(Hwnd, Account):
                 Find = Find_Click_windows(Hwnd, "./pic/hunt/麒麟挑战.png", 0.05, "点击挑战麒麟", "未检测到挑战麒麟图标")
                 if Find:
                     Sleep_print(2)
-                    Find_Click_windows(Hwnd, "./pic/digui/Zhunbei.png", 0.05, "点击准备图标", "未检测到准备图标")
+                    Find_Click_windows(Hwnd, "./pic/digui/准备.png", 0.05, "点击准备图标", "未检测到准备图标")
                     print("        STEP- vvvvv 跳转战斗界面")
                     current_state = "战斗界面"
                 else:
@@ -158,7 +158,7 @@ def Task_Yingjiezhimen(Hwnd, Account):
                     current_state = "异常退出"
 
             case "战斗界面":
-                Find = Find_Click_windows(Hwnd, "./pic/digui/Zhunbei.png", 0.05, "点击准备", "未检测到准备图标")
+                Find = Find_Click_windows(Hwnd, "./pic/digui/准备.png", 0.05, "点击准备", "未检测到准备图标")
                 if Find:
                     print("        STEP- vvvvv 跳转战斗界面")
                     current_state = "等待结束"
