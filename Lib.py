@@ -1011,7 +1011,7 @@ def Itface_guild(Hwnd):
     Itface_scroll(Hwnd)
 
     # 进入阴阳寮
-    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/Yinyangliao.png", 0.05, 0)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/阴阳寮.png", 0.05, 0)
     if Range:
         Click(Hwnd, Range, 1)
         print("        INFO-", Matchs, "进入阴阳寮")
