@@ -22,7 +22,7 @@ from Task_SignIn import MainTask_Signin
 from Task_Fengmo import MainTask_Fengmo
 from Task_Digui import MainTask_Digui
 from Task_Jiejieyangcheng import MainTask_Jiejieyangcheng
-from Task_Thirty import MainTask_Thirty, FullTask_Thirty
+from Task_Thirty import FullTask_Thirty
 from Task_JiejieFight import MainTask_JiejieFight, FullTask_JiejieFight
 from Task_Shouliezhan import MainTask_Shouliezhan
 
