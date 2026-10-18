@@ -14,6 +14,7 @@
 import argparse
 import ast
 import os
+import re
 import sys
 
 # 项目根目录 = 本文件的上上级
@@ -124,13 +125,19 @@ def main():
 
     # ---- 2. 未被引用的图片 ----
     referenced_keys = {ref.lower() for ref, _, _ in static}
-    # 动态拼接的 Team 目录：只要目录里有引用就算用到，不做精确匹配
-    dynamic_team = any("Team/" in seg for seg, _, _ in dynamic)
+
+    # 动态拼接的目录：从 f-string 里提取目录前缀（如 "./pic/team/{Preset_Group}.png" -> "./pic/team/"）
+    # 该目录下的图片按"动态引用"处理，不判定为死图
+    dynamic_dirs = set()
+    for seg, _, _ in dynamic:
+        for m in re.finditer(r'["\'](\./pic/[^"\'{]+/)', seg):
+            dynamic_dirs.add(m.group(1).lower())
+
     unused = []
     for key, real in sorted(disk.items()):
         if key in referenced_keys:
             continue
-        if dynamic_team and "/pic/team/" in key:
+        if any(key.startswith(d) for d in dynamic_dirs):
             continue
         unused.append(real)
 

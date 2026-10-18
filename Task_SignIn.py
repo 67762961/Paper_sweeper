@@ -39,22 +39,22 @@ def Work_Mail(Hwnd, Account):
     """
     Itface_Host(Hwnd)
 
-    Find_Click_windows(Hwnd, "./pic/Mail/Youjian.png", 0.05, "点击邮件", "未识别到邮件入口")
+    Find_Click_windows(Hwnd, "./pic/signin/Youjian.png", 0.05, "点击邮件", "未识别到邮件入口")
 
     # 检测邮箱界面
-    if not Find_Click_windows(Hwnd, "./pic/Mail/Youxiang.png", 0.1, "检测到进入邮箱", "进入邮箱异常"):
+    if not Find_Click_windows(Hwnd, "./pic/signin/Youxiang.png", 0.1, "检测到进入邮箱", "进入邮箱异常"):
         Itface_Host(Hwnd)
         return 0
 
     # 检测是否有奖励未领取
-    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Mail/Quanbulingqu.png", 0.05, 0)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/signin/Quanbulingqu.png", 0.05, 0)
 
     # 没有奖励未领取 检测消息邮件 然后返回
     if not Range:
         print("        INFO-", Matchs, "没有奖励未领取")
         # 检测消息邮件
         while 1:
-            if not Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "发现消息邮件", "未发现消息邮件"):
+            if not Find_Click_windows(Hwnd, "./pic/signin/Xiaoxiyoujian.png", 0.05, "发现消息邮件", "未发现消息邮件"):
                 break
 
         Esc_print(Hwnd)
@@ -69,7 +69,7 @@ def Work_Mail(Hwnd, Account):
         Click(Hwnd, Range, 1)
 
         # 检测全部领取界面
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Mail/Quanbulingqujiemian.png", 0.05, 0)
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/signin/Quanbulingqujiemian.png", 0.05, 0)
         if Range:
             print("        INFO-", Matchs, "检测到进入领取界面")
         else:
@@ -79,10 +79,10 @@ def Work_Mail(Hwnd, Account):
             return 0
 
         # 点击确定
-        Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定", "未正常领取确认")
+        Find_Click_windows(Hwnd, "./pic/common/Queding.png", 0.05, "点击确定", "未正常领取确认")
         Sleep_print(2)
         # 检测领取
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
         if Range:
             print("        INFO-", Matchs, "领取成功")
             # 按下esc退出
@@ -90,17 +90,17 @@ def Work_Mail(Hwnd, Account):
             Sleep_print(2)
 
             # 检测万华牌
-            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/万华牌跳过.png", 0.05, 0)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/signin/万华牌跳过.png", 0.05, 0)
             if Range:
                 Click(Hwnd, Range, 1)
                 print("        INFO-", Matchs, "领取万华牌")
-                Find_Click_windows(Hwnd, "./pic/Main/Cha.png", 0.05, "点击关闭", "未正常关闭万华牌")
+                Find_Click_windows(Hwnd, "./pic/common/Cha.png", 0.05, "点击关闭", "未正常关闭万华牌")
             else:
                 print("        INFO-", Matchs, "未检测到万华牌")
 
             # 检测消息邮件
             for i in range(10):
-                Find = Find_Click_windows(Hwnd, "./pic/Mail/Xiaoxiyoujian.png", 0.05, "点击消息邮件", "未发现消息邮件")
+                Find = Find_Click_windows(Hwnd, "./pic/signin/Xiaoxiyoujian.png", 0.05, "点击消息邮件", "未发现消息邮件")
                 if not Find:
                     break
 
@@ -128,9 +128,9 @@ def Fudai(Hwnd, Account):
     """
     Itface_Host(Hwnd)
     # 检测福袋小纸人
-    if Find_Click_windows(Hwnd, "./pic/Sign/Fudaixiaozhiren.png", 0.05, "检测到福袋小纸人", "未检测到福袋小纸人"):
+    if Find_Click_windows(Hwnd, "./pic/signin/Fudaixiaozhiren.png", 0.05, "检测到福袋小纸人", "未检测到福袋小纸人"):
         # 点击福袋小人后检测领取状态
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
         if Range:
             print("        INFO-", Matchs, "福袋领取成功")
             Esc_print(Hwnd)
@@ -161,15 +161,15 @@ def Qiandao(Hwnd, Account):
     Wait = 0
     for i in range(5):
         # 检测签小纸人
-        if Find_Click_windows(Hwnd, "./pic/Sign/Qiandaoxiaozhiren.png", 0.07, "检测到签到小纸人", "未检测到签到小纸人"):
+        if Find_Click_windows(Hwnd, "./pic/signin/Qiandaoxiaozhiren.png", 0.07, "检测到签到小纸人", "未检测到签到小纸人"):
             # 点击签到小人后
-            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Meiriyiqian.png", 0.05, 0)
+            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/signin/Meiriyiqian.png", 0.05, 0)
             if Find:
                 print("        INFO-", Matchs, "每日一签")
                 Click(Hwnd, Find, 1)
                 for i in range(2):
                     Sleep_print(0.5)
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/signin/Jieqianxiaozhiren.png", 0.05, 0)
                     if Range:
                         print("        INFO-", Matchs, "检测到解签小纸人 每日一签成功")
                         Esc_print(Hwnd)
@@ -179,7 +179,7 @@ def Qiandao(Hwnd, Account):
                         print("        INFO-", Matchs, "未检测到解签小纸人")
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jieqianxiaozhiren.png", 0.05, 0)
+                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/signin/Jieqianxiaozhiren.png", 0.05, 0)
                         if Range:
                             print("        INFO-", Matchs, "检测到解签小纸人 每日一签成功")
                             Esc_print(Hwnd)
@@ -213,24 +213,24 @@ def zhirenjiangli(Hwnd):
     Itface_Host(Hwnd)
 
     # 检测体力小纸人
-    if Find_Click_windows(Hwnd, "./pic/Sign/Tilixiaozhire.png", 0.07, "检测到体力小纸人", "未检测到体力小纸人"):
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+    if Find_Click_windows(Hwnd, "./pic/signin/Tilixiaozhire.png", 0.07, "检测到体力小纸人", "未检测到体力小纸人"):
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
         print("        INFO-", Matchs, "体力纸人领取成功")
 
         Esc_print(Hwnd)
         Sleep_print(0.5)
 
     # 检测勾玉小纸人
-    if Find_Click_windows(Hwnd, "./pic/Sign/Gouyuxiaozhiren.png", 0.07, "检测到勾玉小纸人", "未检测到勾玉小纸人"):
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+    if Find_Click_windows(Hwnd, "./pic/signin/Gouyuxiaozhiren.png", 0.07, "检测到勾玉小纸人", "未检测到勾玉小纸人"):
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
         print("        INFO-", Matchs, "勾玉纸人领取成功")
 
         Esc_print(Hwnd)
         Sleep_print(0.5)
 
     # 检测buff小纸人
-    if Find_Click_windows(Hwnd, "./pic/Sign/BUFFxiaozhiren.png", 0.07, "检测到BUFF小纸人", "未检测到BUFF小纸人"):
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+    if Find_Click_windows(Hwnd, "./pic/signin/BUFFxiaozhiren.png", 0.07, "检测到BUFF小纸人", "未检测到BUFF小纸人"):
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
         print("        INFO-", Matchs, "BUFF纸人领取成功")
 
         Esc_print(Hwnd)
@@ -257,18 +257,18 @@ def mianfeilibao(Hwnd, Account):
     # 开卷轴
     Itface_scroll(Hwnd)
     for i in range(1):
-        if not Find_Click_windows(Hwnd, "./pic/Sign/Shangdian.png", 0.05, "进入商店", "未检测到商店"):
+        if not Find_Click_windows(Hwnd, "./pic/signin/Shangdian.png", 0.05, "进入商店", "未检测到商店"):
             break
-        if not Find_Click_windows(Hwnd, "./pic/Sign/Libaowu.png", 0.05, "进入礼包屋", "未检测到礼包屋"):
-            if not Find_Click_windows(Hwnd, "./pic/Sign/Libaowu1.png", 0.05, "进入礼包屋", "未检测到礼包屋"):
+        if not Find_Click_windows(Hwnd, "./pic/signin/Libaowu.png", 0.05, "进入礼包屋", "未检测到礼包屋"):
+            if not Find_Click_windows(Hwnd, "./pic/signin/Libaowu1.png", 0.05, "进入礼包屋", "未检测到礼包屋"):
                 break
 
         # 此步骤有时候可跳过
-        Find_Click_windows(Hwnd, "./pic/Sign/Richang.png", 0.05, "进入日常项", "未检测到日常项")
+        Find_Click_windows(Hwnd, "./pic/signin/Richang.png", 0.05, "进入日常项", "未检测到日常项")
 
-        if Find_Click_windows(Hwnd, "./pic/Sign/Mianfei.png", 0.05, "领取免费礼包", "未检测到免费礼包"):
+        if Find_Click_windows(Hwnd, "./pic/signin/Mianfei.png", 0.05, "领取免费礼包", "未检测到免费礼包"):
             # 检测领取状态
-            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
             if Range:
                 print("        INFO-", Matchs, "免费礼包领取成功")
                 Esc_print(Hwnd)
@@ -316,7 +316,7 @@ def youqingdain(Hwnd, Account):
     for i in range(10):
         match current_state:
             case "庭院":
-                Find = Find_Click_windows(Hwnd, "./pic/Sign/Haoyou.png", 0.05, "进入好友界面", "未检测到好友界面")
+                Find = Find_Click_windows(Hwnd, "./pic/signin/Haoyou.png", 0.05, "进入好友界面", "未检测到好友界面")
                 if Find:
                     current_state = "好友界面"
                     Sleep_print(2)
@@ -324,19 +324,19 @@ def youqingdain(Hwnd, Account):
                     current_state = "end"
             case "好友界面":
                 if not flag_jiwen:
-                    Find = Find_Click_windows(Hwnd, "./pic/Sign/Jiwen.png", 0.05, "进入吉闻界面", "未检测到吉闻界面")
+                    Find = Find_Click_windows(Hwnd, "./pic/signin/Jiwen.png", 0.05, "进入吉闻界面", "未检测到吉闻界面")
                     if Find:
                         current_state = "吉闻界面"
                     else:
                         current_state = "好友界面"
                 else:
-                    Find = Find_Click_windows(Hwnd, "./pic/Sign/Youqingdianqiehuan.png", 0.05, "进入友情点界面", "未检测到友情点界面")
+                    Find = Find_Click_windows(Hwnd, "./pic/signin/Youqingdianqiehuan.png", 0.05, "进入友情点界面", "未检测到友情点界面")
                     if Find:
                         current_state = "友情点界面"
                     else:
                         current_state = "好友界面"
             case "吉闻界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Sign/Yijianzhufu.png", 0.05, "一键祝福", "未检测到一键祝福")
+                Find = Find_Click_windows(Hwnd, "./pic/signin/Yijianzhufu.png", 0.05, "一键祝福", "未检测到一键祝福")
                 if Find:
                     current_state = "祝福界面"
                 else:
@@ -345,9 +345,9 @@ def youqingdain(Hwnd, Account):
                     Esc_print(Hwnd)
                     Sleep_print(0.5)
             case "祝福界面":
-                Find_Click_windows(Hwnd, "./pic/Sign/Zhufu.png", 0.05, "祝福", "未检测到祝福")
+                Find_Click_windows(Hwnd, "./pic/signin/Zhufu.png", 0.05, "祝福", "未检测到祝福")
                 Sleep_print(1)
-                Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+                Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
                 if Find:
                     print("        INFO-", Matchs, "一键祝福成功")
                     flag_jiwen = 1
@@ -359,7 +359,7 @@ def youqingdain(Hwnd, Account):
                     print("一键祝福似乎未成功")
                     Esc_print(Hwnd)
                     Sleep_print(0.5)
-                    Find = Find_in_windows_Matchs(Hwnd, "./pic/Sign/Jiwen.png", 0.05, 0)
+                    Find = Find_in_windows_Matchs(Hwnd, "./pic/signin/Jiwen.png", 0.05, 0)
                     if not Find:
                         print("退出吉闻界面异常")
                         Esc_print(Hwnd)
@@ -368,8 +368,8 @@ def youqingdain(Hwnd, Account):
                         print("已正常退出吉闻界面")
                 current_state = "好友界面"
             case "友情点界面":
-                Find_Click_windows(Hwnd, "./pic/Sign/Yijianshouqu.png", 0.05, "一键收取", "未检测到一键收取")
-                Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+                Find_Click_windows(Hwnd, "./pic/signin/Yijianshouqu.png", 0.05, "一键收取", "未检测到一键收取")
+                Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
                 if Find:
                     print("        INFO-", Matchs, "一键收取成功")
                     flag_youqingdian = 1

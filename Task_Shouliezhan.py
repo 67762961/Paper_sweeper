@@ -46,9 +46,9 @@ def Task_Qilin(Hwnd, Account):
                 print("        INFO- ----- 前往麒麟界面")
                 Itface_daily(Hwnd)
                 for Wait in range(5):
-                    Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/麒麟图标.png", 0.05, "点击麒麟图标", "未检测到麒麟图标")
+                    Find = Find_Click_windows(Hwnd, "./pic/hunt/麒麟图标.png", 0.05, "点击麒麟图标", "未检测到麒麟图标")
                     if Find:
-                        Find_Click_windows(Hwnd, "./pic/Shouliezhan/前往.png", 0.05, "点击前往图标", "未检测到前往图标")
+                        Find_Click_windows(Hwnd, "./pic/hunt/前往.png", 0.05, "点击前往图标", "未检测到前往图标")
                         print("        STEP- vvvvv 跳转麒麟界面")
                         current_state = "麒麟界面"
                         break
@@ -59,10 +59,10 @@ def Task_Qilin(Hwnd, Account):
                     current_state = "异常退出"
 
             case "麒麟界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/麒麟挑战.png", 0.05, "点击挑战麒麟", "未检测到挑战麒麟图标")
+                Find = Find_Click_windows(Hwnd, "./pic/hunt/麒麟挑战.png", 0.05, "点击挑战麒麟", "未检测到挑战麒麟图标")
                 if Find:
                     Sleep_print(2)
-                    Find_Click_windows(Hwnd, "./pic/Digui/Zhunbei.png", 0.05, "点击准备图标", "未检测到准备图标")
+                    Find_Click_windows(Hwnd, "./pic/digui/Zhunbei.png", 0.05, "点击准备图标", "未检测到准备图标")
                     print("        STEP- vvvvv 跳转战斗界面")
                     current_state = "战斗界面"
                 else:
@@ -74,7 +74,7 @@ def Task_Qilin(Hwnd, Account):
                 print("        INFO- 等待", Waiting, "秒后开始检测结束")
                 Sleep_print(Waiting)
                 for Wait in range(120):
-                    Range, Match = Find_in_windows_Matchs(Hwnd, "./pic/Shouliezhan/胜利太鼓.png", 0.05, 0)
+                    Range, Match = Find_in_windows_Matchs(Hwnd, "./pic/hunt/胜利太鼓.png", 0.05, 0)
                     if Range:
                         print("        STEP- vvvvv 跳转结束界面")
                         current_state = "结束界面"
@@ -89,7 +89,7 @@ def Task_Qilin(Hwnd, Account):
 
             case "结束界面":
                 print("        TASK- ----- 麒麟狩猎战完成")
-                Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/胜利太鼓.png", 0.05, "点击胜利太鼓图标", "未检测到胜利太鼓图标")
+                Find = Find_Click_windows(Hwnd, "./pic/hunt/胜利太鼓.png", 0.05, "点击胜利太鼓图标", "未检测到胜利太鼓图标")
                 Sleep_print(1)
                 Itface_Host(Hwnd)
                 return 1
@@ -128,9 +128,9 @@ def Task_Yingjiezhimen(Hwnd, Account):
                 print("        INFO- ----- 前往阴界之门界面")
                 Itface_daily(Hwnd)
                 Scroll_print(Hwnd, -3)
-                Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/阴界之门图标.png", 0.05, "点击阴界之门图标", "未检测到阴界之门图标")
+                Find = Find_Click_windows(Hwnd, "./pic/hunt/阴界之门图标.png", 0.05, "点击阴界之门图标", "未检测到阴界之门图标")
                 if Find:
-                    Find_Click_windows(Hwnd, "./pic/Shouliezhan/前往.png", 0.05, "点击前往图标", "未检测到前往图标")
+                    Find_Click_windows(Hwnd, "./pic/hunt/前往.png", 0.05, "点击前往图标", "未检测到前往图标")
                     print("        STEP- vvvvv 跳转阴界之门界面")
                     current_state = "阴界之门界面"
                 else:
@@ -138,17 +138,17 @@ def Task_Yingjiezhimen(Hwnd, Account):
                     current_state = "异常退出"
 
             case "阴界之门界面":
-                Find_Click_windows(Hwnd, "./pic/Shouliezhan/攻打阴界之门.png", 0.05, "点击攻打阴界之门", "未检测到攻打阴界之门图标")
+                Find_Click_windows(Hwnd, "./pic/hunt/攻打阴界之门.png", 0.05, "点击攻打阴界之门", "未检测到攻打阴界之门图标")
                 Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/Shouliezhan/挑战.png", 0.05, "点击挑战图标", "未检测到挑战图标")
+                Find_Click_windows(Hwnd, "./pic/hunt/挑战.png", 0.05, "点击挑战图标", "未检测到挑战图标")
                 Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/Main/Queding.png", 0.05, "点击确定图标", "未检测到确定图标")
+                Find_Click_windows(Hwnd, "./pic/common/Queding.png", 0.05, "点击确定图标", "未检测到确定图标")
                 Sleep_print(2)
                 print("        STEP- vvvvv 跳转组队界面")
                 current_state = "组队界面"
 
             case "组队界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/组队界面挑战图标.png", 0.05, "点击挑战", "未检测到挑战图标")
+                Find = Find_Click_windows(Hwnd, "./pic/hunt/组队界面挑战图标.png", 0.05, "点击挑战", "未检测到挑战图标")
                 if Find:
                     print("        STEP- vvvvv 跳转战斗界面")
                     current_state = "战斗界面"
@@ -158,7 +158,7 @@ def Task_Yingjiezhimen(Hwnd, Account):
                     current_state = "异常退出"
 
             case "战斗界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Digui/Zhunbei.png", 0.05, "点击准备", "未检测到准备图标")
+                Find = Find_Click_windows(Hwnd, "./pic/digui/Zhunbei.png", 0.05, "点击准备", "未检测到准备图标")
                 if Find:
                     print("        STEP- vvvvv 跳转战斗界面")
                     current_state = "等待结束"
@@ -171,7 +171,7 @@ def Task_Yingjiezhimen(Hwnd, Account):
                 print("        INFO- 等待", Waiting, "秒后开始检测结束")
                 Sleep_print(Waiting)
                 for Wait in range(120):
-                    Range, Match = Find_in_windows_Matchs(Hwnd, "./pic/Shouliezhan/胜利太鼓.png", 0.05, 0)
+                    Range, Match = Find_in_windows_Matchs(Hwnd, "./pic/hunt/胜利太鼓.png", 0.05, 0)
                     if Range:
                         print("        STEP- vvvvv 跳转结束界面")
                         current_state = "结束界面"
@@ -186,7 +186,7 @@ def Task_Yingjiezhimen(Hwnd, Account):
 
             case "结束界面":
                 print("        TASK- ----- 阴界之门狩猎战完成")
-                Find = Find_Click_windows(Hwnd, "./pic/Shouliezhan/胜利太鼓.png", 0.05, "点击胜利太鼓图标", "未检测到胜利太鼓图标")
+                Find = Find_Click_windows(Hwnd, "./pic/hunt/胜利太鼓.png", 0.05, "点击胜利太鼓图标", "未检测到胜利太鼓图标")
                 Sleep_print(1)
                 Itface_Host(Hwnd)
                 return 1
