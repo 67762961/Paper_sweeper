@@ -16,44 +16,23 @@ from Lib import (
     Click,
     Find_in_windows_Range,
     Itface_explore,
+    run_shared_task,
 )
 
 
 def FullTask_Thirty():
     """
-    寮三十主任务
+    寮三十与真蛇主任务
     """
-    print("        ")
-    print("TASK- ----- 开始执行寮三十任务 --------------------------------------------------------------")
-    current_time = datetime.now()
-    if time(9, 0) <= current_time.time() <= time(23, 00):
-        print("TASK- ----- 当前时间在9:00-23:00之间 可以执行寮三十任务")
-        config_data = read_config("./config/Last_times.yml")
-        Account = list(config_data.keys())
-        Flag = {}
-        for i in range(2):
-            print("        TIME- ----- 读取上次账号", Account[i], "完成寮三十任务时间")
-            Times_liaosanshi = check_lasttime(Account[i], "寮三十")
-            Flag[i] = current_time.date() == Times_liaosanshi.date()
-        # 如果两个账号都未做寮三十 则进行寮三十任务
-        Hwnd = {}
-        if not (Flag[0] and Flag[1]):
-            if MainTask_Thirty():
-                today = datetime.now()
-                week_day = today.weekday()
-        else:
-            for i in range(2):
-                print("        SKIP- ----- 今日账号", Account[i], "已完成寮三十任务 跳过")
-    else:
-        print("TASK- ----- 时间不在9:00-23:00之间 跳过")
+    MainTask_Thirty()
 
+    # 真蛇为周更任务，仅工作日执行，时间窗与寮三十一致
     week_day = datetime.now().weekday()
     current_time = datetime.now()
     if week_day < 5 and time(9, 0) <= current_time.time() <= time(23, 00):
         print("        INFO- ----- 今天是非周末")
         print("        INFO- ----- 当前时间在9:00-23:00之间 开始执行真蛇任务")
         MainTask_Real_Snake()
-    print("TASK- ----- 寮三十任务已完成 ----------------------------------------------------------------")
 
 
 def MainTask_Real_Snake():
@@ -90,30 +69,23 @@ def MainTask_Real_Snake():
 
 
 def MainTask_Thirty():
-    config_data = read_config("./config/Last_times.yml")
-    config = read_config("./config/Setting.yml")
-    Account = {}
-    Account[0] = config["寮三十"]["主账号"]
-    Account[1] = config["寮三十"]["副账号"]
+    """
+    寮三十主任务
+    """
+    def pair():
+        """主副账号取自 Setting.yml，与 Last_times.yml 中的账号顺序无关"""
+        setting = read_config("./config/Setting.yml")
+        return {0: setting["寮三十"]["主账号"], 1: setting["寮三十"]["副账号"]}
 
-    print("        TASK- ----- 开始执行寮三十任务")
-    Hwnd = {}
-    Hwnd[0] = Find_windows(Account[0])
-    Hwnd[1] = Find_windows(Account[1])
-    if Task_Liao_30(Hwnd[0], Hwnd[1], Account):
-        # 更新配置 写入当前时间
-        config = read_config("./config/Last_times.yml")
-        Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        config[Account[0]]["寮三十"] = Now
-        config[Account[1]]["寮三十"] = Now
-        write_config("./config/Last_times.yml", config)
-        print("        TIME- ----- 本次寮三十完成时间")
-        print("        TIME- ----- ", Now)
-        print("        TASK- ----- 寮三十任务完成")
-        return 1
-    else:
-        print("        TASK- ----- 寮三十任务执行过程中出现错误 中断任务")
-        return 0
+    def work(Pair):
+        Hwnd = [Find_windows(Pair[0]), Find_windows(Pair[1])]
+        return Task_Liao_30(Hwnd[0], Hwnd[1], Pair)
+
+    run_shared_task(
+        "寮三十", pair, work,
+        window=(time(9, 0), time(23, 0)),
+    )
+
 
 
 def Task_Liao_30(Hwnd1, Hwnd2, Account):

@@ -6,7 +6,7 @@ import pydirectinput
 import time
 import numpy as np
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import ruamel.yaml
 import subprocess
@@ -613,6 +613,216 @@ def check_lasttime(Account, Times_name):
             print("保存配置失败: ", e)
 
         return Initial_time
+
+
+# ---- 任务准入策略（供 run_accounts_task 使用）----
+# 每个策略接收 (上次完成时间, 当前时间)，返回 True 表示本次可以执行。
+
+def read_accounts():
+    """读取 Last_times.yml 中的账号列表，保持文件中的顺序"""
+    config_data = read_config("./config/Last_times.yml")
+    return list(config_data.keys())
+
+
+def ready_daily(last_time, now):
+    """当日未完成才执行：上次完成时间不是今天"""
+    return last_time.date() != now.date()
+
+
+def ready_weekly(last_time, now):
+    """本周未完成才执行：按 ISO 周比较"""
+    return last_time.isocalendar()[1] != now.isocalendar()[1]
+
+
+def ready_after(hours):
+    """距上次完成满 N 小时才执行（工厂函数）
+
+    :param hours: 冷却小时数
+    :return:      准入判断函数，带 hours 属性供 skip_text 生成文案
+    """
+    def check(last_time, now):
+        return abs(now - last_time) >= timedelta(hours=hours)
+
+    check.hours = hours
+    return check
+
+
+def skip_text(name, ready):
+    """按准入策略生成 SKIP 日志文案
+
+    :param name:  任务名
+    :param ready: 准入判断函数（ready_daily / ready_weekly / ready_after 的产物）
+    """
+    if ready is ready_daily:
+        return "        SKIP- ----- 今日已完成" + name + "任务 跳过"
+    if ready is ready_weekly:
+        return "        SKIP- ----- 本周已完成" + name + "任务 跳过"
+    hours = getattr(ready, "hours", None)
+    if hours:
+        hours_cn = {1: "一小时", 6: "六小时"}.get(hours, str(hours) + "小时")
+        return "        SKIP- ----- " + name + "任务时间间隔未满" + hours_cn + " 跳过"
+    return "        SKIP- ----- " + name + "任务未到执行时间 跳过"
+
+
+def write_task_time(Account, Times_name):
+    """把某账号某任务的成功时间写回 Last_times.yml
+
+    :param Account:    账号名（Last_times.yml 的顶层键）
+    :param Times_name: 任务键（如「逢魔之时」「邮件领取」）
+    :return:           写入的时间字符串，便于调用方打印 TIME- 日志
+    """
+    config = read_config("./config/Last_times.yml")
+    Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    config[Account][Times_name] = Now
+    write_config("./config/Last_times.yml", config)
+    return Now
+
+
+# ---- 单账号任务的固定流程 ----
+
+TASK_LINE_WIDTH = 84  # 任务分隔线总宽度（统一值）
+
+
+def _task_line(title):
+    """输出一条总宽 TASK_LINE_WIDTH 的 TASK- 分隔线"""
+    print("TASK- ----- " + title + " " + "-" * (TASK_LINE_WIDTH - 12 - len(title) - 1))
+
+
+def _fmt_window(window):
+    """把时间窗 (time, time) 格式化为 'HH:MM-HH:MM'"""
+    return window[0].strftime("%H:%M") + "-" + window[1].strftime("%H:%M")
+
+
+def run_accounts_task(name, ready, work, window=None, write_back=True):
+    """单账号任务的固定流程：时间窗 → 遍历账号 → 准入判断 → 执行业务 → 写回时间
+
+    所有日志文案由任务名与时间窗自动生成，调用方只需描述"这个任务是什么"。
+
+    :param name:       任务名（同时是 Last_times.yml 的任务键）
+    :param ready:      准入判断函数 (last_time, now) -> bool；
+                       None 表示硬跑：不读上次时间、不判断冷却与时间窗，直接执行
+    :param work:       业务执行函数 (Account) -> 真值表示成功
+    :param window:     时间窗 (begin, end)，None 表示不限；ready=None 时忽略
+    :param write_back: 成功后是否写回时间（纸人奖励不写回）
+    """
+    _task_line("开始" + name + "任务")
+
+    if ready is not None:
+        # ---- 按需跑：时间窗 + 读上次时间 + 冷却判断 ----
+        now = datetime.now()
+        if window is not None:
+            if not (window[0] <= now.time() <= window[1]):
+                print("TASK- ----- 当前时间不在" + _fmt_window(window) + "之间 跳过")
+                _task_line(name + "任务结束")
+                return
+            print("TASK- ----- 当前时间在" + _fmt_window(window) + "之间 开始执行" + name + "任务")
+
+        for Account in read_accounts():
+            check_stop()
+            print("    切换到 ", Account, " 账号")
+            print("        TIME- ----- 读取上次账号", Account, "完成" + name + "任务时间")
+            last_time = check_lasttime(Account, name)
+            now = datetime.now()
+            if ready(last_time, now):
+                if work(Account):
+                    Now = write_task_time(Account, name) if write_back else None
+                    if write_back:
+                        print("        TIME- ----- 本次" + name + "完成时间")
+                        print("        TIME- ----- ", Now)
+                    else:
+                        # 不写回的任务（如纸人奖励）只打印时间，不打印"本次…完成时间"
+                        print("        TIME- ----- ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    print("        TASK- ----- " + name + "任务完成")
+                else:
+                    print("        TASK- ----- " + name + "任务执行过程中出现错误 中断任务")
+            else:
+                print(skip_text(name, ready))
+    else:
+        # ---- 硬跑：不读上次时间，直接执行 ----
+        for Account in read_accounts():
+            check_stop()
+            print("    切换到 ", Account, " 账号")
+            if work(Account):
+                Now = write_task_time(Account, name) if write_back else None
+                if write_back:
+                    print("        TIME- ----- 本次" + name + "完成时间")
+                    print("        TIME- ----- ", Now)
+                else:
+                    # 不写回的任务（如纸人奖励）只打印时间，不打印"本次…完成时间"
+                    print("        TIME- ----- ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                print("        TASK- ----- " + name + "任务完成")
+            else:
+                print("        TASK- ----- " + name + "任务执行过程中出现错误 中断任务")
+
+    _task_line(name + "任务结束")
+
+
+# ---- 双账号协作任务的固定流程 ----
+
+def write_task_time_pair(Accounts, Times_name):
+    """把同一时间写回多个账号（一次读、全部写、一次存）
+
+    :param Accounts:   账号容器，支持 Accounts[0] / Accounts[1] 索引
+                       （list 或 dict 均可，与 Task_Liao_30 的参数形式保持一致）
+    :param Times_name: 任务键
+    :return:           写入的时间字符串
+    """
+    config = read_config("./config/Last_times.yml")
+    Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for i in range(len(Accounts)):
+        config[Accounts[i]][Times_name] = Now
+    write_config("./config/Last_times.yml", config)
+    return Now
+
+
+def run_shared_task(name, pair, work, window=None):
+    """双账号协作任务的固定流程：两账号一起判定，任一未完成则整体执行一次
+
+    与 run_accounts_task 的区别：
+    - 判定是「或」：任一账号未完成就执行
+    - 业务只执行一次（需要两个窗口同时操作）
+    - 成功时给主副账号都写回时间
+
+    :param name:   任务名（Last_times.yml 的任务键）
+    :param pair:   取主副账号的回调 () -> [主账号, 副账号]（通常来自 Setting.yml）
+    :param work:   业务执行函数 (Accounts) -> 真值表示成功
+    :param window: 时间窗 (begin, end)，None 表示不限
+    """
+    _task_line("开始" + name + "任务")
+
+    now = datetime.now()
+    if window is not None:
+        if not (window[0] <= now.time() <= window[1]):
+            print("TASK- ----- 时间不在" + _fmt_window(window) + "之间 跳过")
+            _task_line(name + "任务结束")
+            return
+        print("TASK- ----- 当前时间在" + _fmt_window(window) + "之间 可以执行" + name + "任务")
+
+    # 用 Last_times.yml 的账号判断「该不该跑」
+    Accounts = read_accounts()
+    Flag = {}
+    for i in range(2):
+        check_stop()
+        print("        TIME- ----- 读取上次账号", Accounts[i], "完成" + name + "任务时间")
+        last_time = check_lasttime(Accounts[i], name)
+        Flag[i] = now.date() == last_time.date()
+
+    if not (Flag[0] and Flag[1]):
+        # 用 Setting.yml 的主副账号决定「谁跟谁配对跑」
+        Pair = pair()
+        print("        TASK- ----- 开始执行" + name + "任务")
+        if work(Pair):
+            Now = write_task_time_pair(Pair, name)
+            print("        TIME- ----- 本次" + name + "完成时间")
+            print("        TIME- ----- ", Now)
+            print("        TASK- ----- " + name + "任务完成")
+        else:
+            print("        TASK- ----- " + name + "任务执行过程中出现错误 中断任务")
+    else:
+        for i in range(2):
+            print("        SKIP- ----- 今日账号", Accounts[i], "已完成" + name + "任务 跳过")
+
+    _task_line(name + "任务结束")
 
 
 def Itface_Quit(Hwnd):

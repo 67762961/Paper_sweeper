@@ -33,11 +33,11 @@ flowchart LR
     FO --> T2["MainTask_Jiejieyangcheng"]
     FO --> T3["MainTask_Digui"]
     FO --> T4["FullTask_Thirty\n含真蛇"]
-    FO --> T5["FullTask_JiejieFight"]
+    FO --> T5["MainTask_JiejieFight"]
     FO --> T6["MainTask_Shouliezhan"]
     FO --> T7["MainTask_Fengmo"]
     SO --> T1 & T2 & T3 & T4 & T5 & T6 & T7
-    T1 & T2 & T3 & T4 & T5 & T6 & T7 --> LIB["Lib.py\n识别/点击/界面/配置"]
+    T1 & T2 & T3 & T4 & T5 & T6 & T7 --> LIB["Lib.py\n识别/点击/界面/配置\nrun_accounts_task 统一流程"]
     LIB --> CFG["config/Setting.yml\nconfig/Last_times.yml"]
     LIB --> PIC["pic/**\n模板图片"]
     FO --> LOG["logs/<date>/console_output_*.log"]
@@ -248,7 +248,7 @@ Single_operation(task_key, console_signal=None)  # 单任务运行
 | 2 | `jiejieyangcheng` | 结界养成 | `MainTask_Jiejieyangcheng()` | `Task_Jiejieyangcheng.py` | 结界养成 | 寮界面：工资/体力、寄养、结界卡、白达摩育成、食盒酒壶 |
 | 3 | `digui` | 地域鬼王 | `MainTask_Digui()` | `Task_Digui.py` | 地域鬼王 | 经探索→六道进入地鬼，时间窗 12:00–23:50，当日冷却 |
 | 4 | `thirty` | 寮三十 / 真蛇 | `FullTask_Thirty()` | `Task_Thirty.py` | 寮三十（真蛇为周更，不参与今日判定） | 寮三十协作刷本 + 非周末真蛇（周冷却） |
-| 5 | `jiejiefight` | 结界突破 | `FullTask_JiejieFight()` | `Task_JiejieFight.py` | 结界突破 | 结界突破，时间窗 7:00–23:00，1 小时冷却 |
+| 5 | `jiejiefight` | 结界突破 | `MainTask_JiejieFight()` | `Task_JiejieFight.py` | 结界突破 | 结界突破，时间窗 7:00–23:00，1 小时冷却 |
 | 6 | `shouliezhan` | 狩猎战 / 阴界 | `MainTask_Shouliezhan()` | `Task_Shouliezhan.py` | 狩猎战 | 周四–周日阴界之门；其余日麒麟狩猎战（当日冷却） |
 | 7 | `fengmo` | 逢魔之时 | `MainTask_Fengmo()` | `Task_Fengmo.py` | 逢魔之时 | 逢魔之时，时间窗 17:00–21:50，当日冷却 |
 
@@ -275,7 +275,32 @@ Single_operation(task_key, console_signal=None)  # 单任务运行
 | 界面 | `Itface_Quit` / `Itface_scroll` / `Itface_guild` / `Itface_daily` / `Itface_explore` | 退出界面、卷轴、阴阳寮、日常外显入口、探索/六道 |
 | 编队 | `Team_Preset` | 式神录→预设编组→队伍→应用御魂预设 |
 | 配置 | `read_config` / `write_config` / `check_lasttime` | YAML 读写；`Last_times.yml` 时间读取与缺失初始化 |
+| 编排 | `run_accounts_task` | **单账号任务固定流程**：分隔线 → 时间窗 → 遍历账号 → 取上次时间 → 准入判断 → 执行业务 → 写回时间。参数 `(name, ready, work, window=None, write_back=True)`；`ready=None` 表示硬跑（不读上次时间、不判断冷却与时间窗） |
+| 编排 | `run_shared_task` | **双账号协作任务固定流程**：两账号一起判定（任一未完成即执行），业务只执行一次，成功后主副账号双写。参数 `(name, pair, work, window=None)` |
+| 编排 | `ready_daily` / `ready_weekly` / `ready_after(hours)` | 准入策略：当日冷却 / 周冷却 / 距上次满 N 小时 |
+| 编排 | `skip_text` | 按准入策略生成 SKIP 日志文案 |
+| 编排 | `write_task_time` / `write_task_time_pair` | 写回单个账号 / 双账号的完成时间 |
 | 中断 | `TaskStopped` / `request_stop` / `reset_stop` / `stop_requested` / `check_stop` / `_sleep_with_stop` | 中断信号与检查点：`check_stop` 在已请求时抛 `TaskStopped`；`_sleep_with_stop` 按 0.2s 切片睡眠 |
+
+#### 任务入口编写约定（PR2 起）
+
+单账号任务的入口只需声明「这个任务是什么」，不再手写控制流与日志：
+
+```python
+def MainTask_Fengmo():
+    run_accounts_task(
+        "逢魔之时", ready_daily,
+        work=lambda Account: Task_Fengmo(Find_windows(Account), Account),
+        window=(time(17, 0), time(21, 50)),
+    )
+```
+
+- 任务名同时是 `Last_times.yml` 的任务键
+- 日志文案（开始/结束分隔线、读取上次时间、成功/失败/SKIP）全部由任务名与时间窗自动生成
+- 需要「硬跑」（跳过冷却与时间窗）时传 `ready=None`
+- 不写回时间的任务（如纸人奖励）传 `write_back=False`
+- 双账号协作任务用 `run_shared_task`
+- 分隔线统一为 84 字符（`Lib.TASK_LINE_WIDTH`）
 
 ### 5.5 中断机制（协作式）
 

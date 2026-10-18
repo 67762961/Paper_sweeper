@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from Lib import Find_in_windows_Matchs, Find_windows, Find_Click_windows, Click, Itface_Host, read_config, write_config, Itface_scroll, check_lasttime, Sleep_print, Esc_print
+from Lib import Find_in_windows_Matchs, Find_windows, Find_Click_windows, Click, Itface_Host, read_config, write_config, Itface_scroll, check_lasttime, Sleep_print, Esc_print, run_accounts_task, ready_daily, ready_after
 
 
 def MainTask_Signin():
@@ -25,32 +25,10 @@ def MainTask_Mail():
     """
     邮件主任务
     """
-    print("        ")
-    print("TASK- ----- 开始执行邮件任务 ----------------------------------------------------------------")
-    current_time = datetime.now()
-    config_data = read_config("./config/Last_times.yml")
-    headers = list(config_data.keys())
-    for Account in headers:
-        print("    切换到 ", Account, " 账号")
-        print("        TIME- ----- 读取上次账号", Account, "完成邮件时间")
-        Times_youjian = check_lasttime(Account, "邮件领取")
-        current_time = datetime.now()
-        if abs(current_time - Times_youjian) >= timedelta(hours=1):
-            Hwnd = Find_windows(Account)
-            if Work_Mail(Hwnd, Account):
-                # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.yml")
-                Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                config[Account]["邮件领取"] = Now
-                write_config("./config/Last_times.yml", config)
-                print("        TIME- ----- 本次邮件领取时间")
-                print("        TIME- ----- ", Now)
-                print("        TASK- ----- 邮件领取完成")
-            else:
-                print("        TASK- ----- 邮件领取任务执行过程中出现错误 中断任务")
-        else:
-            print("        SKIP- ----- 邮件查看时间间隔未满一小时 跳过")
-    print("TASK- ----- 邮件任务执行完毕 ----------------------------------------------------------------")
+    run_accounts_task(
+        "邮件领取", ready_after(1),
+        work=lambda Account: Work_Mail(Find_windows(Account), Account),
+    )
 
 
 def Work_Mail(Hwnd, Account):
@@ -138,34 +116,10 @@ def MainTask_Fudai():
     """
     福袋主任务
     """
-    print("        ")
-    print("TASK- ----- 开始执行福袋任务 ----------------------------------------------------------------")
-    current_time = datetime.now()
-    config_data = read_config("./config/Last_times.yml")
-    headers = list(config_data.keys())
-
-    for Account in headers:
-        print("    切换到 ", Account, " 账号")
-        print("        TIME- ----- 读取上次账号", Account, "领取福袋时间")
-        Times_fudai = check_lasttime(Account, "福袋纸人")
-        current_time = datetime.now()
-        if Times_fudai.date() != current_time.date():
-            Hwnd = Find_windows(Account)
-            if Fudai(Hwnd, Account):
-                # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.yml")
-                current_time = datetime.now()
-                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                config[Account]["福袋纸人"] = Now
-                write_config("./config/Last_times.yml", config)
-                print("        TIME- ----- 本次福袋小纸人领取时间: ")
-                print("        TIME- ----- ", Now)
-                print("        TASK- ----- 福袋小纸人领取成功")
-            else:
-                print("        TASK- ----- 福袋小纸人领取任务执行过程中出现错误 中断任务")
-        else:
-            print("        SKIP- ----- 今天已经领取过福袋纸人 跳过")
-    print("TASK- ----- 福袋任务执行完毕 ----------------------------------------------------------------")
+    run_accounts_task(
+        "福袋纸人", ready_daily,
+        work=lambda Account: Fudai(Find_windows(Account), Account),
+    )
 
 
 def Fudai(Hwnd, Account):
@@ -193,34 +147,10 @@ def MainTask_Qiandao():
     """
     签到主任务
     """
-    print("        ")
-    print("TASK- ----- 开始执行签到任务 ----------------------------------------------------------------")
-    current_time = datetime.now()
-    config_data = read_config("./config/Last_times.yml")
-    headers = list(config_data.keys())
-
-    for Account in headers:
-        print("    切换到 ", Account, " 账号")
-        print("        TIME- ----- 读取上次账号", Account, "每日一签时间")
-        current_time = datetime.now()
-        Times_qiandao = check_lasttime(Account, "每日一签")
-        if Times_qiandao.date() != current_time.date():
-            Hwnd = Find_windows(Account)
-            if Qiandao(Hwnd, Account):
-                # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.yml")
-                current_time = datetime.now()
-                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                config[Account]["每日一签"] = Now
-                write_config("./config/Last_times.yml", config)
-                print("        TIME- ----- 本次每日一签时间: ")
-                print("        TIME- ----- ", Now)
-                print("        TASK- ----- 每日一签成功")
-            else:
-                print("        TASK- ----- 每日一签任务执行过程中出现错误 中断任务")
-        else:
-            print("        SKIP- ----- 今天已经完成每日一签 跳过")
-    print("TASK- ----- 每日一签执行完毕 ----------------------------------------------------------------")
+    run_accounts_task(
+        "每日一签", ready_daily,
+        work=lambda Account: Qiandao(Find_windows(Account), Account),
+    )
 
 
 def Qiandao(Hwnd, Account):
@@ -268,22 +198,12 @@ def MainTask_Zhiren():
     """
     纸人奖励主任务
     """
-    print("        ")
-    print("TASK- ----- 开始领取纸人奖励 ----------------------------------------------------------------")
-    current_time = datetime.now()
-    config_data = read_config("./config/Last_times.yml")
-    headers = list(config_data.keys())
-
-    for Account in headers:
-        print("    切换到 ", Account, " 账号")
-        Hwnd = Find_windows(Account)
-        if zhirenjiangli(Hwnd):
-            Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print("        TIME- ----- ", Now)
-            print("        TASK- ----- 纸人奖励领取成功")
-        else:
-            print("        TASK- ----- 纸人奖励领取任务执行过程中出现错误 中断任务")
-    print("TASK- ----- 纸人奖励领取完毕 ----------------------------------------------------------------")
+    # 纸人奖励不写回时间，因此 ready=None（硬跑）+ write_back=False
+    run_accounts_task(
+        "纸人奖励", None,
+        work=lambda Account: zhirenjiangli(Find_windows(Account)),
+        write_back=False,
+    )
 
 
 def zhirenjiangli(Hwnd):
@@ -323,34 +243,10 @@ def MainTask_mianfeilibao():
     """
     商店免费礼包主任务
     """
-    print("        ")
-    print("TASK- ----- 开始领取商店礼包 ----------------------------------------------------------------")
-    current_time = datetime.now()
-    config_data = read_config("./config/Last_times.yml")
-    headers = list(config_data.keys())
-
-    for Account in headers:
-        print("    切换到 ", Account, " 账号")
-        print("        TIME- ----- 读取上次账号", Account, "领取商店免费礼包时间")
-        current_time = datetime.now()
-        Times_mianfeilibao = check_lasttime(Account, "免费礼包")
-        if Times_mianfeilibao.date() != current_time.date():
-            Hwnd = Find_windows(Account)
-            if mianfeilibao(Hwnd, Account):
-                # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.yml")
-                current_time = datetime.now()
-                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                config[Account]["免费礼包"] = Now
-                write_config("./config/Last_times.yml", config)
-                print("        TIME- ----- 本次商店免费礼包领取时间: ")
-                print("        TIME- ----- ", Now)
-                print("        TASK- ----- 商店免费礼包领取成功")
-            else:
-                print("        TASK- ----- 商店免费礼包任务执行过程中出现错误 中断任务")
-        else:
-            print("        SKIP- ----- 今天已经领取过商店免费礼包 跳过")
-    print("TASK- ----- 商店礼包领取完毕 ----------------------------------------------------------------")
+    run_accounts_task(
+        "免费礼包", ready_daily,
+        work=lambda Account: mianfeilibao(Find_windows(Account), Account),
+    )
 
 
 def mianfeilibao(Hwnd, Account):
@@ -401,34 +297,10 @@ def MainTask_youqingdain():
     """
     友情点主任务
     """
-    print("        ")
-    print("TASK- ----- 开始领取友情奖励 ----------------------------------------------------------------")
-    current_time = datetime.now()
-    config_data = read_config("./config/Last_times.yml")
-    headers = list(config_data.keys())
-
-    for Account in headers:
-        print("    切换到 ", Account, " 账号")
-        print("        TIME- ----- 读取上次账号", Account, "领取友情点以及吉闻祝福时间")
-        current_time = datetime.now()
-        Times_youqingdian = check_lasttime(Account, "送友情点")
-        if Times_youqingdian.date() != current_time.date():
-            Hwnd = Find_windows(Account)
-            if youqingdain(Hwnd, Account):
-                # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.yml")
-                current_time = datetime.now()
-                Now = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                config[Account]["送友情点"] = Now
-                write_config("./config/Last_times.yml", config)
-                print("        TIME- ----- 本次领取友情点以及吉闻祝福时间: ")
-                print("        TIME- ----- ", Now)
-                print("        TASK- ----- 友情点以及吉闻祝福领取成功")
-            else:
-                print("        TASK- ----- 领取友情点以及吉闻祝福任务执行过程中出现错误 中断任务")
-        else:
-            print("        SKIP- ----- 今天已经领取过友情点以及吉闻祝福 跳过")
-    print("TASK- ----- 友情奖励领取完毕 ----------------------------------------------------------------")
+    run_accounts_task(
+        "送友情点", ready_daily,
+        work=lambda Account: youqingdain(Find_windows(Account), Account),
+    )
 
 
 def youqingdain(Hwnd, Account):
