@@ -10,7 +10,7 @@
 说明：
 - 打包配置来自项目根目录的 GUI.spec（onefile、无控制台窗口），通过 --distpath 指定输出位置。
 - pic/ 与 config/ 属于运行期外部资源，不打进 exe；exe 需要和它们放在同一目录下运行。
-- GUI.py 会 import config，因此打包前若缺少 config.py 会自动生成最小版本（stop_thread = False）。
+- ui/window.py 会 import config，因此打包前若缺少 config.py 会自动生成最小版本（stop_thread = False）。
 - 若根目录 GUI.exe 正在运行会被系统锁定，脚本会在打包前直接报错提示，避免打包到一半失败。
 """
 
@@ -30,11 +30,11 @@ APP_NAME = "GUI"  # 产物名，与 GUI.spec 中的 name 保持一致
 MIN_PYTHON = (3, 11)  # 项目要求 Python 3.11+
 CONFIG_PY = "config.py"
 
-# 缺少 config.py 时自动生成的最小内容（GUI.py 只依赖 stop_thread）
+# 缺少 config.py 时自动生成的最小内容（ui/window.py 与 Lib.py 只依赖 stop_thread）
 DEFAULT_CONFIG_PY = '''# -*- coding: utf-8 -*-
 """项目级运行时开关（由 build_exe.py 自动生成的最小内容）。
 
-GUI.py 通过 config.stop_thread 控制任务线程，后续需要额外开关时在此文件追加。
+ui/window.py 与 Lib.py 通过 config.stop_thread 控制任务线程，后续需要额外开关时在此文件追加。
 """
 
 stop_thread = False

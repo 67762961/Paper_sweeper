@@ -191,7 +191,7 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 
 「中断运行」按钮位于「完整运行」左侧，为次要色轮廓按钮，**仅运行中可点**；点击后按钮变「中断中…」并禁用，防止连点。中断不处理游戏内状态（不拉回庭院、不做收尾操作），任务停在哪就是哪。
 
-注意：`GUI.py` / `test_main.py` 会 `import config`。仓库中当前没有 `config.py` 源文件；本地运行前需在项目根目录自备，至少包含：
+注意：`ui/window.py` 与 `Lib.py` 会在运行时 `import config`（`GUI.py` 本身不直接引入）。该文件属于运行期本地模块，**已被 `.gitignore` 忽略、不在版本库中**；本地运行前需在项目根目录自备，至少包含：
 
 ```python
 stop_thread = False
@@ -387,7 +387,8 @@ GUI 的「中断运行」走**协作式中断**，不用 `QThread.terminate()`�
 ### 6.5 项目级 `config.py`
 
 - 用途：运行期开关，目前只有 `config.stop_thread`（中断请求的兼容通道）。
-- 状态：源码树中不存在该文件；属于运行时必需的本地模块。
+- 状态：**被 `.gitignore` 忽略，不在版本库中**（历史上曾入库，已移除）；属于运行时必需的本地模块。
+- 引用方：`ui/window.py`（GUI 中断入口置位）与 `Lib.py`（`stop_requested()` 消费）；`GUI.py` 本身不直接 `import config`。
 - 最小内容：`stop_thread = False`。
 - 中断语义：`stop_thread = True` 会被 `Lib.stop_requested()` 消费，与 `Lib.request_stop()` 等价；GUI 的「中断运行」与「运行中关闭窗口」两条路径都会置位。
 - 生成方式：可手写，也可执行 `python build_exe.py` 时由脚本自动生成（已存在则不改动）。

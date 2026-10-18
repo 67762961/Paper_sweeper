@@ -53,11 +53,13 @@ pip install -r requirements.txt
 
 1. **`config/Setting.yml`** —— 启动命令与任务参数（示例结构见下）。
 2. **`config/Last_times.yml`** —— 可为空；首次运行会按账号/任务自动初始化。
-3. **`config.py`（项目根目录）** —— GUI 使用的停止标志模块，最小内容：
+3. **`config.py`（项目根目录）** —— 运行期停止标志模块，**已被 `.gitignore` 忽略、不在版本库中**；由 `ui/window.py` 与 `Lib.py` 在运行时 `import config`。最小内容：
 
    ```python
    stop_thread = False
    ```
+
+   执行 `python build_exe.py` 时若缺失会自动生成。
 
 4. **`pic/`** —— 界面模板图目录，须与你的窗口分辨率/皮肤一致；缺失模板会导致对应步骤识别失败。
 
@@ -197,11 +199,12 @@ python build_exe.py --fresh    # 先删除 build/ 与残留 dist/，做全新构
 
 ```
 Paper_sweeper/
-├── GUI.py                 # 图形界面入口（7 行任务：今日状态 / 单跑 / 开关 + 控制台）
+├── GUI.py                 # 图形界面入口（环境变量 / 日志 / 异常钩子）
 ├── GUI.spec               # PyInstaller 打包配置
 ├── build_exe.py           # 一键打包脚本（调用 GUI.spec，产物输出到根目录）
 ├── main.py                # 任务注册表、完整/单任务运行编排、任务开关与日志 Tee
 ├── Lib.py                 # 识别、点击、界面状态机、配置、编队
+├── ui/                    # 界面层（theme → icons → widgets → panels → window）
 ├── Task_SignIn.py         # 登录收菜
 ├── Task_Jiejieyangcheng.py# 结界养成
 ├── Task_Digui.py          # 地域鬼王
@@ -210,12 +213,14 @@ Paper_sweeper/
 ├── Task_Shouliezhan.py    # 狩猎战 / 阴界
 ├── Task_Fengmo.py         # 逢魔之时
 ├── pic/                   # 界面模板图（按业务分子目录）
-├── config/                # Setting.yml / Last_times.yml / Gui_state.yml（本地）
+├── config/                # Setting.yml / Last_times.yml / Gui_state.yml / gui.json（本地）
 ├── logs/                  # 运行日志
 ├── requirements.txt
 ├── AGENTS.md              # 协作与编码约定（开发向）
 └── ARCHITECTURE.md        # 架构与任务地图（开发向）
 ```
+
+> `config.py`、`config/`、`logs/`、`build/`、`GUI.exe`、`app_crash.log` 均为运行期产物，已被 `.gitignore` 忽略，故不列在上方结构里。
 
 更细的调用链、状态机与实施约束见 [ARCHITECTURE.md](./ARCHITECTURE.md)；提交代码前的约定见 [AGENTS.md](./AGENTS.md)。
 
@@ -224,7 +229,7 @@ Paper_sweeper/
 ## 常见问题
 
 **Q：点击「完整运行」后立即报 `ModuleNotFoundError: No module named 'config'`？**  
-A：项目根目录缺少 `config.py`。创建该文件并写入 `stop_thread = False`。
+A：项目根目录缺少 `config.py`。创建该文件并写入 `stop_thread = False`（或执行 `python build_exe.py` 自动生成）。该文件已被 `.gitignore` 忽略，克隆仓库后不会自带。
 
 **Q：一直提示「未检测到窗口」？**  
 A：检查游戏是否已启动、窗口标题是否包含 `Setting.yml` 中的账号名（`master`/`slaves`）；若走自动启动，核对 `启动命令` 路径与 `-v` 实例号。
