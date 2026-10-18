@@ -757,6 +757,74 @@ def run_accounts_task(name, ready, work, window=None, write_back=True):
     _task_line(name + "任务结束")
 
 
+# ---- 双账号协作任务的固定流程 ----
+
+def write_task_time_pair(Accounts, Times_name):
+    """把同一时间写回多个账号（一次读、全部写、一次存）
+
+    :param Accounts:   账号容器，支持 Accounts[0] / Accounts[1] 索引
+                       （list 或 dict 均可，与 Task_Liao_30 的参数形式保持一致）
+    :param Times_name: 任务键
+    :return:           写入的时间字符串
+    """
+    config = read_config("./config/Last_times.yml")
+    Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for i in range(len(Accounts)):
+        config[Accounts[i]][Times_name] = Now
+    write_config("./config/Last_times.yml", config)
+    return Now
+
+
+def run_shared_task(name, pair, work, window=None):
+    """双账号协作任务的固定流程：两账号一起判定，任一未完成则整体执行一次
+
+    与 run_accounts_task 的区别：
+    - 判定是「或」：任一账号未完成就执行
+    - 业务只执行一次（需要两个窗口同时操作）
+    - 成功时给主副账号都写回时间
+
+    :param name:   任务名（Last_times.yml 的任务键）
+    :param pair:   取主副账号的回调 () -> [主账号, 副账号]（通常来自 Setting.yml）
+    :param work:   业务执行函数 (Accounts) -> 真值表示成功
+    :param window: 时间窗 (begin, end)，None 表示不限
+    """
+    _task_line("开始" + name + "任务")
+
+    now = datetime.now()
+    if window is not None:
+        if not (window[0] <= now.time() <= window[1]):
+            print("TASK- ----- 时间不在" + _fmt_window(window) + "之间 跳过")
+            _task_line(name + "任务结束")
+            return
+        print("TASK- ----- 当前时间在" + _fmt_window(window) + "之间 可以执行" + name + "任务")
+
+    # 用 Last_times.yml 的账号判断「该不该跑」
+    Accounts = read_accounts()
+    Flag = {}
+    for i in range(2):
+        check_stop()
+        print("        TIME- ----- 读取上次账号", Accounts[i], "完成" + name + "任务时间")
+        last_time = check_lasttime(Accounts[i], name)
+        Flag[i] = now.date() == last_time.date()
+
+    if not (Flag[0] and Flag[1]):
+        # 用 Setting.yml 的主副账号决定「谁跟谁配对跑」
+        Pair = pair()
+        print("        TASK- ----- 开始执行" + name + "任务")
+        if work(Pair):
+            Now = write_task_time_pair(Pair, name)
+            print("        TIME- ----- 本次" + name + "完成时间")
+            print("        TIME- ----- ", Now)
+            print("        TASK- ----- " + name + "任务完成")
+        else:
+            print("        TASK- ----- " + name + "任务执行过程中出现错误 中断任务")
+    else:
+        for i in range(2):
+            print("        SKIP- ----- 今日账号", Accounts[i], "已完成" + name + "任务 跳过")
+
+    _task_line(name + "任务结束")
+
+
 def Itface_Quit(Hwnd):
     """
     检测是否有退出界面 有则esc解除
