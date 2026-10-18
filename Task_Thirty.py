@@ -281,7 +281,7 @@ def Yuhun(Hwnd1, Hwnd2, Account, Fuben, Times):
                 print("    切换到 ", Account[1], " 账号")
                 Esc_print(Hwnd[1])
                 Sleep_print(1)
-                Find = Find_Click_windows(Hwnd[1], "./pic/common/Queding.png", 0.03, "点击确定", "未找到确定图标")
+                Find = Find_Click_windows(Hwnd[1], "./pic/common/确定.png", 0.03, "点击确定", "未找到确定图标")
                 Itface_Host(Hwnd[1])
                 if Find:
                     print("        STEP- vvvvv 跳转庭院界面")
@@ -435,7 +435,7 @@ def Real_Snake(current_state, Hwnd, Account):
             case "创建队伍":
                 print("    切换到 ", Account[0], " 账号")
                 Find_Click_windows(Hwnd[0], "./pic/thirty/真蛇挑战图标.png", 0.05, "点击真蛇挑战图标", "未找到真蛇挑战图标")
-                Find_Click_windows(Hwnd[0], "./pic/common/Queding.png", 0.03, "点击确定", "未找到确定图标")
+                Find_Click_windows(Hwnd[0], "./pic/common/确定.png", 0.03, "点击确定", "未找到确定图标")
                 Sleep_print(1)
                 Range, Matchs = Find_in_windows_Matchs(Hwnd[0], "./pic/thirty/邀请好友和寮成员.png", 0.03, 0)
                 if Range:
@@ -450,7 +450,7 @@ def Real_Snake(current_state, Hwnd, Account):
                 print("    切换到 ", Account[1], " 账号")
                 Find = Find_Click_windows(Hwnd[1], "./pic/thirty/点击加入.png", 0.03, "点击加入队伍", "未找到点击加入")
                 if Find:
-                    Find_Click_windows(Hwnd[1], "./pic/common/Queding.png", 0.03, "点击确定", "未找到确定图标")
+                    Find_Click_windows(Hwnd[1], "./pic/common/确定.png", 0.03, "点击确定", "未找到确定图标")
                     print("        STEP- vvvvv 跳转准备挑战")
                     current_state = "准备挑战"
                 else:

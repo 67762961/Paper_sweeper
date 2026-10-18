@@ -154,14 +154,14 @@ def Work_Salary(Hwnd):
     if Find_Click_windows(Hwnd, "./pic/guild/Jinbigongzi.png", 0.05, "点击工资", "未检测到工资"):
 
         if Find_Click_windows(Hwnd, "./pic/guild/Lingqu.png", 0.05, "领取工资", "领取工资异常"):
-            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
+            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
             if Find:
                 print("        INFO-", Matchs, "领取体力工资成功")
                 Esc_print(Hwnd)
                 Sleep_print(1)
 
     if Find_Click_windows(Hwnd, "./pic/guild/Tiligongzi.png", 0.05, "领取体力工资", "未检测到体力工资"):
-        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
+        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
         if Find:
             print("        INFO-", Matchs, "领取体力工资成功")
             Esc_print(Hwnd)
@@ -175,7 +175,7 @@ def Jiyangjiangli(Hwnd):
     for i in range(1):
         if not Find_Click_windows(Hwnd, "./pic/guild/Jiyangjingyan.png", 0.05, "检测到寄养奖励", "未检测到寄养奖励"):
             break
-        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
+        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
         if Find:
             print("        INFO-", Matchs, "寄养奖励领取成功")
             Sleep_print(1)
@@ -194,7 +194,7 @@ def Tilishihe(Hwnd):
 
         Find_Click_windows(Hwnd, "./pic/guild/Quchu.png", 0.05, "取出体力食盒", "取出体力食盒异常")
         Sleep_print(1)
-        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
+        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
         if Find:
             print("        INFO-", Matchs, "体力食盒领取成功")
             Esc_print(Hwnd)
@@ -244,7 +244,7 @@ def Jiejiekajiangli(Hwnd):
     for i in range(1):
         if Find_Click_windows(Hwnd, "./pic/guild/Jiejiekajiangli.png", 0.05, "检测到结界卡奖励 点击领取", "未检测到结界卡结束奖励"):
             Sleep_print(0.5)
-            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
+            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
             if Find:
                 print("        INFO-", Matchs, "结界卡奖励领取成功")
             else:

@@ -22,7 +22,7 @@ def Task_Fengmo(Hwnd, Account):
     print("        INFO- ----- 前往逢魔界面")
     Itface_daily(Hwnd)
     Range = Find_Click_windows(Hwnd, "./pic/fengmo/Fengmotubiao.png", 0.05, "点击逢魔图标", "未检测到逢魔图标")
-    Range = Find_Click_windows(Hwnd, "./pic/courtyard/Qianwang.png", 0.05, "点击前往", "未检测到前往图标")
+    Range = Find_Click_windows(Hwnd, "./pic/courtyard/前往.png", 0.05, "点击前往", "未检测到前往图标")
     if Range:
         Sleep_print(3)
         # 先点封魔再打boss
@@ -58,7 +58,7 @@ def meirifengmo(Hwnd):
     for i in range(3):
         flag = Find_Click_windows(Hwnd, "./pic/fengmo/Fengmojiangli.png", 0.05, "点击逢魔奖励", "未检测到现世逢魔奖励")
         if flag:
-            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Huodejiangli.png", 0.05, 0)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
             if Range:
                 print("        INFO-", Matchs, "逢魔奖励领取成功")
                 Sleep_print(2)

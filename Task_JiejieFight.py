@@ -77,14 +77,14 @@ def JiejieFight(Hwnd, Account):
                         if Num < Num_Start:
                             Find = Find_Click_windows(Hwnd, "./pic/breakthrough/刷新.png", 0.05, "点击刷新图标", "未检测到刷新图标")
                             if Find:
-                                Find_Click_windows(Hwnd, "./pic/common/Queding.png", 0.05, "点击确定", "未检测到确定图标")
+                                Find_Click_windows(Hwnd, "./pic/common/确定.png", 0.05, "点击确定", "未检测到确定图标")
                                 print("        STEP- vvvvv 跳转结界突破界面")
                                 current_state = "结界突破界面"
                                 Flag_Skip = True
                             else:
                                 print("        INFO- ----- 勋章少于", Num_Start, "个 跳过结界突破任务")
 
-                                Find_Click_windows(Hwnd, "./pic/common/Cha.png", 0.05, "关闭结界突破界面", "未检测到关闭图标")
+                                Find_Click_windows(Hwnd, "./pic/common/关闭.png", 0.05, "关闭结界突破界面", "未检测到关闭图标")
                                 Itface_Host(Hwnd)
                                 return 0
                         else:
@@ -156,7 +156,7 @@ def JiejieFight(Hwnd, Account):
                         Sleep_print(0.5)
                         Esc_print(Hwnd)
                         Sleep_print(0.5)
-                        Find = Find_Click_windows(Hwnd, "./pic/common/Queding.png", 0.05, "点击确定", "未检测到确定按钮")
+                        Find = Find_Click_windows(Hwnd, "./pic/common/确定.png", 0.05, "点击确定", "未检测到确定按钮")
                         if Find:
                             break
 
@@ -171,11 +171,11 @@ def JiejieFight(Hwnd, Account):
                             print("        INFO- ----- 未发现再次挑战按钮 继续等待 已等待 {waittime} 秒".format(waittime=wait + 3))
 
                     Sleep_print(1)
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/Queding.png", 0.05, 0)
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/确定.png", 0.05, 0)
                     if Range:
                         print("        INFO- ----- 出现再次挑战二次确认弹框 点击确认")
                         Find_Click_windows(Hwnd, "./pic/breakthrough/今日不再提醒.png", 0.05, "点击今日不再提醒", "未检测到今日不再提醒")
-                        Find_Click_windows(Hwnd, "./pic/common/Queding.png", 0.05, "点击确定", "未检测到确定按钮")
+                        Find_Click_windows(Hwnd, "./pic/common/确定.png", 0.05, "点击确定", "未检测到确定按钮")
                     else:
                         print("        INFO- ----- 未出现再次挑战二次确认弹框")
                 print("        INFO- ----- ", Num_tui, "次退出完成")
