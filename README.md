@@ -188,6 +188,59 @@ python tools/check_pics.py --quiet    # 只输出错误
 
 ---
 
+## 开发与自检
+
+面向要改代码的人。只想跑日常的话，上面的「快速开始」就够了。
+
+### 依赖分两份
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt            # 只跑日常：图像识别 + 界面
+pip install -r requirements-dev.txt        # 改代码：pytest / 静态检查 / 打包
+```
+
+- `requirements.txt` —— 运行期依赖，**只列代码真正 import 的包**（精确版本，便于复现）
+- `requirements-dev.txt` —— 测试、静态检查、打包工具
+- `pyproject.toml` —— 工具配置（pytest 路径、ruff 规则）与项目元信息；本项目**不是**要 `pip install` 的库，源码直接放在根目录运行
+
+### 自检三件套
+
+改完代码按这个顺序过一遍，从便宜到贵：
+
+```powershell
+# 1. 语法与静态检查（秒级）
+python -m compileall -q Lib.py main.py Task_*.py ui tools
+
+# 2. 单元测试（秒级，不碰游戏窗口）
+python -m pytest
+
+# 3. 模板图引用（改了 pic/ 或模板路径才需要）
+python tools/check_pics.py
+```
+
+`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 53 个用例：
+
+| 文件 | 覆盖内容 |
+|---|---|
+| `tests/test_task_registry.py` | `TASK_REGISTRY` 一致性：key 唯一、入口可调用、状态键合法、今日判定键是状态键子集、默认开关全开、注册表顺序即整跑顺序 |
+| `tests/test_config_io.py` | 四类配置的读写与**回落**：`gui.json` 非法值回默认、`Gui_state.yml` 缺文件默认全开、`Last_times.yml` 缺失/空文件/坏 YAML/坏时间都能自愈、`read_config` 缺失返回 `{}` |
+
+> 新增任务时，先跑 `python -m pytest tests/test_task_registry.py` —— 忘记登记注册表或状态键写错会立刻失败。
+
+### 改代码时的约定
+
+- **入口编排**：单账号任务用 `Lib.run_accounts_task`，双账号协作（寮三十）用 `Lib.run_shared_task`；不要在任务模块里手写分隔线/时间窗/遍历账号/冷却判断这套流程
+- **模板图**：目录用英文、文件名用中文；改动后必须跑 `tools/check_pics.py`，新增/改名后再跑 `tools/gen_pic_readme.py` 刷新索引
+- **行尾**：仓库统一 CRLF（见 `.gitattributes`），用编辑器保存时注意别改成 LF，否则会产生整文件 diff
+- **临时产物**：中间脚本、备份、诊断报告写到 `.dsh-scratch/`（已被 `.gitignore` 忽略），不要散落在项目根目录
+
+更细的调用链与实施约束见 [ARCHITECTURE.md](./ARCHITECTURE.md)，提交前的完整约定见 [AGENTS.md](./AGENTS.md)。
+
+---
+
 ## 使用注意
 
 1. **工作目录**：请在项目根目录启动脚本，否则 `./pic`、`./config` 相对路径会失效。
@@ -226,15 +279,19 @@ Paper_sweeper/
 ├── Task_Fengmo.py         # 逢魔之时
 ├── pic/                   # 界面模板图（目录英文、文件名中文，详见 pic/README.md）
 ├── tools/                 # 开发辅助脚本（不参与打包）
-│   └── check_pics.py      # 模板图引用检查
+│   ├── check_pics.py      # 模板图引用检查
+│   └── gen_pic_readme.py  # 生成 pic/README.md 索引
+├── tests/                 # pytest 用例（纯逻辑，不依赖游戏窗口）
 ├── config/                # Setting.yml / Last_times.yml / Gui_state.yml / gui.json（本地）
 ├── logs/                  # 运行日志
-├── requirements.txt
+├── requirements.txt       # 运行期依赖（精确版本）
+├── requirements-dev.txt   # 测试 / 静态检查 / 打包依赖
+├── pyproject.toml         # 工具配置（pytest / ruff）与项目元信息
 ├── AGENTS.md              # 协作与编码约定（开发向）
 └── ARCHITECTURE.md        # 架构与任务地图（开发向）
 ```
 
-> `config.py`、`config/`、`logs/`、`build/`、`GUI.exe`、`app_crash.log` 均为运行期产物，已被 `.gitignore` 忽略，故不列在上方结构里。
+> `config.py`、`config/`、`logs/`、`build/`、`GUI.exe`、`app_crash.log`、`.dsh-scratch/` 均为运行期产物或本地临时目录，已被 `.gitignore` 忽略，故不列在上方结构里。
 
 更细的调用链、状态机与实施约束见 [ARCHITECTURE.md](./ARCHITECTURE.md)；提交代码前的约定见 [AGENTS.md](./AGENTS.md)。
 
