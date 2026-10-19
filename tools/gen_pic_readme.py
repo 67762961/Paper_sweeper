@@ -202,8 +202,9 @@ def main():
     lines.append("")
 
     out = os.path.join(PIC, "README.md")
+    # 仓库统一 CRLF（见 .gitattributes）：显式写 \r\n，避免每次生成都产生整文件 diff
     with open(out, "w", encoding="utf-8", newline="") as f:
-        f.write("\n".join(lines))
+        f.write("\r\n".join(lines))
     print(f"已生成 {out}")
     print(f"  {total} 张图，{len(DIR_ORDER)} 个目录，{len(lines)} 行")
 
