@@ -21,8 +21,25 @@ import sys
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PIC_DIR_NAME = "pic"
 
+# 模板图扩展名（pic/ 下的 .md 是索引文档，不是模板图）
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
+
 # 不参与检查的目录
-SKIP_DIRS = {".venv", ".git", "__pycache__", "build", "dist", "logs", "config", "tools"}
+# .dsh-scratch 是本地收容所（备份源码、一次性脚本），里面会有历史版本的 ./pic 引用，
+# 扫描它会报出大量"引用了不存在的图片"，属于噪音。
+# tests 里的 ./pic/... 是构造出来的测试数据，不是真实模板引用。
+SKIP_DIRS = {
+    ".venv",
+    ".git",
+    ".dsh-scratch",
+    "__pycache__",
+    "build",
+    "dist",
+    "logs",
+    "config",
+    "tools",
+    "tests",
+}
 
 
 def iter_source_files():
@@ -85,6 +102,9 @@ def collect_references():
 def collect_disk_images():
     """收集磁盘上的所有图片
 
+    只收图片扩展名：pic/ 下还有 README.md 之类的说明文件，
+    它们不是模板图，不该参与"未被引用"的判定。
+
     :return: {小写相对路径: 真实相对路径}
     """
     images = {}
@@ -93,10 +113,57 @@ def collect_disk_images():
         return images
     for root, dirs, files in os.walk(pic_root):
         for fn in files:
+            if os.path.splitext(fn)[1].lower() not in IMAGE_EXTS:
+                continue
             full = os.path.join(root, fn)
             rel = "./" + os.path.relpath(full, PROJECT_ROOT).replace("\\", "/")
             images[rel.lower()] = rel
     return images
+
+
+def classify_references(static, disk):
+    """把静态引用分成「失效」与「大小写不一致」两类
+
+    :param static: collect_references() 返回的静态引用列表
+    :param disk:   collect_disk_images() 返回的 {小写路径: 真实路径}
+    :return: (missing, case_mismatch)
+             missing      = [(引用路径, 文件, 行号)]
+             case_mismatch = [(引用路径, 磁盘真实路径, 文件, 行号)]
+    """
+    missing = []
+    case_mismatch = []
+    for ref, rel_file, lineno in static:
+        key = ref.lower()
+        if key not in disk:
+            missing.append((ref, rel_file, lineno))
+        elif disk[key] != ref:
+            case_mismatch.append((ref, disk[key], rel_file, lineno))
+    return missing, case_mismatch
+
+
+def collect_unused(static, dynamic, disk):
+    """未被任何源码引用的图片（死图）
+
+    动态拼接的目录整体豁免：f-string 拼出来的文件名无法静态枚举，
+    只要目录前缀能匹配上，就认为该目录下的图片可能是被动态引用的。
+
+    :return: [磁盘真实路径]
+    """
+    referenced_keys = {ref.lower() for ref, _, _ in static}
+
+    dynamic_dirs = set()
+    for seg, _, _ in dynamic:
+        for m in re.finditer(r'["\'](\./pic/[^"\'{]+/)', seg):
+            dynamic_dirs.add(m.group(1).lower())
+
+    unused = []
+    for key, real in sorted(disk.items()):
+        if key in referenced_keys:
+            continue
+        if any(key.startswith(d) for d in dynamic_dirs):
+            continue
+        unused.append(real)
+    return unused
 
 
 def main():
@@ -113,33 +180,12 @@ def main():
 
     problems = 0
 
-    # ---- 1. 引用但不存在的文件 ----
-    missing = []
-    case_mismatch = []
-    for ref, rel_file, lineno in static:
-        key = ref.lower()
-        if key not in disk:
-            missing.append((ref, rel_file, lineno))
-        elif disk[key] != ref:
-            case_mismatch.append((ref, disk[key], rel_file, lineno))
+    # ---- 1. 引用但不存在的文件 / 大小写不一致 ----
+    missing, case_mismatch = classify_references(static, disk)
 
     # ---- 2. 未被引用的图片 ----
+    unused = collect_unused(static, dynamic, disk)
     referenced_keys = {ref.lower() for ref, _, _ in static}
-
-    # 动态拼接的目录：从 f-string 里提取目录前缀（如 "./pic/team/{Preset_Group}.png" -> "./pic/team/"）
-    # 该目录下的图片按"动态引用"处理，不判定为死图
-    dynamic_dirs = set()
-    for seg, _, _ in dynamic:
-        for m in re.finditer(r'["\'](\./pic/[^"\'{]+/)', seg):
-            dynamic_dirs.add(m.group(1).lower())
-
-    unused = []
-    for key, real in sorted(disk.items()):
-        if key in referenced_keys:
-            continue
-        if any(key.startswith(d) for d in dynamic_dirs):
-            continue
-        unused.append(real)
 
     # ---- 输出 ----
     if not args.quiet:
