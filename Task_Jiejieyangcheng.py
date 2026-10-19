@@ -39,7 +39,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                 print("        INFO- ----- 尝试前往寮界面")
                 Itface_guild(Hwnd)
                 for Wait in range(3):
-                    Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiejie.png", 0.05, 0)
+                    Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/结界.png", 0.05, 0)
                     if Find:
                         print("        INFO-", Matchs, "检测到结界入口 已经进入寮界面")
                         print("        STEP- vvvvv 跳转寮界面")
@@ -50,7 +50,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                         print("        WAIT- wwwww 等待进入寮界面 已等待 {waittime} 秒".format(waittime=Wait))
                         Sleep_print(1)
                 if not Find:
-                    Find = Find_Click_windows(Hwnd, "./pic/Sis/Tuichu3.png", 0.05, "点击关闭弹窗", "未检测到弹窗")
+                    Find = Find_Click_windows(Hwnd, "./pic/guild/关闭弹窗.png", 0.05, "点击关闭弹窗", "未检测到弹窗")
                     if Find:
                         Sleep_print(1)
                         print("        STEP- vvvvv 跳转寮界面")
@@ -61,11 +61,11 @@ def Jiejieyangcheng(current_state, Hwnd):
 
             case "寮界面":
                 for i in range(5):
-                    Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiejie.png", 0.05, 0)
+                    Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/结界.png", 0.05, 0)
                     if Find:
                         print("        INFO-", Matchs, "检测到结界入口")
                         Work_Salary(Hwnd)
-                        Find = Find_Click_windows(Hwnd, "./pic/Sis/Jiejie.png", 0.05, "点击进入结界", "未检测到结界图标")
+                        Find = Find_Click_windows(Hwnd, "./pic/guild/结界.png", 0.05, "点击进入结界", "未检测到结界图标")
                         if Find:
                             print("        STEP- vvvvv 跳转结界界面")
                             Sleep_print(3)
@@ -76,7 +76,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                             current_state = "异常退出"
                             break
                     else:
-                        Find = Find_Click_windows(Hwnd, "./pic/Sis/Tuichu3.png", 0.05, "点击关闭弹窗", "未检测到弹窗")
+                        Find = Find_Click_windows(Hwnd, "./pic/guild/关闭弹窗.png", 0.05, "点击关闭弹窗", "未检测到弹窗")
                         if Find:
                             Sleep_print(1)
                             print("        STEP- vvvvv 跳转寮界面")
@@ -110,7 +110,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                     flag_Jiejieka = Jiejieka(Hwnd)
                 else:
                     # 新增结界卡运行判据 防止一直不填结界卡
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiejiekayunxing.png", 0.05, 0)
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/结界卡运行中.png", 0.05, 0)
                     if Range:
                         print("        INFO-", Matchs, "结界卡依旧生效")
                     else:
@@ -133,7 +133,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                 Esc_print(Hwnd)
                 Sleep_print(2)
                 for i in range(5):
-                    Find = Find_Click_windows(Hwnd, "./pic/Main/退出标志2.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
+                    Find = Find_Click_windows(Hwnd, "./pic/common/退出标志2.png", 0.05, "点击退出寮界面", "未检测到寮退出图标")
                     if Find:
                         Sleep_print(1)
                         break
@@ -151,17 +151,17 @@ def Work_Salary(Hwnd):
     :param Hwnd:    窗口句柄
     """
     # 领取工资奖励
-    if Find_Click_windows(Hwnd, "./pic/Sis/Jinbigongzi.png", 0.05, "点击工资", "未检测到工资"):
+    if Find_Click_windows(Hwnd, "./pic/guild/金币工资.png", 0.05, "点击工资", "未检测到工资"):
 
-        if Find_Click_windows(Hwnd, "./pic/Sis/Lingqu.png", 0.05, "领取工资", "领取工资异常"):
-            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        if Find_Click_windows(Hwnd, "./pic/guild/领取.png", 0.05, "领取工资", "领取工资异常"):
+            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
             if Find:
                 print("        INFO-", Matchs, "领取体力工资成功")
                 Esc_print(Hwnd)
                 Sleep_print(1)
 
-    if Find_Click_windows(Hwnd, "./pic/Sis/Tiligongzi.png", 0.05, "领取体力工资", "未检测到体力工资"):
-        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+    if Find_Click_windows(Hwnd, "./pic/guild/体力工资.png", 0.05, "领取体力工资", "未检测到体力工资"):
+        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
         if Find:
             print("        INFO-", Matchs, "领取体力工资成功")
             Esc_print(Hwnd)
@@ -173,9 +173,9 @@ def Work_Salary(Hwnd):
 def Jiyangjiangli(Hwnd):
     # 检测寄养奖励
     for i in range(1):
-        if not Find_Click_windows(Hwnd, "./pic/Sis/Jiyangjingyan.png", 0.05, "检测到寄养奖励", "未检测到寄养奖励"):
+        if not Find_Click_windows(Hwnd, "./pic/guild/寄养经验.png", 0.05, "检测到寄养奖励", "未检测到寄养奖励"):
             break
-        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
         if Find:
             print("        INFO-", Matchs, "寄养奖励领取成功")
             Sleep_print(1)
@@ -189,12 +189,12 @@ def Tilishihe(Hwnd):
     Sleep_print(0.5)
     # 检测体力食盒
     for i in range(1):
-        if not Find_Click_windows(Hwnd, "./pic/Sis/Tilingshihe.png", 0.05, "检测到体力食盒", "未检测到体力食盒溢出"):
+        if not Find_Click_windows(Hwnd, "./pic/guild/体力食盒.png", 0.05, "检测到体力食盒", "未检测到体力食盒溢出"):
             break
 
-        Find_Click_windows(Hwnd, "./pic/Sis/Quchu.png", 0.05, "取出体力食盒", "取出体力食盒异常")
+        Find_Click_windows(Hwnd, "./pic/guild/取出.png", 0.05, "取出体力食盒", "取出体力食盒异常")
         Sleep_print(1)
-        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
         if Find:
             print("        INFO-", Matchs, "体力食盒领取成功")
             Esc_print(Hwnd)
@@ -219,20 +219,20 @@ def Jinyanjiuhu(Hwnd):
             return 0
         else:
             print("        INFO-", Matchs, "经验酒壶提取未到上限")
-            Find_Click_windows(Hwnd, "./pic/Sis/Queding.png", 0.05, "育成有满级式神 强行提取", "经验酒壶提取成功")
+            Find_Click_windows(Hwnd, "./pic/guild/确定.png", 0.05, "育成有满级式神 强行提取", "经验酒壶提取成功")
             return 1
 
     Sleep_print(1)
     # 满经验酒壶情况
-    if Find_Click_windows(Hwnd, "./pic/Sis/Jingyanjiuhu.png", 0.05, "检测到经验酒壶满", "经验酒壶未满"):
-        Find_Click_windows(Hwnd, "./pic/Sis/Tiqu.png", 0.05, "提取满的经验酒壶", "提取满的经验酒壶失败")
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Tiqu.png", 0.05, 0)
+    if Find_Click_windows(Hwnd, "./pic/guild/经验酒壶满.png", 0.05, "检测到经验酒壶满", "经验酒壶未满"):
+        Find_Click_windows(Hwnd, "./pic/guild/提取.png", 0.05, "提取满的经验酒壶", "提取满的经验酒壶失败")
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/提取.png", 0.05, 0)
         return Tiqu(Range, Matchs)
     else:
         # 不满经验酒壶情况
-        if Find_Click_windows(Hwnd, "./pic/Sis/Jinyanjiuhu0.png", 0.05, "检测到有经验酒壶", "未检测到经验酒壶"):
-            Find_Click_windows(Hwnd, "./pic/Sis/Tiqu.png", 0.05, "提取经验酒壶", "提取经验酒壶失败")
-            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Tiqu.png", 0.05, 0)
+        if Find_Click_windows(Hwnd, "./pic/guild/经验酒壶.png", 0.05, "检测到有经验酒壶", "未检测到经验酒壶"):
+            Find_Click_windows(Hwnd, "./pic/guild/提取.png", 0.05, "提取经验酒壶", "提取经验酒壶失败")
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/提取.png", 0.05, 0)
             return Tiqu(Range, Matchs)
         else:
             return 0
@@ -242,16 +242,16 @@ def Jiejiekajiangli(Hwnd):
     Sleep_print(1)
     # 检测结界卡奖励
     for i in range(1):
-        if Find_Click_windows(Hwnd, "./pic/Sis/Jiejiekajiangli.png", 0.05, "检测到结界卡奖励 点击领取", "未检测到结界卡结束奖励"):
+        if Find_Click_windows(Hwnd, "./pic/guild/结界卡奖励.png", 0.05, "检测到结界卡奖励 点击领取", "未检测到结界卡结束奖励"):
             Sleep_print(0.5)
-            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Huodejiangli.png", 0.05, 0)
+            Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/获得奖励.png", 0.05, 0)
             if Find:
                 print("        INFO-", Matchs, "结界卡奖励领取成功")
             else:
                 print("        INFO-", Matchs, "结界卡奖励领取失败")
             return 0
         else:
-            Find_Click_windows(Hwnd, "./pic/Sis/Jiejiekayunxing.png", 0.05, "检测到结界卡依旧运行 点击领取", "未检测到结界卡依旧运行")
+            Find_Click_windows(Hwnd, "./pic/guild/结界卡运行中.png", 0.05, "检测到结界卡依旧运行 点击领取", "未检测到结界卡依旧运行")
             return 1
 
 
@@ -259,7 +259,7 @@ def Jiejieka(Hwnd):
     Sleep_print(1)
     # 进入结界卡界面
     for Wait in range(10):
-        Find = Find_Click_windows(Hwnd, "./pic/Sis/Jiejieka.png", 0.07, "进入结界卡界面", "未进入结界卡界面")
+        Find = Find_Click_windows(Hwnd, "./pic/guild/结界卡.png", 0.07, "进入结界卡界面", "未进入结界卡界面")
         if Find:
             break
         else:
@@ -269,7 +269,7 @@ def Jiejieka(Hwnd):
     Sleep_print(1)
     # 放置结界卡
     for i in range(1):
-        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiejiekacao.png", 0.05, 0)
+        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/结界卡槽.png", 0.05, 0)
         if not Find:
             print("        INFO-", Matchs, "结界卡未耗尽")
             Esc_print(Hwnd)
@@ -279,22 +279,22 @@ def Jiejieka(Hwnd):
             print("        INFO-", Matchs, "结界卡已经耗尽")
 
             for i in range(1):
-                if not Find_Click_windows(Hwnd, "./pic/Sis/Jiejiekaliebiao.png", 0.05, "打开结界卡列表", "打开结界卡列表异常"):
+                if not Find_Click_windows(Hwnd, "./pic/guild/结界卡列表.png", 0.05, "打开结界卡列表", "打开结界卡列表异常"):
                     break
-                if not Find_Click_windows(Hwnd, "./pic/Sis/Taiguliebiao.png", 0.05, "点击太鼓列表", "点击太鼓列表异常"):
+                if not Find_Click_windows(Hwnd, "./pic/guild/太鼓列表.png", 0.05, "点击太鼓列表", "点击太鼓列表异常"):
                     break
-                if not Find_Click_windows(Hwnd, "./pic/Sis/Xingjijiangxu.png", 0.05, "点击星级降序", "点击星级降序异常"):
+                if not Find_Click_windows(Hwnd, "./pic/guild/星级降序.png", 0.05, "点击星级降序", "点击星级降序异常"):
                     break
-                if not Find_Click_windows(Hwnd, "./pic/Sis/Shouzhangjiejieka.png", 0.05, "点击首张结界卡", "点击首张结界卡异常"):
-                    if not Find_Click_windows(Hwnd, "./pic/Sis/Jiejiekaliebiao.png", 0.05, "打开结界卡列表", "打开结界卡列表异常"):
+                if not Find_Click_windows(Hwnd, "./pic/guild/首张结界卡.png", 0.05, "点击首张结界卡", "点击首张结界卡异常"):
+                    if not Find_Click_windows(Hwnd, "./pic/guild/结界卡列表.png", 0.05, "打开结界卡列表", "打开结界卡列表异常"):
                         break
-                    if not Find_Click_windows(Hwnd, "./pic/Sis/Douyuliebiao.png", 0.05, "点击斗鱼列表", "点击斗鱼列表异常"):
+                    if not Find_Click_windows(Hwnd, "./pic/guild/斗鱼列表.png", 0.05, "点击斗鱼列表", "点击斗鱼列表异常"):
                         break
-                    if not Find_Click_windows(Hwnd, "./pic/Sis/Shouzhangjiejieka.png", 0.05, "点击首张结界卡", "点击首张结界卡异常"):
+                    if not Find_Click_windows(Hwnd, "./pic/guild/首张结界卡.png", 0.05, "点击首张结界卡", "点击首张结界卡异常"):
                         break
-                if not Find_Click_windows(Hwnd, "./pic/Sis/Jihuo.png", 0.05, "点击激活", "点击激活异常"):
+                if not Find_Click_windows(Hwnd, "./pic/guild/激活.png", 0.05, "点击激活", "点击激活异常"):
                     break
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yaoqing.png", 0.05, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/邀请.png", 0.05, 0)
                 if Range:
                     print("        INFO-", Matchs, "结界卡激活成功")
                     Sleep_print(1)
@@ -314,7 +314,7 @@ def Yucheng(current_state, Hwnd):
         match current_state:
             case "结界界面":
                 for Wait in range(10):
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Shishenyucheng.png", 0.05, 0)
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/式神育成.png", 0.05, 0)
                     if Range:
                         print("        INFO-", Matchs, "检测到结界育成界面")
                         Move_to_range(Hwnd, Range)
@@ -333,22 +333,22 @@ def Yucheng(current_state, Hwnd):
             case "育成界面":
                 # 放出满级式神
                 for i in range(10):
-                    if Find_Click_windows(Hwnd, "./pic/Sis/Manjidamo.png", 0.07, "检测到有满级式神", "未检测到有满级式神"):
+                    if Find_Click_windows(Hwnd, "./pic/guild/满级达摩.png", 0.07, "检测到有满级式神", "未检测到有满级式神"):
                         Sleep_print(0.5)
                     else:
                         break
                         Sleep_print(0.5)
 
-                Find = Find_Click_windows(Hwnd, "./pic/Sis/Fangrushishen.png", 0.05, "检测到有空位", "育成池已经放满")
+                Find = Find_Click_windows(Hwnd, "./pic/guild/放入式神.png", 0.05, "检测到有空位", "育成池已经放满")
                 if Find:
                     # 进入素材列表
-                    if Find_Click_windows(Hwnd, "./pic/Sis/Quanbu.png", 0.05, "进入全部式神列表", "正处在素材列表中"):
+                    if Find_Click_windows(Hwnd, "./pic/guild/全部.png", 0.05, "进入全部式神列表", "正处在素材列表中"):
                         Sleep_print(0.5)
-                        Find_Click_windows(Hwnd, "./pic/Sis/Sucai.png", 0.05, "选择素材列表", "选择素材列表异常")
+                        Find_Click_windows(Hwnd, "./pic/guild/素材.png", 0.05, "选择素材列表", "选择素材列表异常")
 
                     for j in range(10):
                         Sleep_print(0.5)
-                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Fengweidamo.png", 0.07, 0)
+                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/奉为达摩.png", 0.07, 0)
                         if Range:
                             print("        INFO-", Matchs, "放上去一个奉为达摩")
                             Move_to_range(Hwnd, Range)
@@ -356,7 +356,7 @@ def Yucheng(current_state, Hwnd):
                             break
                         else:
                             print("        INFO-", Matchs, "未找到奉为达摩")
-                            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
+                            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/育成列表框.png", 0.05, 0)
                             print("        INFO-", Matchs, "进入翻页区域")
                             Move_to_range(Hwnd, Range)
                             Scroll_print(Hwnd, -3)
@@ -365,13 +365,13 @@ def Yucheng(current_state, Hwnd):
                     current_state = "寄养任务"
 
             case "寄养任务":
-                Find = Find_Click_windows(Hwnd, "./pic/Sis/Jiyangrukou.png", 0.05, "检测到寄养空位", "已经有寄养")
+                Find = Find_Click_windows(Hwnd, "./pic/guild/寄养入口.png", 0.05, "检测到寄养空位", "已经有寄养")
                 if Find:
                     card_handlers = {
-                        "六星太鼓": lambda: Jiyang("寄养列表", Hwnd, "./pic/Sis/6xingtaigu.png", card),
-                        "六星斗鱼": lambda: Jiyang("寄养列表", Hwnd, "./pic/Sis/6xingdouyu.png", card),
-                        "五星太鼓": lambda: Jiyang("寄养列表", Hwnd, "./pic/Sis/5xingtaigu.png", card),
-                        "五星斗鱼": lambda: Jiyang("寄养列表", Hwnd, "./pic/Sis/5xingdouyu.png", card),
+                        "六星太鼓": lambda: Jiyang("寄养列表", Hwnd, "./pic/guild/六星太鼓.png", card),
+                        "六星斗鱼": lambda: Jiyang("寄养列表", Hwnd, "./pic/guild/六星斗鱼.png", card),
+                        "五星太鼓": lambda: Jiyang("寄养列表", Hwnd, "./pic/guild/五星太鼓.png", card),
+                        "五星斗鱼": lambda: Jiyang("寄养列表", Hwnd, "./pic/guild/五星斗鱼.png", card),
                     }
 
                     for card in card_handlers:
@@ -404,7 +404,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
         match current_state:
             case "结界界面":
                 for Wait in range(10):
-                    Find = Find_Click_windows(Hwnd, "./pic/Sis/Shishenyucheng.png", 0.05, "检测到进入结界育成界面", "未检测到进入结界育成界面")
+                    Find = Find_Click_windows(Hwnd, "./pic/guild/式神育成.png", 0.05, "检测到进入结界育成界面", "未检测到进入结界育成界面")
                     if Find:
                         print("        STEP- vvvvv 跳转育成界面")
                         current_state = "育成界面"
@@ -418,7 +418,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     return 0
 
             case "育成界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Sis/Jiyangrukou.png", 0.05, "检测到寄养空位", "已经有寄养")
+                Find = Find_Click_windows(Hwnd, "./pic/guild/寄养入口.png", 0.05, "检测到寄养空位", "已经有寄养")
                 if Find:
                     print("        STEP- vvvvv 跳转寄养列表")
                     current_state = "寄养列表"
@@ -429,12 +429,12 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
             case "寄养列表":
                 # 刷新好友结界卡列表
                 Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/Sis/Kuaqu.png", 0.05, "点击跨区", "点击跨区异常")
+                Find_Click_windows(Hwnd, "./pic/guild/跨区.png", 0.05, "点击跨区", "点击跨区异常")
                 Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/Sis/Haoyou.png", 0.05, "点击好友", "点击好友异常")
+                Find_Click_windows(Hwnd, "./pic/guild/好友.png", 0.05, "点击好友", "点击好友异常")
                 # 寻找对应结界卡
                 for times in range(100):
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiyangliebiao.png", 0.05, 0)
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/寄养列表.png", 0.05, 0)
                     print("        INFO-", Matchs, "移动到寄养列表")
                     Move_to_range(Hwnd, Range)
                     Str1 = "点击" + string
@@ -444,11 +444,11 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     Str2 = "无法点击" + string
                     Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
                     if Find:
-                        if Find_Click_windows(Hwnd, "./pic/Sis/Jinrujiejie.png", 0.05, "点击进入结界", "点击进入结界异常"):
+                        if Find_Click_windows(Hwnd, "./pic/guild/进入结界.png", 0.05, "点击进入结界", "点击进入结界异常"):
                             Sleep_print(2)
                             break
                     else:
-                        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Jiyangliebiaomowei.png", 0.001, 0)
+                        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/寄养列表末尾.png", 0.001, 0)
                         if Find:
                             print("        INFO-", Matchs, "已经到寄养列表末尾")
                             return 0
@@ -465,7 +465,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     return 0
 
             case "寄养结界":
-                Find = Find_Click_windows(Hwnd, "./pic/Sis/youjiyangwei.png", 0.05, "有寄养位", "结界已被占用")
+                Find = Find_Click_windows(Hwnd, "./pic/guild/有寄养位.png", 0.05, "有寄养位", "结界已被占用")
                 if not Find:
                     Esc_print(Hwnd)
                     Sleep_print(0.5)
@@ -474,18 +474,18 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     return Jiyang("结界界面", Hwnd, Jiejieka_Model_path, string)
                 else:
                     # 进入素材列表
-                    if Find_Click_windows(Hwnd, "./pic/Sis/Quanbu.png", 0.05, "进入全部式神列表", "正处在素材列表中"):
+                    if Find_Click_windows(Hwnd, "./pic/guild/全部.png", 0.05, "进入全部式神列表", "正处在素材列表中"):
                         Sleep_print(0.5)
-                        Find_Click_windows(Hwnd, "./pic/Sis/Sucai.png", 0.05, "选择素材列表", "选择素材列表异常")
+                        Find_Click_windows(Hwnd, "./pic/guild/素材.png", 0.05, "选择素材列表", "选择素材列表异常")
 
                     for j in range(10):
-                        if not Find_Click_windows(Hwnd, "./pic/Sis/Fengweidamo.png", 0.07, "放上去一个奉为达摩", "未检测到达摩素材"):
-                            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yuchengliebioakuang.png", 0.05, 0)
+                        if not Find_Click_windows(Hwnd, "./pic/guild/奉为达摩.png", 0.07, "放上去一个奉为达摩", "未检测到达摩素材"):
+                            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/育成列表框.png", 0.05, 0)
                             print("        INFO-", Matchs, "进入翻页区域")
                             Move_to_range(Hwnd, Range)
                             Scroll_print(Hwnd, -3)
                         else:
-                            Find_Click_windows(Hwnd, "./pic/Sis/Queding.png", 0.05, "点击确定", "点击确定异常")
+                            Find_Click_windows(Hwnd, "./pic/guild/确定.png", 0.05, "点击确定", "点击确定异常")
                             Esc_print(Hwnd)
                             Sleep_print(2)
                             Esc_print(Hwnd)

@@ -76,22 +76,27 @@ flowchart LR
 ├── Task_Shouliezhan.py            狩猎战（麒麟）与阴界之门
 ├── Task_Fengmo.py                 逢魔之时
 ├── test.py / test_main.py         开发调试入口（已忽略，不参与交付）
+├── tools/                         开发辅助脚本（不参与打包）
+│   └── check_pics.py              模板图引用检查：失效引用 / 大小写不一致 / 死图
 ├── config/                        运行配置（默认忽略）
 │   ├── Setting.yml                启动项、结界突破、寮三十副本表
 │   ├── Last_times.yml             各账号各任务上次完成时间
 │   ├── Gui_state.yml              GUI 任务开关（是否参与完整运行，缺失默认全开）
 │   └── gui.json                   界面偏好（主题 / 日志自动滚动 / 日志字号）
-├── pic/                           界面模板图
-│   ├── Main/                      庭院/弹窗/协作/返回等通用元素
-│   ├── Sign/                      签到与收菜
-│   ├── Mail/                      邮件
-│   ├── Sis/                       阴阳寮与结界
-│   ├── Team/                      编组与队伍预设
-│   ├── Thr/                       御魂副本与真蛇
-│   ├── Digui/                     地域鬼王
-│   ├── Fengmo/                    逢魔
-│   ├── JiejieFight/               结界突破
-│   └── Shouliezhan/               狩猎战/阴界
+├── pic/                           界面模板图（目录英文、文件名中文，详见 pic/README.md）
+│   ├── common/                    公用元素（确定/关闭/获得奖励/退出标志等）
+│   ├── courtyard/                 庭院主界面与功能入口
+│   ├── signin/                    登录收菜（邮件/签到/福袋/纸人/礼包/友情点）
+│   ├── guild/                     结界养成（寮工资/寄养/结界卡/育成/食盒酒壶）
+│   ├── breakthrough/              结界突破
+│   ├── digui/                     地域鬼王
+│   ├── fengmo/                    逢魔之时
+│   ├── hunt/                      狩猎战（麒麟/阴界之门）
+│   ├── thirty/                    寮三十与真蛇
+│   └── team/                      编队预设（部分由 Team_Preset 动态拼接）
+├── tools/                         开发辅助脚本（不参与打包）
+│   ├── check_pics.py              模板图引用检查
+│   └── gen_pic_readme.py          生成 pic/README.md 索引
 ├── logs/<YYYY-MM-DD>/             运行日志（console_output_*.log / single_<key>_*.log）
 └── build/ __pycache__/ .venv/     构建与环境产物（GUI.exe 直接生成在根目录）
 ```
@@ -518,7 +523,29 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | 脚本 | 调用 `main.Full_operation()` | 无 GUI，输出到控制台与日志 |
 | 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<日期>/single_<key>_*.log` |
 | 调试 | `test.py` / `test_main.py` | 单点验证模板/任务，已 gitignore |
+| 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.1） |
 | 打包 | `python build_exe.py` | 调用 `GUI.spec`，产物 `GUI.exe` 直接输出到项目根目录 |
+
+### 8.1 模板图引用检查（`tools/check_pics.py`）
+
+改动 `pic/` 或任务代码里的模板路径后运行，可自动发现三类问题：
+
+```powershell
+python tools/check_pics.py            # 完整报告
+python tools/check_pics.py --quiet    # 只输出错误（适合接 CI / pre-commit）
+```
+
+| 级别 | 检查项 | 说明 |
+| ---- | ---- | ---- |
+| **错误** | 引用了不存在的图片 | 运行到该步骤必然失败，必须修 |
+| **错误** | 路径大小写与磁盘不一致 | Windows 不敏感，但 Linux / 打包工具 / 大小写敏感文件系统会失败 |
+| 提示 | 未被任何源码引用的图片 | 可能是保留素材，需人工确认后再删 |
+| 信息 | 动态拼接的路径（f-string） | 无法静态校验，需人工确认 |
+
+**注意**：`team/` 目录下的编队图由 `Team_Preset()` 动态拼接（`f"./pic/team/{Preset_name}.png"`），
+工具会跳过该目录的死图判定，只列出动态拼接位置。
+
+退出码：`0` = 无错误（提示项不阻断），`1` = 发现错误，`2` = 找不到 `pic/` 目录。
 
 ## 9. 实施约束
 

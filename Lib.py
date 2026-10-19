@@ -131,13 +131,13 @@ def Log_in(title):
 
     for Wait in range(100):
         check_stop()
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/适龄提示标.png", 0.03, 0)
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/适龄提示标.png", 0.03, 0)
         if Range:
             Sleep_print(1)
             print("        INFO-", Matchs, "检测到适龄提示界面 点击进入游戏")
             Click(Hwnd, [(830, 940), (1085, 1010)], 1)
             Sleep_print(1)
-            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/适龄提示标.png", 0.03, 0)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/适龄提示标.png", 0.03, 0)
             if not Range:
                 print("        INFO-", Matchs, "未检测到适龄提示界面 已经进入游戏")
                 Sleep_print(2)
@@ -486,9 +486,9 @@ def Sleep_print_long(Wait_time):
 
     # 拒绝协作
     if Wait_time > 1:
-        Range, Matchs = Find_in_screen_Matchs("./pic/Main/拒绝协作.png", 0.01, 0)
+        Range, Matchs = Find_in_screen_Matchs("./pic/common/拒绝协作.png", 0.01, 0)
         if Range:
-            Find_Click_screen("./pic/Main/拒绝协作.png", 0.01, "拒绝协作", "未发现协作")
+            Find_Click_screen("./pic/common/拒绝协作.png", 0.01, "拒绝协作", "未发现协作")
 
 
 def read_config(FILE_PATH):
@@ -835,10 +835,10 @@ def Itface_Quit(Hwnd):
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
     _sleep_with_stop(0.5)
     # 注：此处退出界面条件可以极为苛刻 一般识别取值为0.006
-    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Tuichuyouxi.png", 0.01, 0)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/courtyard/退出游戏.png", 0.01, 0)
     if Range:
         print("        INFO-", Matchs, "检测到退出界面")
-        Find_Click_windows(Hwnd, "./pic/Main/Quxiaotuichu.png", 0.03, "取消退出", "取消退出失败")
+        Find_Click_windows(Hwnd, "./pic/courtyard/取消退出.png", 0.03, "取消退出", "取消退出失败")
         return 1
     else:
         print("        INFO-", Matchs, "未检测到退出界面")
@@ -856,14 +856,14 @@ def Itface_Host(Hwnd):
         for i in range(Wait):
             check_stop()
             ctypes.windll.user32.SetForegroundWindow(Hwnd)
-            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Zhujiemian.png", 0.05, 0)
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/courtyard/主界面.png", 0.05, 0)
             if Range:
                 print("        INFO-", Matchs, "检测到进入庭院")
                 return 1
             else:
                 print("        INFO-", Matchs, "未检测到庭院界面")
                 # 一键返回
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/一键返回庭院.png", 0.05, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/一键返回庭院.png", 0.05, 0)
                 Sleep_print(1)
                 if Range:
                     Click(Hwnd, Range, 1)
@@ -890,7 +890,7 @@ def Itface_Host(Hwnd):
                     current_state = "检测协作"
             case "检测协作":
                 # 检测协作
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/拒绝协作.png", 0.01, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/拒绝协作.png", 0.01, 0)
                 Sleep_print(1)
                 if Range:
                     Click(Hwnd, Range, 1)
@@ -906,7 +906,7 @@ def Itface_Host(Hwnd):
                 current_state = "检测弹窗"
             case "检测弹窗":
                 # 检测弹窗
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Cha.png", 0.01 + 0.01 * step, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/关闭.png", 0.01 + 0.01 * step, 0)
                 Sleep_print(1)
                 if Range:
                     Click(Hwnd, Range, 1)
@@ -922,7 +922,7 @@ def Itface_Host(Hwnd):
                 current_state = "检测退出标志1"
 
             case "检测退出标志1":
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/退出标志1.png", 0.05, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/退出标志1.png", 0.05, 0)
                 Sleep_print(1)
                 if Range:
                     Click(Hwnd, Range, 1)
@@ -938,7 +938,7 @@ def Itface_Host(Hwnd):
                 current_state = "检测退出标志2"
 
             case "检测退出标志2":
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/退出标志2.png", 0.05, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/退出标志2.png", 0.05, 0)
                 Sleep_print(1)
                 if Range:
                     Click(Hwnd, Range, 1)
@@ -982,14 +982,14 @@ def Itface_scroll(Hwnd):
     Itface_Host(Hwnd)
 
     # 检测底部卷轴是否展开
-    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Shishenlu.png", 0.05, 0)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/courtyard/式神录.png", 0.05, 0)
     if not Range:
         print("        INFO-", Matchs, "检测到卷轴尚未打开 点击打开卷轴")
         # 坐标法点击展开卷轴
         Range = ((1780, 970), (1910, 1120))
         Click(Hwnd, Range, 2)
 
-        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Shishenlu.png", 0.05, 0)
+        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/courtyard/式神录.png", 0.05, 0)
         if Range:
             print("        INFO-", Matchs, "检测到卷轴已经打开")
         else:
@@ -1011,7 +1011,7 @@ def Itface_guild(Hwnd):
     Itface_scroll(Hwnd)
 
     # 进入阴阳寮
-    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Sis/Yinyangliao.png", 0.05, 0)
+    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/阴阳寮.png", 0.05, 0)
     if Range:
         Click(Hwnd, Range, 1)
         print("        INFO-", Matchs, "进入阴阳寮")
@@ -1028,21 +1028,21 @@ def Itface_daily(Hwnd):
     """
     Itface_Host(Hwnd)
     for i in range(1):
-        if Find_Click_windows(Hwnd, "./pic/Main/Fengmorukou.png", 0.05, "进入逢魔入口", "未检测到逢魔入口"):
+        if Find_Click_windows(Hwnd, "./pic/courtyard/逢魔入口.png", 0.05, "进入逢魔入口", "未检测到逢魔入口"):
             break
-        if Find_Click_windows(Hwnd, "./pic/Main/Doujirukou.png", 0.05, "进入斗技入口", "未检测到斗技入口"):
+        if Find_Click_windows(Hwnd, "./pic/courtyard/斗技入口.png", 0.05, "进入斗技入口", "未检测到斗技入口"):
             break
-        if Find_Click_windows(Hwnd, "./pic/Shouliezhan/阴界之门入口.png", 0.05, "进入阴界之门入口", "未检测到阴界之门入口"):
+        if Find_Click_windows(Hwnd, "./pic/hunt/阴界之门入口.png", 0.05, "进入阴界之门入口", "未检测到阴界之门入口"):
             break
-        if Find_Click_windows(Hwnd, "./pic/Main/Daoguanrukou.png", 0.05, "进入道馆入口", "未检测到道馆入口"):
+        if Find_Click_windows(Hwnd, "./pic/courtyard/道馆入口.png", 0.05, "进入道馆入口", "未检测到道馆入口"):
             break
-        if Find_Click_windows(Hwnd, "./pic/Main/Baiguiyirukou.png", 0.05, "进入百鬼弈入口", "未检测到百鬼弈入口"):
+        if Find_Click_windows(Hwnd, "./pic/courtyard/百鬼弈入口.png", 0.05, "进入百鬼弈入口", "未检测到百鬼弈入口"):
             break
-        if Find_Click_windows(Hwnd, "./pic/Main/Xiajiananyurukou.png", 0.05, "进入狭间暗域入口", "未检测到狭间暗域入口"):
+        if Find_Click_windows(Hwnd, "./pic/courtyard/狭间暗域入口.png", 0.05, "进入狭间暗域入口", "未检测到狭间暗域入口"):
             break
-        if Find_Click_windows(Hwnd, "./pic/Main/Qilinrukou.png", 0.05, "进入麒麟入口", "未检测到麒麟入口"):
+        if Find_Click_windows(Hwnd, "./pic/courtyard/麒麟入口.png", 0.05, "进入麒麟入口", "未检测到麒麟入口"):
             break
-        if Find_Click_windows(Hwnd, "./pic/Main/Yanhuirukou.png", 0.05, "进入宴会入口", "未检测到宴会入口"):
+        if Find_Click_windows(Hwnd, "./pic/courtyard/宴会入口.png", 0.05, "进入宴会入口", "未检测到宴会入口"):
             break
 
 
@@ -1059,7 +1059,7 @@ def Itface_explore(Hwnd):
         Sleep_print(1)
         match current_state:
             case "庭院界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Main/阴阳术.png", 0.05, "点击阴阳术图标", "未检测到阴阳术图标")
+                Find = Find_Click_windows(Hwnd, "./pic/courtyard/阴阳术.png", 0.05, "点击阴阳术图标", "未检测到阴阳术图标")
                 if Find:
                     print("        STEP- vvvvv 跳转阴阳术界面")
                     current_state = "阴阳术界面"
@@ -1067,7 +1067,7 @@ def Itface_explore(Hwnd):
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
             case "阴阳术界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Main/御神.png", 0.05, "点击御神按钮", "未检测到御神按钮")
+                Find = Find_Click_windows(Hwnd, "./pic/courtyard/御神.png", 0.05, "点击御神按钮", "未检测到御神按钮")
                 if Find:
                     print("        STEP- vvvvv 跳转御神界面")
                     current_state = "御神界面"
@@ -1075,7 +1075,7 @@ def Itface_explore(Hwnd):
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
             case "御神界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Main/前往六道.png", 0.05, "点击前往六道按钮", "未检测到前往六道按钮")
+                Find = Find_Click_windows(Hwnd, "./pic/courtyard/前往六道.png", 0.05, "点击前往六道按钮", "未检测到前往六道按钮")
                 if Find:
                     print("        STEP- vvvvv 跳转六道界面")
                     current_state = "六道界面"
@@ -1087,7 +1087,7 @@ def Itface_explore(Hwnd):
                 Sleep_print(1)
                 Range = [(20, 105), (91, 175)]
                 Click(Hwnd, Range, 1)
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Digui/Diguitubiao.png", 0.05, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/digui/地鬼图标.png", 0.05, 0)
                 if Range:
                     print("        INFO-", Matchs, "检测到地鬼入口 已进入探索界面")
                     return 1
@@ -1113,7 +1113,7 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
         Sleep_print(1)
         match current_state:
             case "庭院卷轴界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Main/Shishenlu.png", 0.05, "点击式神录", "未检测到式神录")
+                Find = Find_Click_windows(Hwnd, "./pic/courtyard/式神录.png", 0.05, "点击式神录", "未检测到式神录")
                 Sleep_print(1)
                 if Find:
                     print("        STEP- vvvvv 跳转式神录界面")
@@ -1122,7 +1122,7 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
             case "式神录界面":
-                Find = Find_Click_windows(Hwnd, "./pic/Team/Yushexuanxiang.png", 0.05, "点击预设选项", "未检测到预设选项")
+                Find = Find_Click_windows(Hwnd, "./pic/team/预设选项.png", 0.05, "点击预设选项", "未检测到预设选项")
                 if Find:
                     print("        STEP- vvvvv 跳转队伍预设")
                     current_state = "队伍预设"
@@ -1130,9 +1130,9 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
                     print("        STEP- vvvvv 跳转异常退出界面")
                     current_state = "异常退出"
             case "队伍预设":
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, f"./pic/Team/{Preset_Group}.png", 0.01, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, f"./pic/team/{Preset_Group}.png", 0.01, 0)
                 if Range:
-                    Find = Find_Click_windows(Hwnd, f"./pic/Team/{Preset_Group}.png", 0.01, f"选择预设编组 {Preset_Group}", f"未检测到预设编组 {Preset_Group}")
+                    Find = Find_Click_windows(Hwnd, f"./pic/team/{Preset_Group}.png", 0.01, f"选择预设编组 {Preset_Group}", f"未检测到预设编组 {Preset_Group}")
                     if Find:
                         print("        STEP- vvvvv 跳转组内预设")
                         current_state = "组内预设"
@@ -1144,9 +1144,9 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
                     print("        STEP- vvvvv 跳转组内预设")
                     current_state = "组内预设"
             case "组内预设":
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, f"./pic/Team/{Preset_name}.png", 0.01, 0)
+                Range, Matchs = Find_in_windows_Matchs(Hwnd, f"./pic/team/{Preset_name}.png", 0.01, 0)
                 if Range:
-                    Find = Find_Click_windows(Hwnd, f"./pic/Team/{Preset_name}.png", 0.01, f"选择预设队伍 {Preset_name}", f"未检测到预设队伍 {Preset_name}")
+                    Find = Find_Click_windows(Hwnd, f"./pic/team/{Preset_name}.png", 0.01, f"选择预设队伍 {Preset_name}", f"未检测到预设队伍 {Preset_name}")
                     if Find:
                         print("        STEP- vvvvv 跳转应用预设")
                         current_state = "应用预设"
@@ -1158,16 +1158,16 @@ def Team_Preset(Hwnd, Preset_Group, Preset_name):
                     print("        STEP- vvvvv 跳转应用预设")
                     current_state = "应用预设"
             case "应用预设":
-                Find = Find_Click_windows(Hwnd, "./pic/Team/应用御魂预设.png", 0.03, "点击应用御魂预设", "未检测到应用御魂预设按钮")
+                Find = Find_Click_windows(Hwnd, "./pic/team/应用御魂预设.png", 0.03, "点击应用御魂预设", "未检测到应用御魂预设按钮")
                 if Find:
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Queding.png", 0.05, 0)
+                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/确定.png", 0.05, 0)
                     if Range:
                         Click(Hwnd, Range, 0.5)
                         print("        INFO-", Matchs, "点击确认")
                     else:
                         print("        INFO-", Matchs, "未发现二次确认按钮 似乎已经是此配置")
                     if Find:
-                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/Main/Queding.png", 0.05, 0)
+                        Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/确定.png", 0.05, 0)
                         if Range:
                             Click(Hwnd, Range, 0.5)
                             print("        INFO-", Matchs, "点击确认更换御灵")
