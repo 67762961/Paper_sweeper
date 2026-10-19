@@ -1,0 +1,26 @@
+# Paper Sweeper —— 开发与自检依赖
+#
+# 安装方式：
+#   pip install -r requirements.txt -r requirements-dev.txt
+#
+# 只装开发依赖（不含运行期）：
+#   pip install -r requirements-dev.txt
+
+# ---- 测试 ----
+pytest==9.1.1
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+pygments==2.21.0
+colorama==0.4.6
+
+# ---- 静态检查 ----
+pyflakes==3.4.0
+autoflake==2.3.1
+
+# ---- 打包 ----
+pyinstaller==6.16.0
+pyinstaller-hooks-contrib==2025.9
+altgraph==0.17.4
+pefile==2023.2.7
+pywin32-ctypes==0.2.3

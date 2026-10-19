@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paper-sweeper"
+version = "1.3.0"
+description = "《阴阳师》MuMu 模拟器日常任务自动化助手"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Games/Entertainment",
+]
+
+# 运行期依赖：只列真正被 import 的包。
+# 版本上限留空，避免与用户的模拟器环境/驱动版本打架；
+# 需要复现问题时的精确版本见 requirements.txt。
+dependencies = [
+    "numpy>=2.0",
+    "opencv-python>=4.10",
+    "PyAutoGUI>=0.9.54",
+    "PyDirectInput>=1.0.4",
+    "pywin32>=306",
+    "PyYAML>=6.0",
+    "ruamel.yaml>=0.18",
+    "PyQt6>=6.9",
+    "PyQt6-Fluent-Widgets>=1.11",
+    "PyQt6-Frameless-Window>=0.8",
+    "darkdetect>=0.8",
+]
+
+[project.optional-dependencies]
+# 开发与自检：跑 pytest / 静态检查 / 打包
+dev = [
+    "pytest>=8.0",
+    "pyflakes>=3.0",
+    "autoflake>=2.0",
+    "pyinstaller>=6.0",
+    "pyinstaller-hooks-contrib>=2025.0",
+]
+
+[tool.pytest.ini_options]
+# 测试只覆盖不依赖真实游戏窗口的纯逻辑：注册表、配置读写、图片引用检查
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+# 项目源码在仓库根，测试通过 conftest.py 把它加进 sys.path
+norecursedirs = [".venv", "build", "dist", ".dsh-scratch", "pic", "config", "logs"]
+
+[tool.setuptools]
+# 本仓库不是要 pip install 的库：源码直接放在根目录运行。
+# 这里只声明 pyproject 用于工具配置（pytest / 静态检查 / 打包元信息）。
+packages = []
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# 只开高价值的规则：未使用导入/变量、未定义名称、重复键、f-string 无占位符
+select = ["F", "E9"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# 任务模块里保留历史注释与调试代码，不强制清理
+"Task_*.py" = ["F401"]
