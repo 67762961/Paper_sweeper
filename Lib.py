@@ -494,13 +494,29 @@ def Sleep_print_long(Wait_time):
 def read_config(FILE_PATH):
     """
     读取YAML配置文件
+
+    文件不存在、内容为空或格式损坏时返回空字典，而不是抛异常。
+    配置损坏不应该让 GUI 在启动时就崩掉——具体是哪个文件、什么原因，由日志暴露；
+    真正依赖配置内容的调用方会在取键时失败，报错位置更准确。
+
+    :param FILE_PATH: 配置文件路径
+    :return: 解析后的配置字典；无法读取或解析时返回 {}
     """
-    yaml = ruamel.yaml.YAML()
-    if os.path.exists(FILE_PATH):
-        with open(FILE_PATH, "r", encoding="utf-8") as f:
-            return yaml.load(f)
-    else:
+    if not os.path.exists(FILE_PATH):
         return {}
+
+    try:
+        yaml = ruamel.yaml.YAML()
+        with open(FILE_PATH, "r", encoding="utf-8") as f:
+            data = yaml.load(f)
+    except (OSError, UnicodeDecodeError, ruamel.yaml.YAMLError) as error:
+        reason = str(error).splitlines()[0] if str(error) else type(error).__name__
+        print("        INFO- ----- 配置文件无法解析，按空配置处理:", FILE_PATH)
+        print("        INFO- -----", reason)
+        return {}
+
+    # 空文件解析结果是 None，统一成空字典，避免调用方对 None 取键
+    return data if data is not None else {}
 
 
 def write_config(FILE_PATH, data):
