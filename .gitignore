@@ -25,6 +25,8 @@ app_crash.log
 txt.txt
 
 # ---- 调试脚本（不作为交付入口）----
+# 本地调试脚本统一放 dev/（见 dev/README.md）；下面两条不带路径，
+# 会匹配任意层级的同名文件，因此 dev/test.py、dev/test_main.py 同样被忽略。
 test.py
 test_main.py
 
