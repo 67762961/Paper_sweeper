@@ -9,6 +9,7 @@ import random
 from datetime import datetime, timedelta
 import os
 import ruamel.yaml
+import shutil
 import subprocess
 import threading
 import yaml
@@ -494,13 +495,29 @@ def Sleep_print_long(Wait_time):
 def read_config(FILE_PATH):
     """
     读取YAML配置文件
+
+    文件不存在、内容为空或格式损坏时返回空字典，而不是抛异常。
+    配置损坏不应该让 GUI 在启动时就崩掉——具体是哪个文件、什么原因，由日志暴露；
+    真正依赖配置内容的调用方会在取键时失败，报错位置更准确。
+
+    :param FILE_PATH: 配置文件路径
+    :return: 解析后的配置字典；无法读取或解析时返回 {}
     """
-    yaml = ruamel.yaml.YAML()
-    if os.path.exists(FILE_PATH):
-        with open(FILE_PATH, "r", encoding="utf-8") as f:
-            return yaml.load(f)
-    else:
+    if not os.path.exists(FILE_PATH):
         return {}
+
+    try:
+        yaml = ruamel.yaml.YAML()
+        with open(FILE_PATH, "r", encoding="utf-8") as f:
+            data = yaml.load(f)
+    except (OSError, UnicodeDecodeError, ruamel.yaml.YAMLError) as error:
+        reason = str(error).splitlines()[0] if str(error) else type(error).__name__
+        print("        INFO- ----- 配置文件无法解析，按空配置处理:", FILE_PATH)
+        print("        INFO- -----", reason)
+        return {}
+
+    # 空文件解析结果是 None，统一成空字典，避免调用方对 None 取键
+    return data if data is not None else {}
 
 
 def write_config(FILE_PATH, data):
@@ -515,10 +532,29 @@ def write_config(FILE_PATH, data):
         yaml.dump(data, file)
 
 
+def _backup_corrupt_config(file_path):
+    """把损坏的配置文件另存为带时间戳的 .bak，返回备份路径；失败返回 None
+
+    check_lasttime 在配置损坏时会把文件重置为初始值，原内容若不先备份就永久丢失。
+    备份文件名形如 Last_times.yml.corrupt-20261021-204700.bak，与配置同目录。
+    """
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup_path = f"{file_path}.corrupt-{stamp}.bak"
+    try:
+        shutil.copy2(file_path, backup_path)
+        return backup_path
+    except OSError as error:
+        print("        WAIT- ----- 备份损坏配置失败:", error)
+        return None
+
+
 def check_lasttime(Account, Times_name):
     """
     检测上次运行的时间 如果文件或配置不存在则自动创建
     使用ruamel.yaml处理YAML格式配置文件
+
+    配置损坏时会重置为初始值，但重置前会把原文件备份成 .corrupt-*.bak，
+    避免用户的历史记录被静默清空。
     """
     file_path = "./config/Last_times.yml"  # 改为YAML文件扩展名
 
@@ -562,14 +598,21 @@ def check_lasttime(Account, Times_name):
                     config = yaml.load(content)
                     if config is None:  # 处理YAML文件内容为null的情况
                         config = CommentedMap()
-        except Exception as e:
-            print("读取配置文件失败: ", e)
+        except (OSError, UnicodeDecodeError, ruamel.yaml.YAMLError) as error:
+            print("        WAIT- ----- 读取配置文件失败:", str(error).splitlines()[0] if str(error) else type(error).__name__)
             # 尝试使用更宽松的方式重新读取
             try:
                 with open(file_path, "r", encoding="utf-8") as file:
                     config = yaml.load(file) or CommentedMap()
-            except:
-                print("配置文件格式错误 将重置")
+            except (OSError, UnicodeDecodeError, ruamel.yaml.YAMLError) as retry_error:
+                # 文件确实坏了：重置前先备份，否则历史记录会被静默清空
+                backup_path = _backup_corrupt_config(file_path)
+                print("        WAIT- ----- 配置文件格式错误，将重置为初始值")
+                if backup_path:
+                    print("        WAIT- ----- 原文件已备份:", backup_path)
+                else:
+                    print("        WAIT- ----- 备份失败，原文件内容将丢失")
+                print("        WAIT- ----- 原因:", str(retry_error).splitlines()[0] if str(retry_error) else type(retry_error).__name__)
                 config = CommentedMap()
 
     # 确保配置是CommentedMap类型
