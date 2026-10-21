@@ -10,7 +10,7 @@
 - 按窗口标题定位账号窗口（`master` / `slaves`），未找到时尝试按 `Setting.yml` 启动命令拉起模拟器；
 - OpenCV 模板匹配识别界面元素，Win32 / pyautogui / pydirectinput 完成点击与按键；
 - 任务级冷却与时间窗门禁，结果写回 `Last_times.yml`；
-- 日志双写（控制台 + `logs/<日期>/`），GUI 实时展示；
+- 日志双写（控制台 + `logs/<年-月>/<日期>/`），GUI 实时展示；
 - 当前任务域覆盖：签到收菜、结界养成、地域鬼王、寮三十与真蛇、结界突破、狩猎战/阴界、逢魔之时。
 
 当前代码版本：GUI 标题标注 `v1.3.0`。
@@ -28,7 +28,7 @@ flowchart LR
     REG["main.TASK_REGISTRY\n任务注册表（唯一事实源）"] --> GUI
     REG --> FO
     REG --> SO
-    TM["test_main.py\n开发调试入口"] --> FO
+    TM["dev/test_main.py\n开发调试入口（不入库）"] --> FO
     FO --> T1["MainTask_Signin"]
     FO --> T2["MainTask_Jiejieyangcheng"]
     FO --> T3["MainTask_Digui"]
@@ -40,8 +40,8 @@ flowchart LR
     T1 & T2 & T3 & T4 & T5 & T6 & T7 --> LIB["Lib.py\n识别/点击/界面/配置\nrun_accounts_task 统一流程"]
     LIB --> CFG["config/Setting.yml\nconfig/Last_times.yml"]
     LIB --> PIC["pic/**\n模板图片"]
-    FO --> LOG["logs/<date>/console_output_*.log"]
-    SO --> SLOG["logs/<date>/single_<key>_*.log"]
+    FO --> LOG["logs/<YYYY-MM>/<YYYY-MM-DD>/console_output_*.log"]
+    SO --> SLOG["logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log"]
 ```
 
 ### 目录结构
@@ -75,9 +75,14 @@ flowchart LR
 ├── Task_JiejieFight.py            结界突破
 ├── Task_Shouliezhan.py            狩猎战（麒麟）与阴界之门
 ├── Task_Fengmo.py                 逢魔之时
-├── test.py / test_main.py         开发调试入口（已忽略，不参与交付）
+├── dev/                            本地调试脚本（已忽略，不参与交付）
+│   ├── test.py                     单点验证模板 / 界面动作
+│   ├── test_main.py                单独跑某个 MainTask_* 入口
+│   └── README.md                   说明与注意事项（唯一入库的文件）
 ├── tools/                         开发辅助脚本（不参与打包）
-│   └── check_pics.py              模板图引用检查：失效引用 / 大小写不一致 / 死图
+│   ├── check_pics.py              模板图引用检查：失效引用 / 大小写不一致 / 死图
+│   ├── clean_logs.py              旧日志清理（按年月分层，默认预览）
+│   └── gen_pic_readme.py          生成 pic/README.md 索引
 ├── config/                        运行配置（默认忽略）
 │   ├── Setting.yml                启动项、结界突破、寮三十副本表
 │   ├── Last_times.yml             各账号各任务上次完成时间
@@ -97,8 +102,14 @@ flowchart LR
 ├── tools/                         开发辅助脚本（不参与打包）
 │   ├── check_pics.py              模板图引用检查
 │   └── gen_pic_readme.py          生成 pic/README.md 索引
-├── logs/<YYYY-MM-DD>/             运行日志（console_output_*.log / single_<key>_*.log）
-└── build/ __pycache__/ .venv/     构建与环境产物（GUI.exe 直接生成在根目录）
+├── tests/                         pytest 用例（68 个，纯逻辑不碰窗口）
+├── logs/<YYYY-MM>/<YYYY-MM-DD>/   运行日志（console_output_*.log / single_<key>_*.log）
+├── logs/app_crash.log             崩溃日志（随 exe 目录）
+└── __pycache__/ .venv/            环境产物
+```
+
+> 打包中间产物不再落在源码树：`build_exe.py` 用 `--workpath` 把它写到
+> `.dsh-scratch/build-tmp/pyinstaller/`（已忽略，可随时整体删除）。
 ```
 
 ## 4. 数据 / 控制流向
@@ -115,7 +126,7 @@ WorkerThread(task_key).run()        # task_key=None 表示完整运行
 task_key is None → main.Full_operation(console_signal)
 否则            → main.Single_operation(task_key, console_signal)
         ↓
-Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信号
+Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_*.log + GUI 信号
         ↓
 依次调用 MainTask_* / FullTask_*（完整运行按 TASK_REGISTRY 顺序，单任务只调用一项）
         ↓
@@ -137,7 +148,10 @@ Tee 重定向 stdout → 控制台 + logs/<date>/<日志前缀>_*.log + GUI 信�
 
 ### 5.1 `GUI.py` 与 `ui/` 包
 
-`GUI.py` 只作为入口：设置 Windows DPI（`QT_QPA_PLATFORM=windows:dpiawareness=1`）、安装全局异常钩子（写入 `app_crash.log`）、创建 `QApplication` 并应用主题，最后转出 `ui/` 中的组件供脚本/测试使用。
+`GUI.py` 只作为入口：设置 Windows DPI（`QT_QPA_PLATFORM=windows:dpiawareness=1`）、安装全局异常钩子（写入 `logs/app_crash.log`）、创建 `QApplication` 并应用主题，最后转出 `ui/` 中的组件供脚本/测试使用。
+
+> 崩溃日志的基目录按运行形态取：源码运行时是项目根，PyInstaller 打包后是 `GUI.exe` 所在目录
+> （打包后 `__file__` 指向临时解压目录，进程退出即被清理，不能用来定位日志）。
 
 界面实现位于 `ui/` 包，依赖方向固定为 `theme → icons → widgets → panels → window`，禁止反向引用：
 
@@ -219,7 +233,7 @@ Single_operation(task_key, console_signal=None)  # 单任务运行
 职责：
 
 - 维护 `TASK_REGISTRY`：`TaskEntry(key, title, desc, entry, lasttime_keys, today_keys)`，是「左侧行列表 / 完整运行顺序 / GUI 状态键」的唯一事实源；
-- 创建日志文件：完整运行为 `logs/<YYYY-MM-DD>/console_output_<时间戳>.log`，单任务为 `logs/<YYYY-MM-DD>/single_<key>_<时间戳>.log`；
+- 创建日志文件：完整运行为 `logs/<YYYY-MM>/<YYYY-MM-DD>/console_output_<时间戳>.log`，单任务为 `logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_<时间戳>.log`；
 - 用 `Tee` 把 stdout 同时写到原控制台、日志文件和 GUI 信号；
 - 完整运行按注册表顺序编排并按任务开关跳过，单任务运行只调用一项且**不看开关**；
 - 捕获 `TaskStopped` 统一收尾（打印 `QUIT-` 与中断结束行），任务之间也会 `check_stop()`，因此上一步结束后按下的中断同样生效；
@@ -476,7 +490,7 @@ for step in range(30):
 | `MOVE-` / `QUIT-` | 滚轮、Esc 等操作；`QUIT-` 也用于「收到中断指令」 |
 | `MAIN-` | 完整流程 / 单任务运行起止；被中断时结束行改为「被中断 |
 
-GUI 崩溃日志：`app_crash.log`（`logging` + `sys.excepthook`）。
+GUI 崩溃日志：`logs/app_crash.log`（`logging` + `sys.excepthook`）。
 
 右侧日志面板按行首关键字着色：`ERROR` / `错误` → 红，`SKIP-` → 橙，`TASK-` / `MAIN-` → 蓝，其余使用正文色；
 深浅色各有一套取值，切换主题后会重新着色已有日志；
@@ -504,15 +518,15 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 
 ```
 <workspace>/
-├── logs/<YYYY-MM-DD>/console_output_<timestamp>.log   完整运行日志
-├── logs/<YYYY-MM-DD>/single_<key>_<timestamp>.log     单任务运行日志
-├── app_crash.log                                      未捕获异常
-├── config/Last_times.yml                              任务冷却状态（本地）
-├── config/Gui_state.yml                               任务开关（本地）
-├── config/gui.json                                    界面偏好（本地）
-├── build/                                             PyInstaller 中间产物
-├── GUI.exe                                            打包产物（直接在根目录，默认忽略）
-└── __pycache__/                                       字节码缓存
+├── logs/<YYYY-MM>/<YYYY-MM-DD>/console_output_<timestamp>.log   完整运行日志
+├── logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_<timestamp>.log     单任务运行日志
+├── logs/app_crash.log                                          未捕获异常
+├── config/Last_times.yml                                       任务冷却状态（本地）
+├── config/Gui_state.yml                                        任务开关（本地）
+├── config/gui.json                                             界面偏好（本地）
+├── .dsh-scratch/build-tmp/pyinstaller/                         PyInstaller 中间产物
+├── GUI.exe                                                     打包产物（直接在根目录，默认忽略）
+└── __pycache__/                                                字节码缓存
 ```
 
 运行模式：
@@ -521,9 +535,10 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | ---- | ---- | ---- |
 | GUI | `python GUI.py` | 单击左侧卡片跑单个任务；「完整运行」按注册表顺序跑全套；运行中点「中断运行」立即停止并回待机 |
 | 脚本 | 调用 `main.Full_operation()` | 无 GUI，输出到控制台与日志 |
-| 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<日期>/single_<key>_*.log` |
-| 调试 | `test.py` / `test_main.py` | 单点验证模板/任务，已 gitignore |
+| 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log` |
+| 调试 | `dev/test.py` / `dev/test_main.py` | 单点验证模板/任务，已 gitignore（见 `dev/README.md`） |
 | 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.1） |
+| 清理 | `python tools/clean_logs.py` | 旧日志清理（默认预览，`--apply` 才删） |
 | 打包 | `python build_exe.py` | 调用 `GUI.spec`，产物 `GUI.exe` 直接输出到项目根目录 |
 
 ### 8.1 模板图引用检查（`tools/check_pics.py`）
@@ -558,7 +573,7 @@ python tools/check_pics.py --quiet    # 只输出错误（适合接 CI / pre-com
 3. 识别阈值、点击等待写在调用处，修改后需用真实窗口回归；调试可临时 `Flag_show=1` 弹出标注框。
 4. 时间窗、星期分支写在 `MainTask_*` 入口层，不要埋进底层 `Lib` 点击函数。
 5. 冷却成功写回、失败不写回；`Setting.yml` 只放用户可改的静态配置，GUI 偏好分别写 `Gui_state.yml`（任务开关）与 `gui.json`（主题），三者不要混用。
-6. `config/`、`logs/`、`build/`、`dist/`、`GUI.exe`、调试脚本默认不入库；需要跟踪的新源码与文档请在 `.gitignore` 中显式排除忽略。
+6. `config/`、`logs/`、`.dsh-scratch/`、`GUI.exe`、`dev/` 下的调试脚本默认不入库；需要跟踪的新源码与文档请在 `.gitignore` 中显式排除忽略。根目录只允许放源码、子目录与工程配置（见 `AGENTS.md` 的「根目录白名单」）。
 7. 修改 `Lib.py` 公共匹配/点击/界面函数前，确认所有 `Task_*` 调用方语义不变，尤其是返回值 `1/0` 与 `Range/Matchs` 约定。
 8. 新增界面依赖（如 Fluent 组件库）时，必须同步 `requirements.txt` 与 `GUI.spec` 的 `hiddenimports`，并用 `python build_exe.py` 验证打包产物可启动。
 9. 本项目通过公开 UI 自动化交互，不修改游戏文件；文档与注释避免暗示注入、外挂或协议破解能力。

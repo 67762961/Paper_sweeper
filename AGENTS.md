@@ -12,7 +12,32 @@
 - 代码与 .md 文件用 UTF-8 编码；必要时保持 CRLF 格式。
 - 修改任务流程、界面导航或公共库函数前，必须先阅读 ARCHITECTURE.md，理解入口编排、状态机与 Lib 调用链。
 - 修改后要同步检查 .gitignore、ARCHITECTURE.md、AGENTS.md 和 README.md 中的目录/功能说明。
-- 运行 GUI：`python GUI.py`；完整流程入口：`main.Full_operation()`。调试脚本 `test.py` / `test_main.py` 已忽略，不作为交付入口。
+- 运行 GUI：`python GUI.py`；完整流程入口：`main.Full_operation()`。本地调试脚本放 `dev/`（如 `dev/test.py` / `dev/test_main.py`，见 `dev/README.md`），不入库、不作为交付入口。
+
+### 根目录白名单
+
+**根目录只允许放三类东西**，其它一律归到子目录或写进 `.gitignore`：
+
+| 类别 | 允许的条目 |
+|---|---|
+| 源码 | `Lib.py`、`main.py`、`GUI.py`、`Task_*.py`（7 个） |
+| 子目录 | `ui/`、`tools/`、`tests/`、`pic/`、`dev/` |
+| 工程配置与文档 | `pyproject.toml`、`requirements.txt`、`requirements-dev.txt`、`GUI.spec`、`build_exe.py`、`.gitignore`、`.gitattributes`、`README.md`、`AGENTS.md`、`ARCHITECTURE.md` |
+
+**运行期产物不得落在根目录**（均已忽略，且已迁到子目录）：
+
+| 产物 | 现在的位置 | 生成者 |
+|---|---|---|
+| 运行日志 | `logs/<YYYY-MM>/<YYYY-MM-DD>/` | `main._log_stream` |
+| 崩溃日志 | `logs/app_crash.log` | `GUI.py` |
+| 打包中间产物 | `.dsh-scratch/build-tmp/pyinstaller/` | `build_exe.py --workpath` |
+| 打包产物 | 根目录 `GUI.exe` | `build_exe.py`（**唯一允许留在根目录的产物**，必须与 `pic/`、`config/` 同级才能运行） |
+| 运行期配置 | `config/`、`config.py` | 用户自备 / `build_exe.py` 自动生成 |
+| 调试脚本 | `dev/` | 本地编写，不入库 |
+
+新增文件前先问「它属于上面哪一类」。都不属于，就说明该放子目录或写进 `.gitignore`。
+
+日志清理：`python tools/clean_logs.py`（默认只预览，加 `--apply` 才删除，默认保留最近 6 个月）。
 
 ### 编码规范
 - 任务模块统一 `Task_*.py` 前缀，主入口函数命名为 `MainTask_*`；完整流程变体可用 `FullTask_*`。
