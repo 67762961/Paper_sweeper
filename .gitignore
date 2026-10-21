@@ -21,6 +21,8 @@ Backup
 config
 config.py
 logs
+# 旧版本把崩溃日志写在项目根；新版本已改到 logs/app_crash.log。
+# 保留这条规则是为了兼容历史文件（老 GUI.exe 仍可能在这里生成）。
 app_crash.log
 txt.txt
 
