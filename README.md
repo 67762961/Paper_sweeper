@@ -188,6 +188,276 @@ python tools/check_pics.py --quiet    # 只输出错误
 
 ---
 
+## 开发与自检
+
+面向要改代码的人。只想跑日常的话，上面的「快速开始」就够了。
+
+### 依赖分两份
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt            # 只跑日常：图像识别 + 界面
+pip install -r requirements-dev.txt        # 改代码：pytest / 静态检查 / 打包
+```
+
+- `requirements.txt` —— 运行期依赖，**只列代码真正 import 的包**（精确版本，便于复现）
+- `requirements-dev.txt` —— 测试、静态检查、打包工具
+- `pyproject.toml` —— 工具配置（pytest 路径、ruff 规则）与项目元信息；本项目**不是**要 `pip install` 的库，源码直接放在根目录运行
+
+### 自检三件套
+
+改完代码按这个顺序过一遍，从便宜到贵：
+
+```powershell
+# 1. 语法与静态检查（秒级）
+python -m compileall -q Lib.py main.py Task_*.py ui tools
+
+# 2. 单元测试（秒级，不碰游戏窗口）
+python -m pytest
+
+# 3. 模板图引用（改了 pic/ 或模板路径才需要）
+python tools/check_pics.py
+```
+
+`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 68 个用例：
+
+| 文件 | 用例数 | 覆盖内容 |
+|---|---|---|
+| `tests/test_task_registry.py` | 20 | `TASK_REGISTRY` 一致性：key 唯一、入口可调用、状态键合法、今日判定键是状态键子集、默认开关全开、注册表顺序即整跑顺序 |
+| `tests/test_config_io.py` | 33 | 四类配置的读写与**回落**：`gui.json` 非法值回默认、`Gui_state.yml` 缺文件默认全开、`Last_times.yml` 缺失/空文件/坏 YAML/坏时间都能自愈、`read_config` 缺失返回 `{}` |
+| `tests/test_check_pics.py` | 15 | `tools/check_pics.py` 自身的判定逻辑（失效引用、大小写不一致、死图、动态拼接豁免） |
+
+> 新增任务时，先跑 `python -m pytest tests/test_task_registry.py` —— 忘记登记注册表或状态键写错会立刻失败。
+
+---
+
+### 怎么写测试（从零开始）
+
+如果你没写过测试，这一节够用了。**不需要装任何额外东西**，`requirements-dev.txt` 里的 `pytest` 就是全部。
+
+#### 第 0 步：三条规矩
+
+1. **文件名必须是 `test_*.py`**，放在 `tests/` 下，`pytest` 才会自动找到它
+2. **函数名必须是 `test_` 开头**，否则不会被当成用例
+3. **每个函数只断言一件事**，失败时一眼能看出哪里坏了
+
+就这么简单。没有基类、没有注册、没有配置文件要改。
+
+#### 第 1 步：最简单的用例
+
+新建 `tests/test_我的功能.py`：
+
+```python
+# -*- coding: utf-8 -*-
+"""一句话说明这个文件在测什么。"""
+
+import main
+
+
+def test_注册表有七个任务():
+    assert len(main.TASK_REGISTRY) == 7
+```
+
+跑一下：
+
+```powershell
+python -m pytest tests/test_我的功能.py -v
+```
+
+输出：
+
+```
+tests/test_我的功能.py::test_注册表有七个任务 PASSED   [100%]
+```
+
+`assert` 就是「我断言这里应该是这样」。成立就通过，不成立就失败并打印实际值。
+
+> 函数名可以用中文，Python 3 支持。中文名读起来更清楚，失败时一眼知道哪条规则破了。
+
+#### 第 2 步：不要碰真实配置（`tmp_path` + `monkeypatch`）
+
+问题：`Lib.read_config("./config/Setting.yml")` 用的是**相对路径**。如果测试直接在项目里跑，会读到、甚至覆盖你真实的配置。
+
+解法：把工作目录临时切到一个空目录。`pytest` 自带两个工具：
+
+- **`tmp_path`** —— 一个全新的临时目录，每个用例都不一样，用完自动清理
+- **`monkeypatch.chdir()`** —— 临时切换工作目录，用例结束自动切回来
+
+```python
+import os
+import Lib
+
+
+def test_写进去能读出来(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)          # 工作目录 -> 临时目录
+    os.makedirs("config", exist_ok=True) # 建个空的 config/
+
+    Lib.write_config("./config/Test.yml", {"键": "值"})
+
+    assert Lib.read_config("./config/Test.yml")["键"] == "值"
+```
+
+关键在于：**只要函数参数里写了 `tmp_path`，pytest 就会自动传一个临时目录给你**。不用自己创建，不用自己删除。
+
+项目里还封装了一个更省事的夹具 `tmp_config_dir`（在 `tests/conftest.py`），它把上面两步都做了：
+
+```python
+import main
+
+
+def test_默认全开(tmp_config_dir):
+    # tmp_config_dir 已经帮你 chdir 并建好 config/ 了
+    switches = main.read_task_switches()
+    assert all(switches.values())
+```
+
+#### 第 3 步：一个逻辑测多种情况（`@pytest.mark.parametrize`）
+
+比如「解析时间字符串」，正常值、边界值、坏值都要测。不用写 4 个函数：
+
+```python
+import pytest
+import main
+
+
+@pytest.mark.parametrize(
+    "raw, expected_hour",
+    [
+        ("2026-10-19 08:30:00", 8),
+        ("2026-10-19 23:59:59", 23),
+        ("不是时间", None),
+        ("", None),
+    ],
+)
+def test_解析时间(raw, expected_hour):
+    moment = main._parse_time(raw)
+    if expected_hour is None:
+        assert moment is None
+    else:
+        assert moment.hour == expected_hour
+```
+
+`parametrize` 会把它展开成 4 个独立用例。**哪个输入坏了，报告里直接写着**，不用猜。
+
+#### 第 4 步：验证「调用了什么」（`monkeypatch.setattr`）
+
+有些函数不好直接测结果（比如它只负责把数据交给别的函数）。这时可以**临时替换掉被调用的函数**，看它收到了什么。
+
+```python
+import main
+
+
+def test_开关写进了配置文件(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    calls = []
+
+    def 假的写配置(path, data):
+        calls.append((path, data))
+
+    # 把 main.write_config 临时换成假的（用例结束自动换回来）
+    monkeypatch.setattr(main, "write_config", 假的写配置)
+
+    main.set_task_switch("digui", False)
+
+    assert len(calls) == 1
+    path, data = calls[0]
+    assert path == "./config/Gui_state.yml"
+    assert data["任务开关"]["digui"] is False
+```
+
+这个手法在项目里很有用：测试**不需要真的写盘**，也不需要真的启动游戏窗口，就能验证逻辑对不对。
+
+#### 第 5 步：测试「应该报错」（`pytest.raises`）
+
+中断机制是个好例子：用户点「中断运行」后，下一个检查点必须抛 `TaskStopped`。
+
+```python
+import pytest
+import Lib
+
+
+def test_请求中断后检查点抛异常():
+    Lib.reset_stop()
+    Lib.request_stop()
+
+    with pytest.raises(Lib.TaskStopped):
+        Lib.check_stop()
+
+    Lib.reset_stop()   # 清理，别影响下一个用例
+```
+
+`with pytest.raises(...)` 的意思是「这行代码**必须**抛出这个异常」。如果它没抛，用例就失败。
+
+#### 第 6 步：跑测试的几种姿势
+
+```powershell
+python -m pytest                              # 全部
+python -m pytest tests/test_config_io.py      # 单个文件
+python -m pytest -k 开关                       # 名字含「开关」的用例
+python -m pytest -v                           # 显示每个用例名
+python -m pytest -x                           # 第一个失败就停
+python -m pytest --lf                         # 只重跑上次失败的
+```
+
+#### 第 7 步（重要）：怎么确认测试真的有用
+
+**测试通过 ≠ 测试有用。**
+
+一个测试可能什么都没检查（比如 `assert True`），永远通过；也可能因为写法不对，被测代码坏了它也不报。
+
+验证办法叫**变异测试**：故意把代码改坏，看测试会不会失败。
+
+举个例子，想确认「寮三十今日判定只看寮三十」这条规则有没有被测住：
+
+1. 打开 `main.py`，找到 `("寮三十",)`
+2. 改成 `("寮三十", "真蛇")` —— 模拟手滑
+3. 跑 `python -m pytest tests/test_task_registry.py`
+4. **必须看到失败**。如果还是全绿，说明测试没接上线，得补用例
+5. 改回去
+
+本项目 PR4 就是这么验证的：17 个人工变异，全部被抓住。
+
+#### 常见坑
+
+| 现象 | 原因 | 解决 |
+|---|---|---|
+| `ModuleNotFoundError: No module named 'main'` | 测试跑在别的目录 | 在项目根目录跑；或确认 `tests/conftest.py` 存在（它负责把根目录加进 `sys.path`） |
+| 测试改了你的真实 `config/` | 忘了 `monkeypatch.chdir(tmp_path)` | 所有碰相对路径的用例都要加这个参数 |
+| 用例之间互相影响 | 上一个用例留下了状态 | 每个用例自己准备数据、自己清理；别依赖执行顺序 |
+| 中文函数名报编码错误 | 文件不是 UTF-8 | 文件头加 `# -*- coding: utf-8 -*-`，保存为 UTF-8 无 BOM |
+| 测试通过但功能还是坏的 | 断言太弱（只测了「不报错」） | 用第 7 步的变异测试验证一下 |
+
+#### 这个项目该测什么、不该测什么
+
+**该测**（纯逻辑，跑得飞快，不碰游戏）：
+
+- 注册表一致性、配置读写与回落
+- 时间窗判断、冷却计算、字符串解析
+- 工具脚本的判定逻辑（`check_pics` 这类）
+
+**不该测**（要真实窗口，慢且不稳定）：
+
+- 图像识别（依赖具体分辨率与皮肤）
+- 鼠标点击、键盘输入
+- 界面渲染
+
+**不要为了凑覆盖率去测不该测的**。当前 68 个用例覆盖的都是「改错了会静默出错」的地方，这才是测试的价值所在。
+
+---
+
+### 改代码时的约定
+
+- **入口编排**：单账号任务用 `Lib.run_accounts_task`，双账号协作（寮三十）用 `Lib.run_shared_task`；不要在任务模块里手写分隔线/时间窗/遍历账号/冷却判断这套流程
+- **模板图**：目录用英文、文件名用中文；改动后必须跑 `tools/check_pics.py`，新增/改名后再跑 `tools/gen_pic_readme.py` 刷新索引
+- **行尾**：仓库统一 CRLF（见 `.gitattributes`），用编辑器保存时注意别改成 LF，否则会产生整文件 diff
+- **临时产物**：中间脚本、备份、诊断报告写到 `.dsh-scratch/`（已被 `.gitignore` 忽略），不要散落在项目根目录
+
+更细的调用链与实施约束见 [ARCHITECTURE.md](./ARCHITECTURE.md)，提交前的完整约定见 [AGENTS.md](./AGENTS.md)。
+
+---
+
 ## 使用注意
 
 1. **工作目录**：请在项目根目录启动脚本，否则 `./pic`、`./config` 相对路径会失效。
@@ -226,15 +496,19 @@ Paper_sweeper/
 ├── Task_Fengmo.py         # 逢魔之时
 ├── pic/                   # 界面模板图（目录英文、文件名中文，详见 pic/README.md）
 ├── tools/                 # 开发辅助脚本（不参与打包）
-│   └── check_pics.py      # 模板图引用检查
+│   ├── check_pics.py      # 模板图引用检查
+│   └── gen_pic_readme.py  # 生成 pic/README.md 索引
+├── tests/                 # pytest 用例（纯逻辑，不依赖游戏窗口）
 ├── config/                # Setting.yml / Last_times.yml / Gui_state.yml / gui.json（本地）
 ├── logs/                  # 运行日志
-├── requirements.txt
+├── requirements.txt       # 运行期依赖（精确版本）
+├── requirements-dev.txt   # 测试 / 静态检查 / 打包依赖
+├── pyproject.toml         # 工具配置（pytest / ruff）与项目元信息
 ├── AGENTS.md              # 协作与编码约定（开发向）
 └── ARCHITECTURE.md        # 架构与任务地图（开发向）
 ```
 
-> `config.py`、`config/`、`logs/`、`build/`、`GUI.exe`、`app_crash.log` 均为运行期产物，已被 `.gitignore` 忽略，故不列在上方结构里。
+> `config.py`、`config/`、`logs/`、`build/`、`GUI.exe`、`app_crash.log`、`.dsh-scratch/` 均为运行期产物或本地临时目录，已被 `.gitignore` 忽略，故不列在上方结构里。
 
 更细的调用链、状态机与实施约束见 [ARCHITECTURE.md](./ARCHITECTURE.md)；提交代码前的约定见 [AGENTS.md](./AGENTS.md)。
 

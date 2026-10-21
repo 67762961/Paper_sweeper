@@ -9,6 +9,8 @@
 *.yaml    text eol=crlf
 *.json    text eol=crlf
 *.txt     text eol=crlf
+*.toml    text eol=crlf
+*.cfg     text eol=crlf
 *.spec    text eol=crlf
 *.gitignore text eol=crlf
 *.gitattributes text eol=crlf

@@ -27,3 +27,11 @@ txt.txt
 # ---- 调试脚本（不作为交付入口）----
 test.py
 test_main.py
+
+# ---- 本地教学示例（pytest 写法示范，不入库）----
+# 内容与 README「怎么写测试（从零开始）」一节重复，属于个人学习用的可运行副本。
+# 正式测试套件是 tests/test_task_registry.py 等三个文件，正常入库。
+tests/test_示例_*.py
+
+# ---- 会话临时产物收容所（不属于项目，可随时整体删除）----
+.dsh-scratch
