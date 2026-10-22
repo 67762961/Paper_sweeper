@@ -21,10 +21,14 @@ Backup
 config
 config.py
 logs
+# 旧版本把崩溃日志写在项目根；新版本已改到 logs/app_crash.log。
+# 保留这条规则是为了兼容历史文件（老 GUI.exe 仍可能在这里生成）。
 app_crash.log
 txt.txt
 
 # ---- 调试脚本（不作为交付入口）----
+# 本地调试脚本统一放 dev/（见 dev/README.md）；下面两条不带路径，
+# 会匹配任意层级的同名文件，因此 dev/test.py、dev/test_main.py 同样被忽略。
 test.py
 test_main.py
 

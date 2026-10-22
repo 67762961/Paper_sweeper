@@ -115,7 +115,7 @@ python GUI.py
    （日志打印 `QUIT- ----- 收到中断指令 已停止当前任务 回到待机`，按钮区复位、行内控件恢复）。
    中断**不做断点续跑**，也**不处理游戏内状态**（不会把角色拉回庭院）；再次点「完整运行」就是新的一轮，
    已完成的任务会按冷却/时间窗自动跳过，被中断的任务会重跑。中断响应通常在 0.2 秒内。
-6. 右侧控制台会实时打印识别与任务日志；同一份日志也会写入 `logs/<日期>/`
+6. 右侧控制台会实时打印识别与任务日志；同一份日志也会写入 `logs/<年-月>/<日期>/`
    （完整运行为 `console_output_*.log`，单任务为 `single_<key>_*.log`）。
 
 7. 右侧日志区顶部可一键**清空日志**、切换**自动滚动**；点击齿轮打开**设置**（主题、日志字号、打开日志目录）。
@@ -129,7 +129,7 @@ python GUI.py
 from main import Full_operation, Single_operation
 
 Full_operation()                  # 完整运行：控制台 + logs/ 文件
-Single_operation("fengmo")        # 只跑「逢魔之时」，日志写 logs/<日期>/single_fengmo_*.log
+Single_operation("fengmo")        # 只跑「逢魔之时」，日志写 logs/<年-月>/<日期>/single_fengmo_*.log
 ```
 
 `Single_operation` 的 key 与左侧任务行一一对应：`signin` / `jiejieyangcheng` / `digui` /
@@ -156,7 +156,8 @@ from Task_SignIn import MainTask_Signin
 MainTask_Signin()
 ```
 
-开发用脚本 `test.py` / `test_main.py` 不在版本库跟踪范围，可按需在本地改写，用于验证单张模板或单个状态机。
+开发用脚本放在 `dev/`（如 `dev/test.py` / `dev/test_main.py`），不在版本库跟踪范围，可按需在本地改写，
+用于验证单张模板或单个状态机。详见 [dev/README.md](./dev/README.md)。
 
 ### 方式四：打包为 exe
 
@@ -165,8 +166,11 @@ MainTask_Signin()
 
 ```powershell
 python build_exe.py            # 打包，产物为项目根目录的 GUI.exe
-python build_exe.py --fresh    # 先删除 build/ 与残留 dist/，做全新构建
+python build_exe.py --fresh    # 先清空构建缓存与历史遗留的 build/、dist/，做全新构建
 ```
+
+PyInstaller 的中间产物写在 `.dsh-scratch/build-tmp/pyinstaller/`（已被忽略），
+不会在源码树里生成 `build/`。
 
 脚本会依次检查 Python 版本（需 3.11+）与 PyInstaller 是否安装、核对 `GUI.spec` 与 `GUI.py`，
 并在缺少 `config.py` 时自动生成最小版本（`stop_thread = False`）。单次构建约 30～60 秒。
@@ -470,10 +474,11 @@ python -m pytest --lf                         # 只重跑上次失败的
 8. **协作与弹窗**：脚本会尝试自动关闭协作邀请与常见弹窗；若布局变化导致误判，优先检查 `pic/Main` 中相关模板。
 9. **硬编码坐标**：极少数界面（如庭院卷轴）仍使用绝对坐标，窗口位置/分辨率变化后可能失效。
 10. **日志排查**：
-   - 完整运行日志：`logs/<YYYY-MM-DD>/console_output_*.log`
-   - 单任务运行日志：`logs/<YYYY-MM-DD>/single_<key>_*.log`
-   - GUI 崩溃：`app_crash.log`
+   - 完整运行日志：`logs/<YYYY-MM>/<YYYY-MM-DD>/console_output_*.log`
+   - 单任务运行日志：`logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log`
+   - GUI 崩溃：`logs/app_crash.log`
    - 控制台匹配得分（`INFO- 0.0xx ...`）可辅助判断阈值是否过严/过松。
+   - 清理旧日志：`python tools/clean_logs.py`（默认只预览，`--apply` 才删除，默认保留 6 个月）。
 
 ---
 
@@ -497,10 +502,12 @@ Paper_sweeper/
 ├── pic/                   # 界面模板图（目录英文、文件名中文，详见 pic/README.md）
 ├── tools/                 # 开发辅助脚本（不参与打包）
 │   ├── check_pics.py      # 模板图引用检查
+│   ├── clean_logs.py      # 旧日志清理（按年月分层，默认预览）
 │   └── gen_pic_readme.py  # 生成 pic/README.md 索引
 ├── tests/                 # pytest 用例（纯逻辑，不依赖游戏窗口）
+├── dev/                   # 本地调试脚本（不入库，详见 dev/README.md）
 ├── config/                # Setting.yml / Last_times.yml / Gui_state.yml / gui.json（本地）
-├── logs/                  # 运行日志
+├── logs/                  # 运行日志（<年-月>/<日期>/，含 app_crash.log）
 ├── requirements.txt       # 运行期依赖（精确版本）
 ├── requirements-dev.txt   # 测试 / 静态检查 / 打包依赖
 ├── pyproject.toml         # 工具配置（pytest / ruff）与项目元信息
@@ -508,7 +515,9 @@ Paper_sweeper/
 └── ARCHITECTURE.md        # 架构与任务地图（开发向）
 ```
 
-> `config.py`、`config/`、`logs/`、`build/`、`GUI.exe`、`app_crash.log`、`.dsh-scratch/` 均为运行期产物或本地临时目录，已被 `.gitignore` 忽略，故不列在上方结构里。
+> `config.py`、`config/`、`logs/`、`GUI.exe`、`.dsh-scratch/` 均为运行期产物或本地临时目录，
+> 已被 `.gitignore` 忽略，故不列在上方结构里。打包中间产物已从源码树移到
+> `.dsh-scratch/build-tmp/pyinstaller/`，不再产生根目录 `build/`。
 
 更细的调用链、状态机与实施约束见 [ARCHITECTURE.md](./ARCHITECTURE.md)；提交代码前的约定见 [AGENTS.md](./AGENTS.md)。
 

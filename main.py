@@ -286,11 +286,17 @@ def set_task_switch(task_key, enabled):
 
 @contextlib.contextmanager
 def _log_stream(console_signal, log_prefix):
-    """把 stdout 同时重定向到原控制台、日志文件和 GUI 信号；退出时恢复并冲刷缓冲"""
+    """把 stdout 同时重定向到原控制台、日志文件和 GUI 信号；退出时恢复并冲刷缓冲
+
+    日志按「年-月 / 年-月-日」两级目录存放：
+        logs/2026-10/2026-10-21/console_output_2026-10-21_21-30-00.log
+
+    这样一个月一个目录，单目录下的文件数量不会无限增长，
+    清理旧日志时也能整月删除（见 tools/clean_logs.py）。
+    """
     now = datetime.datetime.now()
-    log_dir = os.path.join("logs", now.strftime("%Y-%m-%d"))
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    log_dir = os.path.join("logs", now.strftime("%Y-%m"), now.strftime("%Y-%m-%d"))
+    os.makedirs(log_dir, exist_ok=True)
 
     timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
     log_file_path = os.path.join(log_dir, f"{log_prefix}_{timestamp}.log")

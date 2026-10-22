@@ -5,10 +5,13 @@
 
 用法（在任意目录执行均可，脚本会自动切到项目根目录）：
     python build_exe.py            # 打包，产物输出到项目根目录 GUI.exe
-    python build_exe.py --fresh    # 先删除 build/ 与残留 dist/，做全新构建
+    python build_exe.py --fresh    # 先删除构建缓存与残留产物，做全新构建
 
 说明：
 - 打包配置来自项目根目录的 GUI.spec（onefile、无控制台窗口），通过 --distpath 指定输出位置。
+- PyInstaller 的中间产物（分析结果、依赖拷贝）默认写到源码树的 build/ 目录，
+  会污染根目录；本脚本通过 --workpath 统一改写到收容所 .dsh-scratch/build-tmp/pyinstaller/，
+  该目录已被 .gitignore 忽略，可随时整体删除。
 - pic/ 与 config/ 属于运行期外部资源，不打进 exe；exe 需要和它们放在同一目录下运行。
 - ui/window.py 会 import config，因此打包前若缺少 config.py 会自动生成最小版本（stop_thread = False）。
 - 若根目录 GUI.exe 正在运行会被系统锁定，脚本会在打包前直接报错提示，避免打包到一半失败。
@@ -29,6 +32,11 @@ ENTRY_FILE = "GUI.py"  # 打包入口
 APP_NAME = "GUI"  # 产物名，与 GUI.spec 中的 name 保持一致
 MIN_PYTHON = (3, 11)  # 项目要求 Python 3.11+
 CONFIG_PY = "config.py"
+
+# 构建中间产物目录：放到收容所里，避免 PyInstaller 在源码树里建 build/
+SCRATCH_DIR = os.path.join(PROJECT_ROOT, ".dsh-scratch", "build-tmp", "pyinstaller")
+WORK_PATH = os.path.join(SCRATCH_DIR, "work")
+DIST_PATH = os.path.join(SCRATCH_DIR, "dist")
 
 # 缺少 config.py 时自动生成的最小内容（ui/window.py 与 Lib.py 只依赖 stop_thread）
 DEFAULT_CONFIG_PY = '''# -*- coding: utf-8 -*-
@@ -126,25 +134,39 @@ def check_target_writable():
 
 
 def clean_outputs():
-    """可选：删除 build/ 与历史遗留的 dist/，保证全新构建"""
+    """可选：清空构建缓存与残留产物，保证全新构建
+
+    清理的是收容所里的 build-tmp 目录，而不是源码树；另外顺带清掉历史版本
+    遗留在根目录的 build/ 与 dist/（旧脚本曾把中间产物写在那里）。
+    """
+    for path in (WORK_PATH, DIST_PATH):
+        if os.path.isdir(path):
+            log(f"INFO- 删除构建缓存 {os.path.relpath(path, PROJECT_ROOT)}")
+            shutil.rmtree(path, ignore_errors=True)
+
+    # 历史遗留：旧版本把中间产物写在源码树里，这里顺手清理
     for name in ("build", "dist"):
         path = os.path.join(PROJECT_ROOT, name)
         if os.path.isdir(path):
-            log(f"INFO- 删除旧目录 {name}/")
+            log(f"INFO- 删除历史遗留目录 {name}/")
             shutil.rmtree(path, ignore_errors=True)
 
 
 def run_pyinstaller():
     """调用 PyInstaller 依据 GUI.spec 打包，产物直接写入项目根目录"""
     log("STEP 3/4 调用 PyInstaller 打包（首次构建耗时较长，请耐心等待）")
+    os.makedirs(SCRATCH_DIR, exist_ok=True)
+
     command = [
         sys.executable,
         "-m",
         "PyInstaller",
         "--noconfirm",              # 覆盖旧产物时不询问
         "--clean",                  # 清理 PyInstaller 缓存，避免旧依赖残留
+        "--workpath",
+        WORK_PATH,                  # 关键：中间产物改写到收容所，不污染源码树
         "--distpath",
-        PROJECT_ROOT,               # 关键：产物输出目录改为项目根目录
+        DIST_PATH,                  # 先输出到收容所，再由下面搬到根目录
         SPEC_FILE,
     ]
     log("INFO- " + " ".join(command))
@@ -156,6 +178,23 @@ def run_pyinstaller():
     if result.returncode != 0:
         fail(f"PyInstaller 返回码 {result.returncode}，打包失败；请查看上方日志")
     log(f"INFO- 打包完成，耗时 {elapsed:.1f} 秒")
+
+
+def move_artifact_to_root():
+    """把收容所里的产物搬到项目根目录（exe 必须与 pic/、config/ 同级才能运行）"""
+    built = os.path.join(DIST_PATH, f"{APP_NAME}.exe")
+    if not os.path.exists(built):
+        fail(f"PyInstaller 未产出 {built}")
+
+    target = target_exe()
+    if os.path.exists(target):
+        try:
+            os.remove(target)
+        except OSError as error:
+            fail(f"无法覆盖根目录的 {APP_NAME}.exe（可能程序还在运行）: {error}")
+
+    shutil.move(built, target)
+    log(f"INFO- 产物已移至根目录: {target}")
 
 
 def report():
@@ -172,7 +211,11 @@ def report():
 
 def main():
     parser = argparse.ArgumentParser(description="打包 Paper Sweeper 为单文件 GUI.exe（输出到项目根目录）")
-    parser.add_argument("--fresh", action="store_true", help="先删除 build/ 与残留 dist/，做全新构建")
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="先清空构建缓存（.dsh-scratch/build-tmp）与历史遗留的 build/、dist/，做全新构建",
+    )
     args = parser.parse_args()
 
     os.chdir(PROJECT_ROOT)
@@ -184,6 +227,7 @@ def main():
         if args.fresh:
             clean_outputs()
         run_pyinstaller()
+        move_artifact_to_root()
         report()
     except KeyboardInterrupt:
         print("BUILD- 已取消", flush=True)
