@@ -8,6 +8,7 @@ import numpy as np
 import random
 from datetime import datetime, timedelta
 import os
+import paths
 import ruamel.yaml
 import shutil
 import subprocess
@@ -122,9 +123,8 @@ def Find_windows(title):
 
 def Log_in(title):
     check_stop()
-    with open("./config/Setting.yml", "r", encoding="utf-8") as f:
-        config = read_config("./config/Setting.yml")
-        launch_cmd = config["启动项"][title]["启动命令"]
+    config = read_config(paths.SETTING)
+    launch_cmd = config["启动项"][title]["启动命令"]
     subprocess.Popen(launch_cmd, shell=True)
     print("        INFO- -----", title, "正在启动")
     _sleep_with_stop(25)
@@ -556,7 +556,7 @@ def check_lasttime(Account, Times_name):
     配置损坏时会重置为初始值，但重置前会把原文件备份成 .corrupt-*.bak，
     避免用户的历史记录被静默清空。
     """
-    file_path = "./config/Last_times.yml"  # 改为YAML文件扩展名
+    file_path = paths.LAST_TIMES
 
     # 初始化ruamel.yaml
     yaml = ruamel.yaml.YAML()
@@ -564,7 +564,8 @@ def check_lasttime(Account, Times_name):
     yaml.indent(mapping=2, sequence=4, offset=2)
     CommentedMap = ruamel.yaml.comments.CommentedMap
 
-    # 确保配置目录存在
+    # 确保状态目录存在（同时把旧布局 config/Last_times.yml 迁过来）
+    paths.ensure_state_dir()
     config_dir = os.path.dirname(file_path)
     if config_dir and not os.path.exists(config_dir):
         try:
@@ -663,7 +664,7 @@ def check_lasttime(Account, Times_name):
 
 def read_accounts():
     """读取 Last_times.yml 中的账号列表，保持文件中的顺序"""
-    config_data = read_config("./config/Last_times.yml")
+    config_data = read_config(paths.LAST_TIMES)
     return list(config_data.keys())
 
 
@@ -714,10 +715,10 @@ def write_task_time(Account, Times_name):
     :param Times_name: 任务键（如「逢魔之时」「邮件领取」）
     :return:           写入的时间字符串，便于调用方打印 TIME- 日志
     """
-    config = read_config("./config/Last_times.yml")
+    config = read_config(paths.LAST_TIMES)
     Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     config[Account][Times_name] = Now
-    write_config("./config/Last_times.yml", config)
+    write_config(paths.LAST_TIMES, config)
     return Now
 
 
@@ -810,11 +811,11 @@ def write_task_time_pair(Accounts, Times_name):
     :param Times_name: 任务键
     :return:           写入的时间字符串
     """
-    config = read_config("./config/Last_times.yml")
+    config = read_config(paths.LAST_TIMES)
     Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for i in range(len(Accounts)):
         config[Accounts[i]][Times_name] = Now
-    write_config("./config/Last_times.yml", config)
+    write_config(paths.LAST_TIMES, config)
     return Now
 
 

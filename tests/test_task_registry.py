@@ -77,7 +77,7 @@ def test_get_task_known_and_unknown():
 
 
 def test_all_tasks_enabled_by_default(tmp_config_dir):
-    """config/Gui_state.yml 缺失时默认全开"""
+    """state/Gui_state.yml 缺失时默认全开"""
     switches = main.read_task_switches()
     assert set(switches) == {task.key for task in main.TASK_REGISTRY}
     assert all(switches.values()), "缺失配置时应默认全部开启"

@@ -35,7 +35,7 @@ def test_read_config_broken_yaml_returns_empty(tmp_config_dir):
 def test_read_config_empty_file_returns_empty(tmp_config_dir):
     """空文件解析结果是 None，必须归一成 {}，否则 read_accounts 会对 None 取键"""
     (tmp_config_dir / "Last_times.yml").write_text("", encoding="utf-8")
-    assert Lib.read_config("./config/Last_times.yml") == {}
+    assert Lib.read_config("./state/Last_times.yml") == {}
 
 
 def test_read_config_invalid_utf8_returns_empty(tmp_config_dir):
