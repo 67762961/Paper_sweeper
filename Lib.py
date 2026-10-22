@@ -39,13 +39,13 @@ def reset_stop():
 
 
 def stop_requested():
-    """是否已请求中断：本模块的标志或项目级 config.stop_thread 任一为真"""
+    """是否已请求中断：本模块的标志或项目级 runtime.stop_thread 任一为真"""
     if _stop_event.is_set():
         return True
-    # 延迟导入避免与 GUI 入口循环依赖；config 缺失时按未请求处理
+    # 延迟导入避免与 GUI 入口循环依赖；runtime 缺失时按未请求处理
     try:
-        import config
-        return bool(getattr(config, "stop_thread", False))
+        import runtime
+        return bool(getattr(runtime, "stop_thread", False))
     except Exception:
         return False
 

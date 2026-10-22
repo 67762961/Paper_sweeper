@@ -13,7 +13,7 @@
   会污染根目录；本脚本通过 --workpath 统一改写到收容所 .dsh-scratch/build-tmp/pyinstaller/，
   该目录已被 .gitignore 忽略，可随时整体删除。
 - pic/ 与 config/ 属于运行期外部资源，不打进 exe；exe 需要和它们放在同一目录下运行。
-- ui/window.py 会 import config，因此打包前若缺少 config.py 会自动生成最小版本（stop_thread = False）。
+- ui/window.py 会 import runtime，因此打包前若缺少 runtime.py 会自动生成最小版本（stop_thread = False）。
 - 若根目录 GUI.exe 正在运行会被系统锁定，脚本会在打包前直接报错提示，避免打包到一半失败。
 """
 
@@ -31,18 +31,24 @@ SPEC_FILE = "GUI.spec"  # PyInstaller 打包配置
 ENTRY_FILE = "GUI.py"  # 打包入口
 APP_NAME = "GUI"  # 产物名，与 GUI.spec 中的 name 保持一致
 MIN_PYTHON = (3, 11)  # 项目要求 Python 3.11+
-CONFIG_PY = "config.py"
+# 运行期开关模块。PR7 起从 config.py 改名为 runtime.py：
+# 原先 config.py 与 config/ 目录同名，`import config` 的解析依赖「目录里没有
+# __init__.py」这一隐含前提，一旦有人往 config/ 加 __init__.py 就会变成包导入，
+# stop_thread 直接失效且没有任何报错。改名后彻底消除这个阴影。
+RUNTIME_PY = "runtime.py"
+# 旧名字，仅用于提示用户改名（不再生成）
+LEGACY_CONFIG_PY = "config.py"
 
 # 构建中间产物目录：放到收容所里，避免 PyInstaller 在源码树里建 build/
 SCRATCH_DIR = os.path.join(PROJECT_ROOT, ".dsh-scratch", "build-tmp", "pyinstaller")
 WORK_PATH = os.path.join(SCRATCH_DIR, "work")
 DIST_PATH = os.path.join(SCRATCH_DIR, "dist")
 
-# 缺少 config.py 时自动生成的最小内容（ui/window.py 与 Lib.py 只依赖 stop_thread）
-DEFAULT_CONFIG_PY = '''# -*- coding: utf-8 -*-
+# 缺少 runtime.py 时自动生成的最小内容（ui/window.py 与 Lib.py 只依赖 stop_thread）
+DEFAULT_RUNTIME_PY = '''# -*- coding: utf-8 -*-
 """项目级运行时开关（由 build_exe.py 自动生成的最小内容）。
 
-ui/window.py 与 Lib.py 通过 config.stop_thread 控制任务线程，后续需要额外开关时在此文件追加。
+ui/window.py 与 Lib.py 通过 runtime.stop_thread 控制任务线程，后续需要额外开关时在此文件追加。
 """
 
 stop_thread = False
@@ -96,17 +102,23 @@ def check_environment():
     log(f"INFO- Python {sys.version.split()[0]} | {sys.executable}")
 
 
-def ensure_config_py():
-    """确保存在 config.py：缺失时生成最小版本，否则打包出的 exe 启动即报 ModuleNotFoundError"""
-    log("STEP 2/4 检查本地运行时配置 config.py")
-    config_path = os.path.join(PROJECT_ROOT, CONFIG_PY)
-    if os.path.exists(config_path):
-        log(f"INFO- 已存在 {CONFIG_PY}，保持不变")
-        return
+def ensure_runtime_py():
+    """确保存在 runtime.py：缺失时生成最小版本，否则打包出的 exe 启动即报 ModuleNotFoundError"""
+    log("STEP 2/4 检查本地运行期开关 runtime.py")
+    runtime_path = os.path.join(PROJECT_ROOT, RUNTIME_PY)
 
-    with open(config_path, "w", encoding="utf-8", newline="\r\n") as f:
-        f.write(DEFAULT_CONFIG_PY)
-    log(f"INFO- 未找到 {CONFIG_PY}，已自动生成最小版本（stop_thread = False）")
+    # 旧名字存在时提示一下（不自动改，避免动用户文件）
+    legacy_path = os.path.join(PROJECT_ROOT, LEGACY_CONFIG_PY)
+    if os.path.exists(legacy_path) and not os.path.exists(runtime_path):
+        log(f"WAIT- 发现旧的 {LEGACY_CONFIG_PY}，程序已改用 {RUNTIME_PY}；"
+            f"请改名或删除它，否则会被忽略")
+
+    if os.path.exists(runtime_path):
+        log(f"INFO- 已存在 {RUNTIME_PY}，保持不变")
+    else:
+        with open(runtime_path, "w", encoding="utf-8", newline="\r\n") as f:
+            f.write(DEFAULT_RUNTIME_PY)
+        log(f"INFO- 未找到 {RUNTIME_PY}，已自动生成最小版本（stop_thread = False）")
 
     for directory in ("pic", "config"):
         if not os.path.isdir(os.path.join(PROJECT_ROOT, directory)):
@@ -222,7 +234,7 @@ def main():
 
     try:
         check_environment()
-        ensure_config_py()
+        ensure_runtime_py()
         check_target_writable()
         if args.fresh:
             clean_outputs()
