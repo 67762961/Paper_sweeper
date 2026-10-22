@@ -175,7 +175,7 @@ PyInstaller 的中间产物写在 `.dsh-scratch/build-tmp/pyinstaller/`（已被
 脚本会依次检查 Python 版本（需 3.11+）与 PyInstaller 是否安装、核对 `GUI.spec` 与 `GUI.py`，
 并在缺少 `runtime.py` 时自动生成最小版本（`stop_thread = False`）。单次构建约 30～60 秒。
 
-> 注意：`pic/` 与 `config/` 是运行期外部资源，**不会**打进 exe。请把 `GUI.exe` 与这两个目录放在同一目录下运行，
+> 注意：`pic/`、`config/`、`state/` 是运行期外部资源，**不会**打进 exe。请把 `GUI.exe` 与这些目录放在同一目录下运行，
 > 否则模板图与配置的相对路径会失效。根目录 `GUI.exe` 正在运行时会被锁定，打包前请先关闭程序。
 
 ### 方式五：检查模板图引用
@@ -215,8 +215,8 @@ pip install -r requirements-dev.txt        # 改代码：pytest / 静态检查 /
 改完代码按这个顺序过一遍，从便宜到贵：
 
 ```powershell
-# 1. 语法与静态检查（秒级）
-python -m compileall -q Lib.py main.py Task_*.py ui tools
+# 1. 语法检查（秒级）
+python -m compileall -q Lib.py main.py GUI.py build_exe.py paths.py Task_*.py ui tools tests
 
 # 2. 单元测试（秒级，不碰游戏窗口）
 python -m pytest
@@ -225,12 +225,17 @@ python -m pytest
 python tools/check_pics.py
 ```
 
-`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 68 个用例：
+`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 126 个用例：
 
 | 文件 | 用例数 | 覆盖内容 |
 |---|---|---|
 | `tests/test_task_registry.py` | 20 | `TASK_REGISTRY` 一致性：key 唯一、入口可调用、状态键合法、今日判定键是状态键子集、默认开关全开、注册表顺序即整跑顺序 |
 | `tests/test_config_io.py` | 33 | 四类配置的读写与**回落**：`gui.json` 非法值回默认、`Gui_state.yml` 缺文件默认全开、`Last_times.yml` 缺失/空文件/坏 YAML/坏时间都能自愈、`read_config` 缺失返回 `{}` |
+| `tests/test_config_corrupt.py` | 10 | **配置文件损坏时不崩**：`read_config` 对坏 YAML / 非法 UTF-8 返回 `{}`，上层四个调用方都不抛异常 |
+| `tests/test_config_backup.py` | 10 | **损坏配置先备份再重置**：重置前生成 `.corrupt-*.bak`，历史记录不被静默清空 |
+| `tests/test_paths.py` | 16 | **`config/` 与 `state/` 分层**：路径常量位置、旧布局迁移（不覆盖、不复制）、迁移后四个读取入口都能读到旧数据 |
+| `tests/test_runtime.py` | 9 | **`runtime.py` 命名约定**：`stop_thread` 可被消费、`config/` 里不能有 `__init__.py`、全项目禁止 `import config` |
+| `tests/test_logs.py` | 13 | 日志按年月分层、`clean_logs.py` 的按月/按天清理计划（只碰 `YYYY-MM` 目录） |
 | `tests/test_check_pics.py` | 15 | `tools/check_pics.py` 自身的判定逻辑（失效引用、大小写不一致、死图、动态拼接豁免） |
 
 > 新增任务时，先跑 `python -m pytest tests/test_task_registry.py` —— 忘记登记注册表或状态键写错会立刻失败。
@@ -282,7 +287,7 @@ tests/test_我的功能.py::test_注册表有七个任务 PASSED   [100%]
 
 #### 第 2 步：不要碰真实配置（`tmp_path` + `monkeypatch`）
 
-问题：`Lib.read_config("./config/Setting.yml")` 用的是**相对路径**。如果测试直接在项目里跑，会读到、甚至覆盖你真实的配置。
+问题：`Lib.read_config(paths.LAST_TIMES)` 里的路径是**相对路径**（`state/Last_times.yml`）。如果测试直接在项目里跑，会读到、甚至覆盖你真实的冷却历史。
 
 解法：把工作目录临时切到一个空目录。`pytest` 自带两个工具：
 
@@ -291,16 +296,17 @@ tests/test_我的功能.py::test_注册表有七个任务 PASSED   [100%]
 
 ```python
 import os
+
 import Lib
 
 
 def test_写进去能读出来(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)          # 工作目录 -> 临时目录
-    os.makedirs("config", exist_ok=True) # 建个空的 config/
+    monkeypatch.chdir(tmp_path)            # 工作目录 -> 临时目录
+    os.makedirs("state", exist_ok=True)    # 建个空的 state/
 
-    Lib.write_config("./config/Test.yml", {"键": "值"})
+    Lib.write_config("./state/Test.yml", {"键": "值"})
 
-    assert Lib.read_config("./config/Test.yml")["键"] == "值"
+    assert Lib.read_config("./state/Test.yml")["键"] == "值"
 ```
 
 关键在于：**只要函数参数里写了 `tmp_path`，pytest 就会自动传一个临时目录给你**。不用自己创建，不用自己删除。
@@ -351,6 +357,7 @@ def test_解析时间(raw, expected_hour):
 
 ```python
 import main
+import paths
 
 
 def test_开关写进了配置文件(tmp_path, monkeypatch):
@@ -367,7 +374,7 @@ def test_开关写进了配置文件(tmp_path, monkeypatch):
 
     assert len(calls) == 1
     path, data = calls[0]
-    assert path == "./state/Gui_state.yml"
+    assert path == paths.GUI_STATE      # 用常量比对，避免硬编码分隔符
     assert data["任务开关"]["digui"] is False
 ```
 
@@ -428,7 +435,7 @@ python -m pytest --lf                         # 只重跑上次失败的
 | 现象 | 原因 | 解决 |
 |---|---|---|
 | `ModuleNotFoundError: No module named 'main'` | 测试跑在别的目录 | 在项目根目录跑；或确认 `tests/conftest.py` 存在（它负责把根目录加进 `sys.path`） |
-| 测试改了你的真实 `config/` | 忘了 `monkeypatch.chdir(tmp_path)` | 所有碰相对路径的用例都要加这个参数 |
+| 测试改了你的真实 `config/` 或 `state/` | 忘了 `monkeypatch.chdir(tmp_path)` | 所有碰相对路径的用例都要加这个参数 |
 | 用例之间互相影响 | 上一个用例留下了状态 | 每个用例自己准备数据、自己清理；别依赖执行顺序 |
 | 中文函数名报编码错误 | 文件不是 UTF-8 | 文件头加 `# -*- coding: utf-8 -*-`，保存为 UTF-8 无 BOM |
 | 测试通过但功能还是坏的 | 断言太弱（只测了「不报错」） | 用第 7 步的变异测试验证一下 |
@@ -447,7 +454,7 @@ python -m pytest --lf                         # 只重跑上次失败的
 - 鼠标点击、键盘输入
 - 界面渲染
 
-**不要为了凑覆盖率去测不该测的**。当前 68 个用例覆盖的都是「改错了会静默出错」的地方，这才是测试的价值所在。
+**不要为了凑覆盖率去测不该测的**。当前 126 个用例覆盖的都是「改错了会静默出错」的地方，这才是测试的价值所在。
 
 ---
 
@@ -464,14 +471,14 @@ python -m pytest --lf                         # 只重跑上次失败的
 
 ## 使用注意
 
-1. **工作目录**：请在项目根目录启动脚本，否则 `./pic`、`./config` 相对路径会失效。
+1. **工作目录**：请在项目根目录启动脚本，否则 `./pic`、`./config`、`./state` 这些相对路径会失效。
 2. **不要抢占键鼠**：任务运行时脚本会置前游戏窗口并移动鼠标，请避免同时操作。
 3. **分辨率 / 皮肤**：模板图对 UI 缩放敏感；换分辨率或界面主题后应重截对应 `pic/` 子目录。
 4. **冷却状态**：成功完成会写入 `state/Last_times.yml`；若要强制重跑某任务，可删除该账号下对应键或改写时间。
 5. **界面偏好**：主题、日志自动滚动与日志字号保存在 `state/gui.json`；删除该文件即恢复默认（浅色 / 自动滚动 / 12 pt）。
 6. **中断运行**：中断是协作式的，任务在下一个检查点（≤0.2 秒）退出，不会强杀线程；中断后不保留进度，下次运行即新的一轮。中断瞬间鼠标键盘输入立即停止，但**不会**把角色拉回庭院。
 7. **任务开关**：左侧行的开关只影响「完整运行」，点击 ▶ 始终可以单跑该任务；开关状态存于 `state/Gui_state.yml`，删除该文件即恢复「全部开启」。
-8. **协作与弹窗**：脚本会尝试自动关闭协作邀请与常见弹窗；若布局变化导致误判，优先检查 `pic/Main` 中相关模板。
+8. **协作与弹窗**：脚本会尝试自动关闭协作邀请与常见弹窗；若布局变化导致误判，优先检查 `pic/common` 或 `pic/courtyard` 中的相关模板。
 9. **硬编码坐标**：极少数界面（如庭院卷轴）仍使用绝对坐标，窗口位置/分辨率变化后可能失效。
 10. **日志排查**：
    - 完整运行日志：`logs/<YYYY-MM>/<YYYY-MM-DD>/console_output_*.log`
@@ -491,6 +498,7 @@ Paper_sweeper/
 ├── build_exe.py           # 一键打包脚本（调用 GUI.spec，产物输出到根目录）
 ├── main.py                # 任务注册表、完整/单任务运行编排、任务开关与日志 Tee
 ├── Lib.py                 # 识别、点击、界面状态机、配置、编队
+├── paths.py               # 配置/状态文件路径常量 + 旧布局迁移
 ├── ui/                    # 界面层（theme → icons → widgets → panels → window）
 ├── Task_SignIn.py         # 登录收菜
 ├── Task_Jiejieyangcheng.py# 结界养成
@@ -506,7 +514,8 @@ Paper_sweeper/
 │   └── gen_pic_readme.py  # 生成 pic/README.md 索引
 ├── tests/                 # pytest 用例（纯逻辑，不依赖游戏窗口）
 ├── dev/                   # 本地调试脚本（不入库，详见 dev/README.md）
-├── config/                # Setting.yml / Last_times.yml / Gui_state.yml / gui.json（本地）
+├── config/                # Setting.yml（静态配置，用户手改）
+├── state/                 # Last_times.yml / Gui_state.yml / gui.json（程序读写）
 ├── logs/                  # 运行日志（<年-月>/<日期>/，含 app_crash.log）
 ├── requirements.txt       # 运行期依赖（精确版本）
 ├── requirements-dev.txt   # 测试 / 静态检查 / 打包依赖
@@ -515,9 +524,12 @@ Paper_sweeper/
 └── ARCHITECTURE.md        # 架构与任务地图（开发向）
 ```
 
-> `runtime.py`、`config/`、`logs/`、`GUI.exe`、`.dsh-scratch/` 均为运行期产物或本地临时目录，
+> `runtime.py`、`config/`、`state/`、`logs/`、`GUI.exe`、`.dsh-scratch/` 均为运行期产物或本地目录，
 > 已被 `.gitignore` 忽略，故不列在上方结构里。打包中间产物已从源码树移到
 > `.dsh-scratch/build-tmp/pyinstaller/`，不再产生根目录 `build/`。
+>
+> **`config/` 与 `state/` 的区别**：前者是**用户手改**的静态配置，后者是**程序读写**的运行期状态。
+> 删除 `state/` 即恢复初始状态（所有任务视为从未完成、开关全开、偏好回默认）。
 
 更细的调用链、状态机与实施约束见 [ARCHITECTURE.md](./ARCHITECTURE.md)；提交代码前的约定见 [AGENTS.md](./AGENTS.md)。
 
@@ -525,7 +537,7 @@ Paper_sweeper/
 
 ## 常见问题
 
-**Q：点击「完整运行」后立即报 `ModuleNotFoundError: No module named 'config'`？**  
+**Q：点击「完整运行」后立即报 `ModuleNotFoundError: No module named 'runtime'`？**  
 A：项目根目录缺少 `runtime.py`。创建该文件并写入 `stop_thread = False`（或执行 `python build_exe.py` 自动生成）。该文件已被 `.gitignore` 忽略，克隆仓库后不会自带。
 
 **Q：一直提示「未检测到窗口」？**  
