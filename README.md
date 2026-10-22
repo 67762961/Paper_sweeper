@@ -52,8 +52,8 @@ pip install -r requirements.txt
 仓库默认忽略运行配置与调试文件，克隆后请自行准备：
 
 1. **`config/Setting.yml`** —— 启动命令与任务参数（示例结构见下）。
-2. **`config/Last_times.yml`** —— 可为空；首次运行会按账号/任务自动初始化。
-3. **`config.py`（项目根目录）** —— 运行期停止标志模块，**已被 `.gitignore` 忽略、不在版本库中**；由 `ui/window.py` 与 `Lib.py` 在运行时 `import config`。最小内容：
+2. **`state/Last_times.yml`** —— 可为空；首次运行会按账号/任务自动初始化。
+3. **`runtime.py`（项目根目录）** —— 运行期停止标志模块，**已被 `.gitignore` 忽略、不在版本库中**；由 `ui/window.py` 与 `Lib.py` 在运行时 `import runtime`。最小内容：
 
    ```python
    stop_thread = False
@@ -108,7 +108,7 @@ python GUI.py
    - **任务名 + 上次运行时间**（多账号取最新一条）；
    - **齿轮**：该任务的配置入口，当前版本**暂未开放**，点击只弹提示；
    - **▶ 运行**：单击只运行这一项（不绕过任务自身的时间窗与冷却，条件不满足会打印 `SKIP-`）；
-   - **开关**：开启时参与「完整运行」，关闭时「完整运行」直接跳过该任务（配置存 `config/Gui_state.yml`，缺失默认全开）。
+   - **开关**：开启时参与「完整运行」，关闭时「完整运行」直接跳过该任务（配置存 `state/Gui_state.yml`，缺失默认全开）。
 3. **运行全套日常**：点击右侧 **「完整运行」**，按行顺序依次执行**开关开启**的任务；已关闭的任务会在日志里打印 `SKIP- ... 已在左侧关闭 跳过`。
 4. 运行期间所有行的按钮、齿轮与开关会一起禁用，避免并发抢占键鼠；结束后自动刷新「上次运行」时间与今日状态。
 5. **中断运行**：运行中「完整运行」左侧的 **「中断运行」** 按钮会变为可点。点击后立即停止当前任务并回到待机状态
@@ -135,7 +135,7 @@ Single_operation("fengmo")        # 只跑「逢魔之时」，日志写 logs/<�
 `Single_operation` 的 key 与左侧任务行一一对应：`signin` / `jiejieyangcheng` / `digui` /
 `thirty` / `jiejiefight` / `shouliezhan` / `fengmo`（完整列表见 `main.TASK_REGISTRY`）。
 `Full_operation` / `Single_operation` 都会遵守冷却与时间窗；其中 `Full_operation` 还会读取
-`config/Gui_state.yml` 的任务开关，跳过被关闭的任务。
+`state/Gui_state.yml` 的任务开关，跳过被关闭的任务。
 
 脚本里也可以主动中断（等价于 GUI 的「中断运行」）：
 
@@ -173,7 +173,7 @@ PyInstaller 的中间产物写在 `.dsh-scratch/build-tmp/pyinstaller/`（已被
 不会在源码树里生成 `build/`。
 
 脚本会依次检查 Python 版本（需 3.11+）与 PyInstaller 是否安装、核对 `GUI.spec` 与 `GUI.py`，
-并在缺少 `config.py` 时自动生成最小版本（`stop_thread = False`）。单次构建约 30～60 秒。
+并在缺少 `runtime.py` 时自动生成最小版本（`stop_thread = False`）。单次构建约 30～60 秒。
 
 > 注意：`pic/` 与 `config/` 是运行期外部资源，**不会**打进 exe。请把 `GUI.exe` 与这两个目录放在同一目录下运行，
 > 否则模板图与配置的相对路径会失效。根目录 `GUI.exe` 正在运行时会被锁定，打包前请先关闭程序。
@@ -312,7 +312,7 @@ import main
 
 
 def test_默认全开(tmp_config_dir):
-    # tmp_config_dir 已经帮你 chdir 并建好 config/ 了
+    # tmp_config_dir 已经帮你 chdir 并建好 config/ 与 state/ 了
     switches = main.read_task_switches()
     assert all(switches.values())
 ```
@@ -367,7 +367,7 @@ def test_开关写进了配置文件(tmp_path, monkeypatch):
 
     assert len(calls) == 1
     path, data = calls[0]
-    assert path == "./config/Gui_state.yml"
+    assert path == "./state/Gui_state.yml"
     assert data["任务开关"]["digui"] is False
 ```
 
@@ -467,10 +467,10 @@ python -m pytest --lf                         # 只重跑上次失败的
 1. **工作目录**：请在项目根目录启动脚本，否则 `./pic`、`./config` 相对路径会失效。
 2. **不要抢占键鼠**：任务运行时脚本会置前游戏窗口并移动鼠标，请避免同时操作。
 3. **分辨率 / 皮肤**：模板图对 UI 缩放敏感；换分辨率或界面主题后应重截对应 `pic/` 子目录。
-4. **冷却状态**：成功完成会写入 `config/Last_times.yml`；若要强制重跑某任务，可删除该账号下对应键或改写时间。
-5. **界面偏好**：主题、日志自动滚动与日志字号保存在 `config/gui.json`；删除该文件即恢复默认（浅色 / 自动滚动 / 12 pt）。
+4. **冷却状态**：成功完成会写入 `state/Last_times.yml`；若要强制重跑某任务，可删除该账号下对应键或改写时间。
+5. **界面偏好**：主题、日志自动滚动与日志字号保存在 `state/gui.json`；删除该文件即恢复默认（浅色 / 自动滚动 / 12 pt）。
 6. **中断运行**：中断是协作式的，任务在下一个检查点（≤0.2 秒）退出，不会强杀线程；中断后不保留进度，下次运行即新的一轮。中断瞬间鼠标键盘输入立即停止，但**不会**把角色拉回庭院。
-7. **任务开关**：左侧行的开关只影响「完整运行」，点击 ▶ 始终可以单跑该任务；开关状态存于 `config/Gui_state.yml`，删除该文件即恢复「全部开启」。
+7. **任务开关**：左侧行的开关只影响「完整运行」，点击 ▶ 始终可以单跑该任务；开关状态存于 `state/Gui_state.yml`，删除该文件即恢复「全部开启」。
 8. **协作与弹窗**：脚本会尝试自动关闭协作邀请与常见弹窗；若布局变化导致误判，优先检查 `pic/Main` 中相关模板。
 9. **硬编码坐标**：极少数界面（如庭院卷轴）仍使用绝对坐标，窗口位置/分辨率变化后可能失效。
 10. **日志排查**：
@@ -515,7 +515,7 @@ Paper_sweeper/
 └── ARCHITECTURE.md        # 架构与任务地图（开发向）
 ```
 
-> `config.py`、`config/`、`logs/`、`GUI.exe`、`.dsh-scratch/` 均为运行期产物或本地临时目录，
+> `runtime.py`、`config/`、`logs/`、`GUI.exe`、`.dsh-scratch/` 均为运行期产物或本地临时目录，
 > 已被 `.gitignore` 忽略，故不列在上方结构里。打包中间产物已从源码树移到
 > `.dsh-scratch/build-tmp/pyinstaller/`，不再产生根目录 `build/`。
 
@@ -526,7 +526,7 @@ Paper_sweeper/
 ## 常见问题
 
 **Q：点击「完整运行」后立即报 `ModuleNotFoundError: No module named 'config'`？**  
-A：项目根目录缺少 `config.py`。创建该文件并写入 `stop_thread = False`（或执行 `python build_exe.py` 自动生成）。该文件已被 `.gitignore` 忽略，克隆仓库后不会自带。
+A：项目根目录缺少 `runtime.py`。创建该文件并写入 `stop_thread = False`（或执行 `python build_exe.py` 自动生成）。该文件已被 `.gitignore` 忽略，克隆仓库后不会自带。
 
 **Q：一直提示「未检测到窗口」？**  
 A：检查游戏是否已启动、窗口标题是否包含 `Setting.yml` 中的账号名（`master`/`slaves`）；若走自动启动，核对 `启动命令` 路径与 `-v` 实例号。
@@ -535,7 +535,7 @@ A：检查游戏是否已启动、窗口标题是否包含 `Setting.yml` 中的�
 A：多为模板图与当前 UI 不符或阈值过严。用临时调试脚本对目标模板 `Flag_show=1` 查看红框是否命中，再替换 `pic/` 下对应图片。
 
 **Q：任务全部 SKIP？**  
-A：多半是冷却未到。查看 `config/Last_times.yml`，或确认当前时间是否落在任务时间窗内。点击 ▶ 单独运行同样受这些限制，不会强制重跑。
+A：多半是冷却未到。查看 `state/Last_times.yml`，或确认当前时间是否落在任务时间窗内。点击 ▶ 单独运行同样受这些限制，不会强制重跑。
 
 **Q：点了 ▶ 没反应 / 只有一行提示？**  
 A：先看控制台是否出现 `SKIP-`。单任务运行沿用与完整运行一致的冷却和时间窗判断；若行首仍是 `!`，通常就是条件未满足或该任务本次未成功。

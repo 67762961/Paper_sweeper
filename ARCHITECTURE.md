@@ -38,7 +38,7 @@ flowchart LR
     FO --> T7["MainTask_Fengmo"]
     SO --> T1 & T2 & T3 & T4 & T5 & T6 & T7
     T1 & T2 & T3 & T4 & T5 & T6 & T7 --> LIB["Lib.py\n识别/点击/界面/配置\nrun_accounts_task 统一流程"]
-    LIB --> CFG["config/Setting.yml\nconfig/Last_times.yml"]
+    LIB --> CFG["config/Setting.yml\nstate/Last_times.yml"]
     LIB --> PIC["pic/**\n模板图片"]
     FO --> LOG["logs/<YYYY-MM>/<YYYY-MM-DD>/console_output_*.log"]
     SO --> SLOG["logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log"]
@@ -60,7 +60,7 @@ flowchart LR
 ├── ui/                            界面层（单向依赖 theme→icons→widgets→panels→window）
 │   ├── theme.py                   设计 token：颜色/间距/圆角/字号
 │   ├── theme_manager.py           Fluent 主题初始化与深浅色切换
-│   ├── prefs.py                   界面偏好读写（config/gui.json）
+│   ├── prefs.py                   界面偏好读写（state/gui.json）
 │   ├── settings_dialog.py         设置弹窗（主题 / 日志偏好 / 日志目录）
 │   ├── icons.py                   今日状态图标与齿轮/运行按钮（QPainter 绘制）
 │   ├── widgets.py                 整跑开关、任务行
@@ -142,7 +142,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 
 `Full_operation` 与 `Single_operation` 都通过 `main._log_stream` 统一安装/恢复日志流，区别只在日志文件名前缀（`console_output_` / `single_<key>_`）。
 
-`Full_operation` 在开始时读取 `config/Gui_state.yml` 的任务开关，关闭的任务打印 `SKIP- ----- 任务 <标题> 已在左侧关闭 跳过` 后跳过。
+`Full_operation` 在开始时读取 `state/Gui_state.yml` 的任务开关，关闭的任务打印 `SKIP- ----- 任务 <标题> 已在左侧关闭 跳过` 后跳过。
 
 ## 5. 入口函数说明
 
@@ -161,8 +161,8 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | `ui/icons.py` | `StatusIcon`（QPainter 绘制对勾/感叹号/播放三角）、`IconButton`（FluentIcon 图标按钮） |
 | `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`） |
 | `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 「中断运行 / 完整运行」按钮组） |
-| `ui/theme_manager.py` | Fluent 主题初始化与深浅色切换（主题偏好存 `config/gui.json`） |
-| `ui/prefs.py` | 界面偏好读写（`config/gui.json`：主题 / 日志自动滚动 / 日志字号） |
+| `ui/theme_manager.py` | Fluent 主题初始化与深浅色切换（主题偏好存 `state/gui.json`） |
+| `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号） |
 | `ui/settings_dialog.py` | 设置弹窗：主题、日志偏好与「打开日志目录」 |
 | `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + 中断入口 + `InfoBar` 结果提示） |
 
@@ -179,7 +179,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 - 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果；
 - 顶栏右侧提供深浅色主题快捷切换按钮，右侧日志区提供「清空 / 自动滚动 / 设置」工具条；
 - 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号，并提供「打开日志目录」入口；
-- 界面偏好写入 `config/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `Setting.yml` / `Gui_state.yml`；
+- 界面偏好写入 `state/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `Setting.yml` / `Gui_state.yml`；
 - 深浅色主题各有独立配色：文字类控件用 Fluent 标签（浅色 / 深色两套文字色由库自动切换），
   自绘状态图标、日志行着色与轮廓按钮在切换后按当前主题重新取色；主强调色是比原 `#007BFF`
   深一档的蓝（浅色 `#0d6bc2`，深色 `#3d8bd6`），避免浅色下过艳、深色下发灰看不清。
@@ -192,7 +192,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | 任务信息 | 名称 + 「上次运行 MM-DD HH:MM」 | 时间取该任务所有账号、所有状态键中的最新值 |
 | 配置 | `IconButton(kind="gear")` | `FluentIcon.SETTING`；本期为**占位**：弹「配置功能暂未开放」，不写盘 |
 | 单跑 | `IconButton(kind="play")` | `FluentIcon.PLAY`；点击只运行该任务（等价于 `Single_operation`） |
-| 开关 | `ToggleSwitch` | Fluent `SwitchButton`（不显示 On/Off 文案）；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `config/Gui_state.yml` |
+| 开关 | `ToggleSwitch` | Fluent `SwitchButton`（不显示 On/Off 文案）；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `state/Gui_state.yml` |
 
 图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为**主色**轮廓按钮（主色描边 + 主色文字，悬停同色系浅底），其左侧「中断运行」为**次要色**轮廓按钮（带 `FluentIcon.PAUSE`），都不使用实心主色块；轮廓按钮用 Fluent 的「浅色 / 深色两套自定义样式」注册，主题切换后不会退回默认实心按钮。
 
@@ -202,7 +202,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | ---- | ---- |
 | 点击行内 ▶ | 只运行该行对应的顶层任务（对 `Last_times.yml` 全部账号），冷却与时间窗照旧生效 |
 | 点击行内齿轮 | 弹出占位提示，不写任何配置 |
-| 拨动行内开关 | 写入 `config/Gui_state.yml`；关闭时该行灰化，且在「完整运行」中被跳过 |
+| 拨动行内开关 | 写入 `state/Gui_state.yml`；关闭时该行灰化，且在「完整运行」中被跳过 |
 | 点击「完整运行」 | 按 `TASK_REGISTRY` 顺序执行**开关开启**的任务 |
 | 点击「中断运行」 | 立即置位停止请求；任务在下一个检查点抛 `TaskStopped` 退出，界面回到待机。**不做断点续跑**，下次运行即新的一轮 |
 | 运行中再次点击 | 被 `busy` 互斥拒绝，不会启动第二个线程 |
@@ -210,7 +210,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 
 「中断运行」按钮位于「完整运行」左侧，为次要色轮廓按钮，**仅运行中可点**；点击后按钮变「中断中…」并禁用，防止连点。中断不处理游戏内状态（不拉回庭院、不做收尾操作），任务停在哪就是哪。
 
-注意：`ui/window.py` 与 `Lib.py` 会在运行时 `import config`（`GUI.py` 本身不直接引入）。该文件属于运行期本地模块，**已被 `.gitignore` 忽略、不在版本库中**；本地运行前需在项目根目录自备，至少包含：
+注意：`ui/window.py` 与 `Lib.py` 会在运行时 `import runtime`（`GUI.py` 本身不直接引入）。该文件属于运行期本地模块，**已被 `.gitignore` 忽略、不在版本库中**；本地运行前需在项目根目录自备，至少包含：
 
 ```python
 stop_thread = False
@@ -253,7 +253,7 @@ Single_operation(task_key, console_signal=None)  # 单任务运行
 | `completion_snapshot(entries=None)` | 记录各任务当前完成时间快照 |
 | `completion_advanced(before, after)` | 对比快照，返回 `{key: 是否推进}`，用于运行结果摘要 |
 | `entry_done_today(entry, completions=None, today=None)` | 判定「今日已完成」：`check_keys` 中的每个键在所有账号上都要有今天的记录 |
-| `read_task_switches()` | 读取 `config/Gui_state.yml` 的任务开关，缺失默认全开，只读不建文件 |
+| `read_task_switches()` | 读取 `state/Gui_state.yml` 的任务开关，缺失默认全开，只读不建文件 |
 | `is_task_enabled(key, switches=None)` / `enabled_task_keys(switches=None)` | 判断/列出参与完整运行的任务 |
 | `set_task_switch(key, enabled)` | 写入单个任务开关，成功返回 `True` |
 
@@ -351,7 +351,29 @@ GUI 的「中断运行」走**协作式中断**，不用 `QThread.terminate()`�
 
 ## 6. 配置体系
 
-### 6.1 `config/Setting.yml`
+### 6.0 目录划分：config/ 与 state/
+
+按「谁写」把文件分成两个目录，路径常量集中在 `paths.py`（唯一事实源，其它模块不要自己拼字符串）：
+
+| 目录 | 文件 | 谁写 | 用户是否手改 |
+|---|---|---|---|
+| `config/` | `Setting.yml` | 用户 | ✅ 会手改 |
+| `state/` | `Last_times.yml` | 程序 | ❌ 只读或删掉重来 |
+| `state/` | `Gui_state.yml` | 程序（GUI 开关） | ❌ |
+| `state/` | `gui.json` | 程序（界面偏好） | ❌ |
+| 项目根 | `runtime.py` | 程序（运行期开关模块） | 可手写，也可由打包脚本生成 |
+
+**为什么要分开**：混在一起时，用户手改 `Setting.yml` 容易顺手改坏 `Last_times.yml`
+（那里是冷却历史，改坏就要重跑一天）；备份/同步 `config/` 时也会把「机器状态」当成配置带走。
+
+**旧布局迁移**：PR7 之前上述三个状态文件都在 `config/` 下。`paths.ensure_state_dir()`
+会在首次读取时把它们搬到 `state/`（规则：目标不存在且源存在才搬，两边都有时不覆盖）。
+触发点覆盖所有读取入口：`Lib.check_lasttime`、`main.read_completions` /
+`read_task_switches` / `set_task_switch`、`ui/prefs.load_prefs` / `save_prefs`。
+
+删除 `state/` 目录即恢复初始状态（所有任务视为从未完成、开关全部开启、界面偏好回默认）。
+
+### 6.1 `config/Setting.yml`（静态配置，用户手改）
 
 | 键 | 含义 |
 | ---- | ---- |
@@ -362,7 +384,7 @@ GUI 的「中断运行」走**协作式中断**，不用 `QThread.terminate()`�
 
 寮三十副本类型当前支持：`魂虚`、`魂海`、`日蚀` 等；次数填 `0` 表示当日跳过。
 
-### 6.2 `config/Last_times.yml`
+### 6.2 `state/Last_times.yml`（运行期状态）
 
 结构：`<账号> -> <任务名> -> ISO 时间字符串`。
 
@@ -381,7 +403,10 @@ GUI 的「中断运行」走**协作式中断**，不用 `QThread.terminate()`�
 
 `check_lasttime` 在键缺失时初始化为 `2000-01-01 00:00:00`。
 
-### 6.3 `config/Gui_state.yml`（任务开关）
+**损坏保护**：文件整体解析失败时，重置前会先备份成 `Last_times.yml.corrupt-<时间戳>.bak`
+（与文件同目录），日志用 `WAIT-` 说明备份位置，避免冷却历史被静默清空。
+
+### 6.3 `state/Gui_state.yml`（任务开关）
 
 结构：`任务开关 -> <注册表 key> -> true/false`，由 GUI 行内开关写入，决定该任务是否参与「完整运行」。
 
@@ -403,7 +428,7 @@ GUI 的「中断运行」走**协作式中断**，不用 `QThread.terminate()`�
 - 与 `Setting.yml`（任务参数）分离，避免 GUI 偏好混进用户手写配置；
 - 单击行内 ▶ 不受该开关影响，只有「完整运行」会跳过关闭的任务。
 
-### 6.4 `config/gui.json`（界面偏好）
+### 6.4 `state/gui.json`（界面偏好）
 
 由 `ui/prefs.py` 自管（普通 JSON，非 qconfig 配置文件），保存界面偏好：
 
@@ -428,14 +453,20 @@ GUI 的「中断运行」走**协作式中断**，不用 `QThread.terminate()`�
 - 主题切换后日志区按新主题重新着色、自绘状态图标同步重绘，Fluent 控件由库自动换肤；
 - 与 `Setting.yml`（任务参数）、`Gui_state.yml`（任务开关）互不干扰。
 
-### 6.5 项目级 `config.py`
+### 6.5 项目级 `runtime.py`（运行期开关模块）
 
-- 用途：运行期开关，目前只有 `config.stop_thread`（中断请求的兼容通道）。
-- 状态：**被 `.gitignore` 忽略，不在版本库中**（历史上曾入库，已移除）；属于运行时必需的本地模块。
-- 引用方：`ui/window.py`（GUI 中断入口置位）与 `Lib.py`（`stop_requested()` 消费）；`GUI.py` 本身不直接 `import config`。
+- 用途：运行期开关，目前只有 `runtime.stop_thread`（中断请求的兼容通道）。
+- 状态：**被 `.gitignore` 忽略，不在版本库中**；属于运行时必需的本地模块。
+- 引用方：`ui/window.py`（GUI 中断入口置位）与 `Lib.py`（`stop_requested()` 消费）；`GUI.py` 本身不直接导入。
 - 最小内容：`stop_thread = False`。
 - 中断语义：`stop_thread = True` 会被 `Lib.stop_requested()` 消费，与 `Lib.request_stop()` 等价；GUI 的「中断运行」与「运行中关闭窗口」两条路径都会置位。
 - 生成方式：可手写，也可执行 `python build_exe.py` 时由脚本自动生成（已存在则不改动）。
+
+> **为什么叫 runtime 而不是 config**：PR7 之前这个模块叫 `runtime.py`，与 `config/` 目录同名。
+> `import config` 能工作，依赖的是「`config/` 里没有 `__init__.py`」这个隐含前提；
+> 一旦有人往里加 `__init__.py`，导入就会变成包导入、`stop_thread` 静默失效，
+> 表现为「中断按钮点了没反应且不报错」。改名后两者彻底解耦。
+> 旧的 `runtime.py` 若仍存在，打包脚本会输出 `WAIT-` 提示改名（不自动改用户文件）。
 
 ## 7. 关键模块与算法
 
@@ -497,7 +528,7 @@ GUI 崩溃日志：`logs/app_crash.log`（`logging` + `sys.excepthook`）。
 运行期间面板下方显示不确定进度条，结束后用 `InfoBar` 提示本次结果。
 
 日志区顶部工具条提供「清空日志」按钮与「自动滚动」开关（关闭后新日志不再强制滚到底部）；
-日志字号可在设置弹窗中调整为 11～14 pt，偏好保存在 `config/gui.json`。
+日志字号可在设置弹窗中调整为 11～14 pt，偏好保存在 `state/gui.json`。
 
 单任务运行在 `MAIN-` 起止行中带任务标题，例如：
 
@@ -521,9 +552,9 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 ├── logs/<YYYY-MM>/<YYYY-MM-DD>/console_output_<timestamp>.log   完整运行日志
 ├── logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_<timestamp>.log     单任务运行日志
 ├── logs/app_crash.log                                          未捕获异常
-├── config/Last_times.yml                                       任务冷却状态（本地）
-├── config/Gui_state.yml                                        任务开关（本地）
-├── config/gui.json                                             界面偏好（本地）
+├── state/Last_times.yml                                       任务冷却状态（本地）
+├── state/Gui_state.yml                                        任务开关（本地）
+├── state/gui.json                                             界面偏好（本地）
 ├── .dsh-scratch/build-tmp/pyinstaller/                         PyInstaller 中间产物
 ├── GUI.exe                                                     打包产物（直接在根目录，默认忽略）
 └── __pycache__/                                                字节码缓存
