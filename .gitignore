@@ -18,7 +18,13 @@ GUI.exe
 Backup
 
 # ---- 运行期配置与产物（不入库）----
+# config/ = 静态配置（Setting.yml），用户手改
+# state/  = 运行期状态（Last_times.yml / Gui_state.yml / gui.json），程序读写
 config
+state
+# 运行期开关模块（PR7 起叫 runtime.py）
+runtime.py
+# 旧名字，保留这条以兼容历史文件
 config.py
 logs
 # 旧版本把崩溃日志写在项目根；新版本已改到 logs/app_crash.log。

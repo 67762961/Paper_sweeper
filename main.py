@@ -5,6 +5,7 @@ import contextlib
 from dataclasses import dataclass
 from typing import Callable
 
+import paths
 from PyQt6.QtCore import QObject, pyqtSignal
 # 中断相关的 request_stop / reset_stop / stop_requested 在此重新导出，
 # 供 GUI 层只依赖 main 而不必直接 import Lib
@@ -179,8 +180,13 @@ def _parse_time(value):
 
 
 def read_completions():
-    """一次读取 Last_times.yml，返回 {账号: {任务键: datetime}}；只读，不创建也不写盘"""
-    config_data = read_config("./config/Last_times.yml") or {}
+    """一次读取 Last_times.yml，返回 {账号: {任务键: datetime}}；只读，不创建也不写盘
+
+    会顺带触发一次旧布局迁移（config/Last_times.yml -> state/），
+    这样 GUI 启动时读到的是迁移后的历史，而不是一片空白。
+    """
+    paths.ensure_state_dir()
+    config_data = read_config(paths.LAST_TIMES) or {}
     completions = {}
     for account, account_data in config_data.items():
         if not isinstance(account_data, dict):
@@ -240,12 +246,13 @@ def entry_done_today(entry, completions=None, today=None):
 
 # ---- 任务开关（左侧行最右的开关，决定该任务是否参与「完整运行」）----
 
-GUI_STATE_PATH = "./config/Gui_state.yml"
+GUI_STATE_PATH = paths.GUI_STATE
 TASK_SWITCH_SECTION = "任务开关"
 
 
 def read_task_switches():
     """读取任务开关；文件或键缺失时默认全部开启（只读，不创建文件）"""
+    paths.ensure_state_dir()
     config_data = read_config(GUI_STATE_PATH) or {}
     section = config_data.get(TASK_SWITCH_SECTION)
     if not isinstance(section, dict):
@@ -266,10 +273,11 @@ def enabled_task_keys(switches=None):
 
 
 def set_task_switch(task_key, enabled):
-    """把单个任务开关写入 config/Gui_state.yml，写入成功返回 True"""
+    """把单个任务开关写入 state/Gui_state.yml，写入成功返回 True"""
     if get_task(task_key) is None:
         return False
     try:
+        paths.ensure_state_dir()
         os.makedirs(os.path.dirname(GUI_STATE_PATH), exist_ok=True)
         config_data = read_config(GUI_STATE_PATH) or {}
         section = config_data.get(TASK_SWITCH_SECTION)

@@ -1,4 +1,6 @@
 from datetime import datetime, time
+
+import paths
 from Lib import (
     Find_windows,
     Find_in_windows_Matchs,
@@ -36,7 +38,7 @@ def FullTask_Thirty():
 
 
 def MainTask_Real_Snake():
-    config_data = read_config("./config/Last_times.yml")
+    config_data = read_config(paths.LAST_TIMES)
     Accounts = list(config_data.keys())
     Account1 = Accounts[0]
     Account2 = Accounts[1]
@@ -52,10 +54,10 @@ def MainTask_Real_Snake():
             print("        INFO- ----- 账号", Account, "本周未完成真蛇任务 开始执行真蛇任务")
             if Real_Snake("御魂装配", Hwnd, Accounts):
                 # 更新配置 写入当前时间
-                config = read_config("./config/Last_times.yml")
+                config = read_config(paths.LAST_TIMES)
                 Now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 config[Account]["真蛇"] = Now
-                write_config("./config/Last_times.yml", config)
+                write_config(paths.LAST_TIMES, config)
                 print("        TIME- ----- 本次真蛇完成时间")
                 print("        TIME- ----- ", Now)
                 print("        TASK- ----- 真蛇任务完成")

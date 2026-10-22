@@ -15,7 +15,7 @@ from qfluentwidgets import (
     qconfig,
 )
 
-import config
+import runtime
 from main import (
     Full_operation,
     Single_operation,
@@ -190,7 +190,7 @@ class MainWindow(MSFluentWindow):
             return
 
         self.busy = True
-        config.stop_thread = False
+        runtime.stop_thread = False
         reset_stop()  # 清除上一次的中断请求，避免新任务刚开始就被停掉
 
         # 运行前快照，结束后用它判断任务是否真正推进了完成时间
@@ -240,9 +240,9 @@ class MainWindow(MSFluentWindow):
         if not self.busy:
             return
 
-        # 置位停止请求（同时保留 config.stop_thread，关闭窗口那条路径语义一致）
+        # 置位停止请求（同时保留 runtime.stop_thread，关闭窗口那条路径语义一致）
         request_stop()
-        config.stop_thread = True
+        runtime.stop_thread = True
 
         self.right_panel.append_separator("中断：已请求停止，正在结束当前任务")
         self.right_panel.set_interrupting()
@@ -342,7 +342,7 @@ class MainWindow(MSFluentWindow):
 
         # 置位停止请求并短暂等待线程收尾；检查点按 0.2 秒切片，通常很快退出
         request_stop()
-        config.stop_thread = True
+        runtime.stop_thread = True
         if self.thread is not None and self.thread.isRunning():
             self.thread.wait(3000)
         event.accept()

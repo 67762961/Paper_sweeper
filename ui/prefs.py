@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""界面偏好读写（config/gui.json）。
+"""界面偏好读写（state/gui.json）。
 
-只保存界面相关选项，与任务参数（Setting.yml）、任务开关（Gui_state.yml）隔离。
+只保存界面相关选项，与任务参数（config/Setting.yml）、任务开关（state/Gui_state.yml）隔离。
 文件缺失或内容非法时回落到默认值，不阻塞界面启动。
 """
 
@@ -9,7 +9,9 @@ import json
 import logging
 import os
 
-PREFS_PATH = "config/gui.json"
+import paths
+
+PREFS_PATH = paths.PREFS
 
 DEFAULT_PREFS = {
     "theme": "light",            # light / dark / auto
@@ -26,6 +28,9 @@ def load_prefs(path=None):
     path = path or PREFS_PATH
     data = {}
     try:
+        # 首次读取时把旧布局 config/gui.json 迁到 state/ 下
+        if path == PREFS_PATH:
+            paths.ensure_state_dir()
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as handle:
                 loaded = json.load(handle)
@@ -54,6 +59,9 @@ def save_prefs(prefs, path=None):
     merged = dict(DEFAULT_PREFS)
     merged.update({key: prefs[key] for key in DEFAULT_PREFS if key in prefs})
     try:
+        # 首次保存时把旧布局 config/gui.json 迁到 state/ 下
+        if path == PREFS_PATH:
+            paths.ensure_state_dir()
         directory = os.path.dirname(path)
         if directory:
             os.makedirs(directory, exist_ok=True)
