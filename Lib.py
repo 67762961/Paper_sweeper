@@ -15,10 +15,10 @@ import subprocess
 import threading
 import yaml
 
-
 # ---- 中断机制（GUI「中断运行」按钮）----
 # 任务层不允许捕获 TaskStopped，让它一路抛到 main.py 统一收尾。
 # 检查点放在本文件的公共原语里，因此所有 Task_*.py 无需改动。
+
 
 class TaskStopped(Exception):
     """任务被用户中断：由 check_stop() 抛出，只允许在 main.py 收尾"""
@@ -45,6 +45,7 @@ def stop_requested():
     # 延迟导入避免与 GUI 入口循环依赖；runtime 缺失时按未请求处理
     try:
         import runtime
+
         return bool(getattr(runtime, "stop_thread", False))
     except Exception:
         return False
@@ -141,7 +142,7 @@ def Log_in(title):
             Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/common/适龄提示标.png", 0.03, 0)
             if not Range:
                 print("        INFO-", Matchs, "未检测到适龄提示界面 已经进入游戏")
-                Sleep_print(2)
+                Sleep_print(5)
                 return 1
         else:
             print("        INFO-", Matchs, "未检测到适龄提示界面")
@@ -662,6 +663,7 @@ def check_lasttime(Account, Times_name):
 # ---- 任务准入策略（供 run_accounts_task 使用）----
 # 每个策略接收 (上次完成时间, 当前时间)，返回 True 表示本次可以执行。
 
+
 def read_accounts():
     """读取 Last_times.yml 中的账号列表，保持文件中的顺序"""
     config_data = read_config(paths.LAST_TIMES)
@@ -684,6 +686,7 @@ def ready_after(hours):
     :param hours: 冷却小时数
     :return:      准入判断函数，带 hours 属性供 skip_text 生成文案
     """
+
     def check(last_time, now):
         return abs(now - last_time) >= timedelta(hours=hours)
 
@@ -802,6 +805,7 @@ def run_accounts_task(name, ready, work, window=None, write_back=True):
 
 
 # ---- 双账号协作任务的固定流程 ----
+
 
 def write_task_time_pair(Accounts, Times_name):
     """把同一时间写回多个账号（一次读、全部写、一次存）
@@ -1130,7 +1134,7 @@ def Itface_explore(Hwnd):
                 print("        INFO- -----点击退出区域")
                 Sleep_print(1)
                 Range = [(20, 105), (91, 175)]
-                Click(Hwnd, Range, 1)
+                Click(Hwnd, Range, 2)
                 Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/digui/地鬼图标.png", 0.05, 0)
                 if Range:
                     print("        INFO-", Matchs, "检测到地鬼入口 已进入探索界面")
