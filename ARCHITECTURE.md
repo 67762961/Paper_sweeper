@@ -420,13 +420,22 @@ QThread.finished → on_thread_finished → _run_after_actions()
   ├ 都关 → 直接返回，行为与没有该功能时完全一致
   └ 至少一个开 → CountdownDialog（10 秒，可取消）
         ↓ 取消 → 日志记「完成动作：已取消」
-        ↓ 确认/倒计时归零
-              ↓ 关模拟器（silent=True，不弹 InfoBar）
-              ↓ QTimer 3 秒
+        ↓ 确认/倒计时归零 → processEvents() 让弹窗淡出动画走完
+              ↓ 关模拟器（CloseEmulatorThread 后台跑，silent=True 不弹 InfoBar）
+              ↓ 后台完成回调 → QTimer 3 秒
               ↓ 睡眠（SetSuspendState）
 ```
 
-3 秒间隔是给 MuMu 回收虚拟机的时间：它持有系统唤醒请求时系统睡不下去，所以顺序必须是**先关模拟器再睡眠**。
+3 秒间隔是给 MuMu 回收虚拟机的时间：它持有系统唤醒请求时系统睡不下去，所以顺序必须是**先关模拟器再睡眠**。关模拟器失败**不阻断**睡眠——用户要的是「跑完就睡」，失败只写日志。
+
+**关闭模拟器必须跑在后台线程**（`CloseEmulatorThread`）：`MuMuManager control ... shutdown` 会同步阻塞到虚拟机真正关机才返回，本机实测约 **4.1 秒**（对照：`info` 只要 0.1 秒，说明是 shutdown 本身在等）。放在主线程会引发两个可见问题：
+
+1. 界面完全冻住，日志不刷新；
+2. 倒计时弹窗留下**半透明虚影**——`MaskDialogBase.done()` 不是立即关闭，而是先跑 100ms 的透明度淡出动画、动画 `finished` 才调 `QDialog.done()`。弹窗刚淡出第一帧主线程就被 `subprocess.run` 占死，Qt 无法重绘，窗口停在约 0.9 透明度的中间帧；等 4 秒后线程解放，动画补完才真正消失。
+
+因此 `dialog.exec()` 返回后要补一次 `QApplication.processEvents()` 让淡出动画走完，再启动后台线程。
+
+> 信号名用 `close_finished` 而不是 `finished`：`QThread` 自己已有同名信号，重名会覆盖基类的线程结束通知，导致线程对象无法正确释放。
 
 **睡眠实现**：`Lib.sleep_system()` 用 ctypes 调 `powrprof.SetSuspendState(False, False, False)`，第一个参数 `False` 表示**睡眠（S3）而非休眠（S4）**。
 

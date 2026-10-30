@@ -70,6 +70,7 @@
 - `MuMuManager.exe` 的路径**不要写死**：从 `Setting.yml.启动项.<账号>.启动命令` 里的 exe 推导目录（同目录 → 上一级 → `shell/`），找不到就降级为发 `WM_CLOSE`；用户可用可选键 `模拟器.MuMuManager` 显式覆盖。
 - 「完整运行完成后的动作」（关模拟器 / 睡眠）的触发条件严格为 `task_key is None` + `ok` + `not stopped`，**单跑、中断、异常一律不触发**。执行时机必须是 `QThread.finished`（`on_thread_finished`），不能是 `task_finished`——后者发出时 `main._log_stream` 的日志文件还没关，此时睡眠会截断日志。
 - 睡眠用 `Lib.sleep_system()`（`powrprof.SetSuspendState(False, ...)`，S3 不是休眠），**不要**用 `rundll32 powrprof.dll,SetSuspendState 0,1,0`（开了休眠的机器会变成休眠）。调用前必须 `_enable_shutdown_privilege()`；ctypes 调 Win32 时必须显式声明 `restype` / `argtypes`，否则伪句柄会被截断（`GetCurrentProcess` 的 `-1` 变成 `0xFFFFFFFF`，`OpenProcessToken` 报错误 6）。
+- **关模拟器必须跑在后台线程**（`CloseEmulatorThread`）：`MuMuManager control ... shutdown` 同步阻塞约 4 秒，放主线程会让界面冻住，并让倒计时弹窗的 100ms 淡出动画停在中间帧（半透明虚影）。`dialog.exec()` 返回后先 `processEvents()` 让动画走完再启线程。QThread 子类的结果信号**不要叫 `finished`**（会覆盖基类的线程结束通知），本项目用 `close_finished`。
 - 配色统一从 `ui/theme.py` 取：`COLOR_*` 是浅色取值、深色覆盖在 `_DARK_COLORS`；组件取色用 `theme.color()` / `light_color()` / `dark_color()`，不要在组件里写死十六进制。
 - 会随主题变化的元素不要用裸 `QLabel` 承载文字（深色下会变黑看不清）：文字用 Fluent 标签并 `setTextColor(浅色, 深色)`；轮廓按钮用 `setCustomStyleSheet(light_qss, dark_qss)` 注册；自绘控件连接 `qconfig.themeChangedFinished` 后重绘。
 - `Full_operation` 与 `Single_operation` 共用 `main._log_stream`；日志收尾必须先恢复 `sys.stdout` 再冲刷，避免打包版（`console=False`，`sys.stdout` 为 `None`）下抛出异常导致 GUI 卡在「运行中」。
