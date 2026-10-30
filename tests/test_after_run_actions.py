@@ -42,11 +42,13 @@ class FakeWindow:
         self._pending_after_run = False
         self.dialog_result = 1        # QDialog.exec()：1 = Accepted（确认），0 = Rejected（取消）
         self.dialog_calls = []
-        self.close_calls = []
+        self.close_calls = []         # 记录「启动了后台关闭」
         self.sleep_calls = []
         self.scheduled = []
+        self._close_then_sleep = False
+        self._close_silent = True
 
-    # 从 MainWindow 借来的两个方法（逻辑原样，避免重复实现）
+    # 从 MainWindow 借来的方法（逻辑原样，避免重复实现）
     _run_after_actions = None
     _do_after_actions = None
     _sleep_system = None
@@ -69,15 +71,24 @@ def window(monkeypatch, tmp_config_dir):
 
     monkeypatch.setattr(window_module, "CountdownDialog", FakeDialog)
 
-    def fake_close(silent=False):
+    # 关模拟器现在是异步的：替身只记录「有没有启动」，不真的开线程
+    def fake_start_close(silent=True):
         fake.close_calls.append(silent)
+        fake._close_silent = silent
 
-    fake.close_emulators = fake_close
+    fake._start_close_emulators = fake_start_close
     fake._sleep_system = lambda: fake.sleep_calls.append(True)
 
     # 绑定真实的完成动作逻辑
     fake._run_after_actions = window_module.MainWindow._run_after_actions.__get__(fake)
     fake._do_after_actions = window_module.MainWindow._do_after_actions.__get__(fake)
+    fake._on_close_emulators_finished = (
+        window_module.MainWindow._on_close_emulators_finished.__get__(fake)
+    )
+    # 结果摘要用的是真实实现，但 InfoBar 在测试里没有父窗口，用记录代替
+    fake._report_close_result = lambda result, silent=False: fake.right_panel.append_separator(
+        "关闭模拟器：摘要"
+    )
 
     # QTimer.singleShot 换成记录，避免用例里真的等 3 秒
     monkeypatch.setattr(
@@ -148,15 +159,60 @@ def test_两个都开时先关再睡(window):
 
     window._run_after_actions()
 
-    # 先关模拟器（同步），睡眠走 3 秒延时
+    # 关模拟器现在是异步的：启动后台线程后立即返回，此时还没排睡眠
     assert window.close_calls == [True]
+    assert window._close_then_sleep is True
+    assert window.scheduled == []
+    assert window.sleep_calls == []
+
+
+def test_关闭完成后才排睡眠(window, monkeypatch):
+    """关模拟器在后台线程跑完 → 回调里才排 3 秒后的睡眠"""
+    from ui import window as window_module
+
+    _set_prefs(after_run_close_emulator=True, after_run_sleep=True)
+    window._pending_after_run = True
+    window._run_after_actions()
+
+    # 模拟后台线程回报结果
+    report = window_module.MainWindow._on_close_emulators_finished.__get__(window)
+    report({"result": {"closed": ["master"], "missing": [], "stuck": []}, "error": None})
+
     assert len(window.scheduled) == 1
     assert window.scheduled[0][0] == 3000
     assert window.sleep_calls == []
 
-    # 手动触发那个延时回调，模拟 3 秒后
     window.scheduled[0][1]()
     assert window.sleep_calls == [True]
+
+
+def test_只关不睡时关闭完成不排睡眠(window):
+    from ui import window as window_module
+
+    _set_prefs(after_run_close_emulator=True, after_run_sleep=False)
+    window._pending_after_run = True
+    window._run_after_actions()
+
+    report = window_module.MainWindow._on_close_emulators_finished.__get__(window)
+    report({"result": {"closed": ["master"], "missing": [], "stuck": []}, "error": None})
+
+    assert window.scheduled == []
+    assert window.sleep_calls == []
+
+
+def test_关闭失败也照样接着睡眠(window):
+    """关模拟器失败不该阻断睡眠：用户要的是「跑完就睡」"""
+    from ui import window as window_module
+
+    _set_prefs(after_run_close_emulator=True, after_run_sleep=True)
+    window._pending_after_run = True
+    window._run_after_actions()
+
+    report = window_module.MainWindow._on_close_emulators_finished.__get__(window)
+    report({"result": None, "error": "模拟器不肯关"})
+
+    assert len(window.scheduled) == 1
+    assert any("模拟器不肯关" in line for line in window.right_panel.lines)
 
 
 def test_标记用过就清掉(window):

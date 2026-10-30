@@ -4,7 +4,7 @@
 import logging
 
 from PyQt6.QtCore import QThread, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QMessageBox, QWidget
+from PyQt6.QtWidgets import QApplication, QHBoxLayout, QMessageBox, QWidget
 from qfluentwidgets import (
     FluentIcon,
     InfoBar,
@@ -69,6 +69,28 @@ class WorkerThread(QThread):
             self.task_finished.emit({"key": self.task_key, "ok": False, "error": str(error), "stopped": False})
 
 
+class CloseEmulatorThread(QThread):
+    """后台关闭模拟器
+
+    **为什么必须用线程**：`MuMuManager control ... shutdown` 会同步阻塞到虚拟机
+    真正关机才返回，本机实测约 4 秒（`info` 只要 0.1 秒，说明是 shutdown 本身在等）。
+    放在主线程里界面会完全冻住——连倒计时弹窗的 100ms 淡出动画都停在中间帧，
+    看起来就是一层半透明虚影，等几秒才「啪」地消失。
+    """
+
+    # 不能叫 finished：QThread 自己已有同名信号，重名会覆盖基类的线程结束通知
+    close_finished = pyqtSignal(object)
+
+    def run(self):
+        # 异常必须在线程内捕获，否则 Qt 线程静默退出、界面一直停在「正在关闭」
+        try:
+            result = Lib.close_emulators()
+            self.close_finished.emit({"result": result, "error": None})
+        except Exception as error:
+            logging.warning("关闭模拟器失败: %s", error)
+            self.close_finished.emit({"result": None, "error": str(error)})
+
+
 class MainWindow(MSFluentWindow):
     """主窗口：Fluent 外壳 + 双栏内容（左侧任务列表 / 右侧日志控制台）"""
 
@@ -82,6 +104,9 @@ class MainWindow(MSFluentWindow):
         # 完整运行成功后暂存，等线程真正退出（QThread.finished）再执行完成动作：
         # task_finished 发出时 _log_stream 的日志文件还没关，此时睡眠会截断最后几行
         self._pending_after_run = False
+        # 后台关闭模拟器的线程与「关完要做什么」的回调
+        self._close_thread = None
+        self._close_then_sleep = False
         self.init_ui()
 
     def init_ui(self):
@@ -305,21 +330,68 @@ class MainWindow(MSFluentWindow):
             self.right_panel.append_separator("完成动作：已取消")
             return
 
+        # 让弹窗的 100ms 淡出动画走完再干活：紧接着的关模拟器虽然已挪到后台线程，
+        # 但这里同步做的那点事（写日志、建线程）也会打断动画，留下半透明残影
+        QApplication.processEvents()
+
         self._do_after_actions(close_emulator, sleep)
 
     def _do_after_actions(self, close_emulator, sleep):
         """真正执行完成动作：先关模拟器，等 3 秒，再睡眠"""
         if close_emulator:
-            self.close_emulators(silent=True)
+            # 关模拟器放到后台线程：MuMuManager 关机要等虚拟机真正退出（实测约 4 秒），
+            # 同步跑会把界面冻住
+            self._close_then_sleep = bool(sleep)
+            self._start_close_emulators()
+            return
 
         if not sleep:
             return
 
-        if close_emulator:
-            # 给 MuMu 一点时间回收虚拟机：它持有唤醒请求时系统睡不下去
-            QTimer.singleShot(3000, self._sleep_system)
+        self._sleep_system()
+
+    def _start_close_emulators(self, silent=True):
+        """在后台线程里关闭模拟器；关完后按 _close_then_sleep 决定是否接着睡眠"""
+        if self._close_thread is not None and self._close_thread.isRunning():
+            return
+
+        self.right_panel.append_separator("关闭模拟器：正在关闭受控模拟器窗口")
+        self._close_silent = bool(silent)
+        self._close_thread = CloseEmulatorThread()
+        self._close_thread.close_finished.connect(self._on_close_emulators_finished)
+        # 线程对象在真正退出后再释放，避免 run() 尚未返回就被回收
+        self._close_thread.finished.connect(self._on_close_thread_finished)
+        self._close_thread.start()
+
+    def _on_close_emulators_finished(self, payload):
+        """后台关闭完成：写日志、按需提示、必要时接着睡眠"""
+        error = payload.get("error")
+        if error:
+            self.right_panel.append_separator(f"关闭模拟器：失败 - {error}")
+            if not self._close_silent:
+                InfoBar.error(
+                    "关闭模拟器失败",
+                    error,
+                    parent=self,
+                    duration=5000,
+                    position=InfoBarPosition.TOP_RIGHT,
+                )
         else:
-            self._sleep_system()
+            self._report_close_result(payload.get("result") or {}, self._close_silent)
+
+        if not self._close_then_sleep:
+            return
+        self._close_then_sleep = False
+        # 给 MuMu 一点时间回收虚拟机：它持有唤醒请求时系统睡不下去
+        QTimer.singleShot(3000, self._sleep_system)
+
+    def _on_close_thread_finished(self):
+        """后台线程真正退出后再断开引用"""
+        thread = self.sender()
+        if thread is self._close_thread:
+            self._close_thread = None
+        if thread is not None:
+            thread.deleteLater()
 
     def _sleep_system(self):
         """让电脑进入睡眠；失败时明确提示，不要静默什么都不发生"""
@@ -355,30 +427,18 @@ class MainWindow(MSFluentWindow):
         )
 
     def close_emulators(self, silent=False):
-        """「关闭模拟器」：关闭受程序管理的模拟器窗口
+        """「关闭模拟器」按钮入口：在后台线程关闭受控模拟器窗口
 
         :param silent: 由完成动作内部调用时为 True——不弹 InfoBar，
                        因为紧接着要睡眠，弹窗来不及看，日志留痕就够了
         """
         if self.busy:
             return
+        self._close_then_sleep = False   # 手动点按钮不联动睡眠
+        self._start_close_emulators(silent=silent)
 
-        self.right_panel.append_separator("关闭模拟器：正在关闭受控模拟器窗口")
-        try:
-            result = Lib.close_emulators()
-        except Exception as error:
-            logging.warning("关闭模拟器失败: %s", error)
-            self.right_panel.append_separator(f"关闭模拟器：失败 - {error}")
-            if not silent:
-                InfoBar.error(
-                    "关闭模拟器失败",
-                    str(error),
-                    parent=self,
-                    duration=5000,
-                    position=InfoBarPosition.TOP_RIGHT,
-                )
-            return
-
+    def _report_close_result(self, result, silent=False):
+        """把关闭结果写成控制台摘要，并按需弹提示"""
         closed = result.get("closed") or []
         missing = result.get("missing") or []
         stuck = result.get("stuck") or []
