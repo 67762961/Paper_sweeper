@@ -167,6 +167,10 @@ class CountdownDialog(MessageBoxBase):
 
     为什么不用 InfoBar：InfoBar 没有「倒计时结束回调 + 可取消」的组合能力，
     关闭 InfoBar 也无法可靠地通知调用方。
+
+    **倒计时在 exec() 里启动，不在单独的 start() 里**：调用方拿到对话框后
+    按 QDialog 的惯例直接 exec()，如果定时器只在别的方法里启动，就会漏掉，
+    表现为「弹窗出来了但数字一直停在 N 秒、也不会自动关闭」。
     """
 
     def __init__(self, parent=None, seconds=10, action_text=""):
@@ -198,12 +202,18 @@ class CountdownDialog(MessageBoxBase):
 
     # ---- 倒计时 ----
 
-    def start(self):
-        """显示并开始倒计时（阻塞到用户选择或倒计时结束）"""
+    def exec(self):
+        """显示对话框并开始倒计时（阻塞到用户选择或倒计时归零）
+
+        重写而不是新增一个 start()：调用方按 QDialog 惯例直接 exec()，
+        把倒计时绑在这里才不会漏启动。
+        """
         self._timer.start()
         try:
-            return self.exec()
+            return super().exec()
         finally:
+            # 用户点按钮、倒计时归零、或窗口被外部关闭都要停表，
+            # 否则对话框已销毁而定时器还在跑
             self._timer.stop()
 
     def _tick(self):

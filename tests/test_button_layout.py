@@ -30,8 +30,13 @@ def panel(tmp_config_dir):
     from ui.panels import RightPanel
 
     widget = RightPanel()
+    widget.setParent(None)
     yield widget
+    # 必须真正销毁：只 deleteLater() 的话控件会留到后续文件的事件循环里，
+    # 与其它测试文件的 QTimer 一起跑时会触发 Qt 访问违例
+    widget.setParent(None)
     widget.deleteLater()
+    _APP.processEvents()
 
 
 def _button_layout(panel):
