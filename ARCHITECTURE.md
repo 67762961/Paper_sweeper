@@ -399,12 +399,27 @@ GUI「关闭模拟器」按钮走 `Lib.close_emulators()`，与任务流程**完
 
 ### 5.7 完整运行完成后的动作
 
-按钮区的设置齿轮打开 `ui/after_run_dialog.py` 的 `AfterRunDialog`，里面只有两个开关，都存在 `state/gui.json`：
+按钮区的设置齿轮打开 `ui/after_run_dialog.py` 的 `AfterRunDialog`，里面是一个开关 + 一个下拉框，都存在 `state/gui.json`：
 
 | 键 | 默认 | 含义 |
 | ---- | ---- | ---- |
 | `after_run_close_emulator` | `False` | 完整运行结束后关闭受控模拟器窗口 |
-| `after_run_sleep` | `False` | 完整运行结束后让电脑进入睡眠（S3） |
+| `after_run_sleep` | `False` | **是否启用**结束后的电源动作 |
+| `after_run_power` | `"sleep"` | 启用时执行哪个：`logoff` / `sleep` / `shutdown` |
+
+**为什么是两个键而不是一个**：开关表达「要不要」，下拉框表达「要哪个」。这样老配置（只有 `after_run_sleep`）升级后新键缺失回落 `"sleep"`，**行为零变化、无需迁移**；而且「不执行」这个状态由开关表达，`after_run_power` 就不必塞一个 `"none"`。
+
+界面行为：开关关闭时下拉框 `setEnabled(False)` 灰化（`checkedChanged` 直接连 `setEnabled`），直观表达「这个动作不启用」。标签是「电源动作」而不是「让电脑睡眠」——后者在选到注销/关机时会自相矛盾。
+
+**三种动作的差别**（决定了它们各自适合什么场景）：
+
+| 动作 | 实现 | 程序状态 | 内核 | 远程接管 |
+| ---- | ---- | ---- | ---- | ---- |
+| 注销 `logoff` | `ExitWindowsEx(EWX_LOGOFF)` | 本进程结束 | **继续运行** | ✅ 可以 |
+| 睡眠 `sleep` | `powrprof.SetSuspendState(False, ...)` | 保留在内存 | 挂起 | ❌ 不行 |
+| 关机 `shutdown` | `ExitWindowsEx(EWX_POWEROFF)` | 全部结束 | 停止 | ❌ 不行 |
+
+**注销为什么能远程接管**：注销只结束当前用户的会话（Session 1+），Session 0 的系统服务继续运行。远程控制软件（如 UU 远程的 `GameViewerService`）以服务形式常驻，所以注销后仍能接受连接，输入密码即可回到桌面。睡眠/关机时整个内核挂起或停止，服务自然不存在。
 
 **触发条件（严格）**：`task_key is None` **且** `payload["ok"]` **且** `not payload["stopped"]`。即只有「完整运行 + 成功 + 未中断」才触发；**单跑、中断、异常一律不触发**。全部任务被冷却 SKIP 也算成功完成，**仍会触发**——语义是「完整运行这一轮走完了」，而不是「至少干成了一件事」。
 
@@ -416,17 +431,20 @@ GUI「关闭模拟器」按钮走 `Lib.close_emulators()`，与任务流程**完
 on_job_finished（成功分支）→ 打 _pending_after_run 标记
   ↓
 QThread.finished → on_thread_finished → _run_after_actions()
-  ↓ 读 gui.json 两个开关
+  ↓ 读 gui.json：after_run_close_emulator + after_run_sleep
+  ↓ 开关关闭时 power 记为 "none"
   ├ 都关 → 直接返回，行为与没有该功能时完全一致
   └ 至少一个开 → CountdownDialog（10 秒，可取消）
         ↓ 取消 → 日志记「完成动作：已取消」
         ↓ 确认/倒计时归零 → processEvents() 让弹窗淡出动画走完
               ↓ 关模拟器（CloseEmulatorThread 后台跑，silent=True 不弹 InfoBar）
               ↓ 后台完成回调 → QTimer 3 秒
-              ↓ 睡眠（SetSuspendState）
+              ↓ 电源动作（Lib.power_action：logoff / sleep / shutdown）
 ```
 
-3 秒间隔是给 MuMu 回收虚拟机的时间：它持有系统唤醒请求时系统睡不下去，所以顺序必须是**先关模拟器再睡眠**。关模拟器失败**不阻断**睡眠——用户要的是「跑完就睡」，失败只写日志。
+3 秒间隔是给 MuMu 回收虚拟机的时间：它持有系统唤醒请求时系统睡不下去，所以顺序必须是**先关模拟器再睡眠**。关模拟器失败**不阻断**电源动作——用户要的是「跑完就睡」，失败只写日志。
+
+**注销/关机前必须 `processEvents()`**：这两个动作会立刻结束本进程，如果日志行还堆在事件队列里没渲染，用户就永远看不到「完成动作：正在请求注销」这一行。
 
 **关闭模拟器必须跑在后台线程**（`CloseEmulatorThread`）：`MuMuManager control ... shutdown` 会同步阻塞到虚拟机真正关机才返回，本机实测约 **4.1 秒**（对照：`info` 只要 0.1 秒，说明是 shutdown 本身在等）。放在主线程会引发两个可见问题：
 
@@ -437,13 +455,20 @@ QThread.finished → on_thread_finished → _run_after_actions()
 
 > 信号名用 `close_finished` 而不是 `finished`：`QThread` 自己已有同名信号，重名会覆盖基类的线程结束通知，导致线程对象无法正确释放。
 
-**睡眠实现**：`Lib.sleep_system()` 用 ctypes 调 `powrprof.SetSuspendState(False, False, False)`，第一个参数 `False` 表示**睡眠（S3）而非休眠（S4）**。
+**电源动作实现**：三种动作统一走 `Lib.power_action(action)`，共用 `_enable_shutdown_privilege()`：
 
+- `logoff` → `user32.ExitWindowsEx(EWX_LOGOFF, 0)`；
+- `sleep` → `powrprof.SetSuspendState(False, False, False)`，第一个参数 `False` 表示**睡眠（S3）而非休眠（S4）**；
+- `shutdown` → `user32.ExitWindowsEx(EWX_POWEROFF, 0)`。用 `EWX_POWEROFF` 而不是 `EWX_SHUTDOWN`：前者真正切断电源（配合 ATX 电源），后者只做到「可以安全断电」的状态。
+
+`Lib.sleep_system()` 保留（早期只有睡眠一种动作，现有测试仍在引用），逻辑与 `power_action("sleep")` 等价。
+
+- **不加 `EWX_FORCE` / `EWX_FORCEIFHUNG`**：强制标志会杀掉所有未保存的工作（包括用户开着的文档）。此时模拟器已关，正常不会有阻拦者；万一有程序阻拦，系统会弹确认框让用户自己决定；
 - **不用** `rundll32 powrprof.dll,SetSuspendState 0,1,0`：第二个参数为 1 时，开了休眠的机器会变成休眠而不是睡眠，且返回值不可检测；
 - 调用前必须 `Lib._enable_shutdown_privilege()` 启用 `SeShutdownPrivilege`，否则静默失败（返回 0 无异常）；
 - **坑**：`GetCurrentProcess` / `OpenProcessToken` 必须显式声明 `restype` / `argtypes`，否则伪句柄 `-1` 被截断成 `0xFFFFFFFF`，`OpenProcessToken` 报错误 6（无效句柄）；
 - `AdjustTokenPrivileges` 成功但未授予权限时只置 `ERROR_NOT_ALL_ASSIGNED`，必须单独检查；
-- 睡眠失败时用 `InfoBar.error` 明确提示，不静默什么都不发生。
+- 动作失败时用 `InfoBar.error` 明确提示（按动作名区分「注销失败」/「睡眠失败」/「关机失败」），不静默什么都不发生。
 
 **倒计时对话框**：`ui/widgets.py` 的 `CountdownDialog(MessageBoxBase)`，每秒刷新剩余秒数，归零自动 `accept()`。为什么不用 `InfoBar`：它没有「倒计时结束回调 + 可取消」的组合能力，关闭 InfoBar 也无法可靠地通知调用方。
 
@@ -536,7 +561,8 @@ QThread.finished → on_thread_finished → _run_after_actions()
   "log_auto_scroll": true,
   "log_font_size": 12,
   "after_run_close_emulator": false,
-  "after_run_sleep": false
+  "after_run_sleep": false,
+  "after_run_power": "sleep"
 }
 ```
 
@@ -546,13 +572,15 @@ QThread.finished → on_thread_finished → _run_after_actions()
 | `log_auto_scroll` | 新日志是否自动滚动到底部 | `SettingsDialog`（日志区齿轮） |
 | `log_font_size` | 日志字号，取值 11 / 12 / 13 / 14 | `SettingsDialog`（日志区齿轮） |
 | `after_run_close_emulator` | 完整运行结束后关闭受控模拟器窗口（详见 §5.7） | `AfterRunDialog`（按钮区齿轮） |
-| `after_run_sleep` | 完整运行结束后让电脑进入睡眠 | `AfterRunDialog`（按钮区齿轮） |
+| `after_run_sleep` | 完整运行结束后**是否启用**电源动作 | `AfterRunDialog`（按钮区齿轮） |
+| `after_run_power` | 启用时执行哪个：`logoff` / `sleep` / `shutdown` | `AfterRunDialog`（按钮区齿轮） |
 
 约定：
 
-- 文件缺失或字段非法时回落默认值（浅色、自动滚动、12 pt、两个完成动作都关闭），不阻塞启动；
+- 文件缺失或字段非法时回落默认值（浅色、自动滚动、12 pt、两个完成动作都关闭、电源动作为睡眠），不阻塞启动；
 - 布尔类偏好（`log_auto_scroll` / `after_run_close_emulator` / `after_run_sleep`）统一按 `BOOL_PREF_KEYS` 校验：**只认真正的布尔值**，字符串 `"false"`、数字 `0`/`1`、`null` 一律回落默认。手改 `gui.json` 写出字符串是常见错误，不做类型校验会被当成真值而误触发睡眠；
-- 两个完成动作键**由 `AfterRunDialog` 写**，`SettingsDialog` 完全不碰；反过来 `AfterRunDialog` 也不碰主题与日志偏好；
+- `after_run_power` 按 `VALID_POWER_ACTIONS` 校验，非法值回落 `"sleep"`。**注意它没有 `"none"`**：「不执行」由 `after_run_sleep` 开关表达，两个键职责不重叠；
+- 三个完成动作键**由 `AfterRunDialog` 写**，`SettingsDialog` 完全不碰；反过来 `AfterRunDialog` 也不碰主题与日志偏好；
 - `qconfig` 只负责运行时主题状态，不再托管配置文件，避免被覆写；
 - 主题切换后日志区按新主题重新着色、自绘状态图标同步重绘，Fluent 控件由库自动换肤；
 - 与 `Setting.yml`（任务参数）、`Gui_state.yml`（任务开关）互不干扰。
