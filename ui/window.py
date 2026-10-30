@@ -34,6 +34,7 @@ from . import theme_manager
 from . import theme
 from .panels import LeftPanel, RightPanel
 from .settings_dialog import SettingsDialog
+from .after_run_dialog import AfterRunDialog
 
 
 class WorkerThread(QThread):
@@ -117,6 +118,7 @@ class MainWindow(MSFluentWindow):
         self.right_panel.interrupt_clicked.connect(self.interrupt_job)
         self.right_panel.close_emulator_clicked.connect(self.close_emulators)
         self.right_panel.settings_clicked.connect(self.open_settings)
+        self.right_panel.after_run_settings_clicked.connect(self.open_after_run_settings)
 
         # 主题切换后重新着色日志区已有文本；行内状态图标在 ui/icons.py 内自行重绘，
         # 文字类标签由 Fluent 自动切换浅色 / 深色两套取值
@@ -176,6 +178,33 @@ class MainWindow(MSFluentWindow):
         theme_manager.apply_theme(values["theme"])
         self.right_panel.apply_prefs(values)
         self._notify_theme(values["theme"])
+
+    def open_after_run_settings(self):
+        """打开「完整运行设置」：只有两个完成动作开关，不改主题与日志偏好"""
+        dialog = AfterRunDialog(self)
+        if not dialog.exec():
+            return
+
+        merged = ui_prefs.load_prefs()
+        merged.update(dialog.values())
+        # 写盘失败必须显式提示：用户改的是「会不会把电脑睡过去」，
+        # 静默失败会让人以为设置已生效
+        if ui_prefs.save_prefs(merged):
+            InfoBar.success(
+                "设置已保存",
+                "完整运行完成后的动作已更新",
+                parent=self,
+                duration=2000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
+        else:
+            InfoBar.error(
+                "保存失败",
+                "无法写入 state/gui.json，请检查目录是否可写",
+                parent=self,
+                duration=4000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
 
     def _notify_theme(self, mode):
         InfoBar.success("主题已切换", theme_manager.THEME_LABELS.get(mode, mode),
