@@ -14,13 +14,19 @@ import paths
 PREFS_PATH = paths.PREFS
 
 DEFAULT_PREFS = {
-    "theme": "light",            # light / dark / auto
-    "log_auto_scroll": True,     # 日志自动滚动到底部
-    "log_font_size": 12,         # 日志字号（pt）
+    "theme": "light",                    # light / dark / auto
+    "log_auto_scroll": True,             # 日志自动滚动到底部
+    "log_font_size": 12,                 # 日志字号（pt）
+    # 完整运行成功结束后的动作；只对「完整运行」生效，单跑与中断都不触发
+    "after_run_close_emulator": False,   # 关闭受控模拟器窗口
+    "after_run_sleep": False,            # 让电脑进入睡眠（S3）
 }
 
 VALID_THEMES = ("light", "dark", "auto")
 VALID_LOG_SIZES = (11, 12, 13, 14)
+
+# 布尔类偏好：统一按「是 bool 才采纳，否则回落默认」处理
+BOOL_PREF_KEYS = ("log_auto_scroll", "after_run_close_emulator", "after_run_sleep")
 
 
 def load_prefs(path=None):
@@ -42,8 +48,11 @@ def load_prefs(path=None):
     prefs = dict(DEFAULT_PREFS)
     if data.get("theme") in VALID_THEMES:
         prefs["theme"] = data["theme"]
-    if isinstance(data.get("log_auto_scroll"), bool):
-        prefs["log_auto_scroll"] = data["log_auto_scroll"]
+    for key in BOOL_PREF_KEYS:
+        # 只认真正的布尔值：字符串 "false"、数字 0 都回落默认，
+        # 避免手改 gui.json 时写出 "false" 被当成真值
+        if isinstance(data.get(key), bool):
+            prefs[key] = data[key]
     try:
         size = int(data.get("log_font_size", DEFAULT_PREFS["log_font_size"]))
         if size in VALID_LOG_SIZES:
