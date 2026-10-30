@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
-"""「完整运行完成后」两个开关的偏好读写用例（不碰 GUI、不真的睡眠）。
+"""「完整运行完成后」动作的偏好读写用例（不碰 GUI、不真的睡眠）。
 
 守住三件事：
 1. 两个新键默认关闭——不改变老用户的行为；
 2. 非法值（字符串、数字、null）一律回落默认，不能因为手改 gui.json 就把电脑睡过去；
 3. 与已有的三个键互不干扰。
+
+`after_run_sleep` 管「是否启用」，`after_run_power` 管「用哪个」：
+前者是布尔、后者是三选一的字符串，两者独立校验、互不影响。
 """
 
 import json
@@ -36,6 +39,51 @@ def test_两个新开关默认都是关闭(tmp_config_dir):
 def test_默认值里包含两个新键(tmp_config_dir):
     assert "after_run_close_emulator" in prefs.DEFAULT_PREFS
     assert "after_run_sleep" in prefs.DEFAULT_PREFS
+
+
+def test_电源动作默认是睡眠(tmp_config_dir):
+    """老配置没有 after_run_power 时回落 sleep，行为与升级前一致"""
+    loaded = prefs.load_prefs()
+
+    assert loaded["after_run_power"] == "sleep"
+    assert "after_run_power" in prefs.DEFAULT_PREFS
+
+
+@pytest.mark.parametrize("action", ["logoff", "sleep", "shutdown"])
+def test_三种电源动作都能读回(tmp_config_dir, action):
+    _write_prefs(tmp_config_dir, {"after_run_power": action})
+
+    assert prefs.load_prefs()["after_run_power"] == action
+
+
+@pytest.mark.parametrize("bad_value", ["none", "hibernate", "", None, 1, True, ["sleep"]])
+def test_非法电源动作回落默认(tmp_config_dir, bad_value):
+    _write_prefs(tmp_config_dir, {"after_run_power": bad_value})
+
+    assert prefs.load_prefs()["after_run_power"] == "sleep"
+
+
+def test_开关与动作互不影响(tmp_config_dir):
+    """after_run_sleep 管「是否启用」，after_run_power 管「用哪个」，两者独立"""
+    _write_prefs(tmp_config_dir, {"after_run_sleep": False, "after_run_power": "shutdown"})
+
+    loaded = prefs.load_prefs()
+
+    assert loaded["after_run_sleep"] is False
+    assert loaded["after_run_power"] == "shutdown"
+
+
+def test_保存时两个键都写盘(tmp_config_dir):
+    merged = prefs.load_prefs()
+    merged["after_run_sleep"] = True
+    merged["after_run_power"] = "logoff"
+    prefs.save_prefs(merged)
+
+    with open(prefs.PREFS_PATH, "r", encoding="utf-8") as handle:
+        raw = json.load(handle)
+
+    assert raw["after_run_sleep"] is True
+    assert raw["after_run_power"] == "logoff"
 
 
 def test_文件不存在时不创建文件(tmp_config_dir):

@@ -10,11 +10,19 @@
 """
 
 from PyQt6.QtWidgets import QHBoxLayout
-from qfluentwidgets import BodyLabel, CaptionLabel, MessageBoxBase, SubtitleLabel
+from qfluentwidgets import BodyLabel, CaptionLabel, ComboBox, MessageBoxBase, SubtitleLabel
 
 from . import prefs
 from . import theme
 from .widgets import ToggleSwitch
+
+# 下拉框顺序即界面顺序；取值与 prefs.VALID_POWER_ACTIONS 一致
+POWER_ORDER = ("logoff", "sleep", "shutdown")
+POWER_LABELS = {
+    "logoff": "注销",
+    "sleep": "睡眠",
+    "shutdown": "关机",
+}
 
 
 class AfterRunDialog(MessageBoxBase):
@@ -49,25 +57,43 @@ class AfterRunDialog(MessageBoxBase):
         close_row.addWidget(self.close_emulator_switch)
         self.viewLayout.addLayout(close_row)
 
-        # 让电脑睡眠
-        sleep_row = QHBoxLayout()
-        sleep_row.addWidget(BodyLabel("让电脑睡眠", self))
-        sleep_row.addStretch()
-        self.sleep_switch = ToggleSwitch(self)
-        self.sleep_switch.setOnText("")
-        self.sleep_switch.setOffText("")
-        self.sleep_switch.setToolTip("睡眠（S3），不是休眠；睡眠失败请检查电源设置")
-        self.sleep_switch.setChecked(current["after_run_sleep"])
-        sleep_row.addWidget(self.sleep_switch)
-        self.viewLayout.addLayout(sleep_row)
+        # 电源动作：开关决定是否启用，下拉框选注销 / 睡眠 / 关机。
+        # 开关关闭时下拉框灰化，直观表达「这个动作不启用」
+        power_row = QHBoxLayout()
+        power_row.addWidget(BodyLabel("电源动作", self))
+        power_row.addStretch()
+
+        self.power_combo = ComboBox(self)
+        self.power_combo.addItems([POWER_LABELS[action] for action in POWER_ORDER])
+        self.power_combo.setCurrentIndex(POWER_ORDER.index(current["after_run_power"]))
+        self.power_combo.setMinimumWidth(110)
+        self.power_combo.setToolTip(
+            "注销：结束当前用户会话，服务继续运行，远程可随时接管\n"
+            "睡眠：S3，CPU 断电、内存供电，远程无法连接\n"
+            "关机：全部断电，远程无法连接"
+        )
+        power_row.addWidget(self.power_combo)
+
+        self.power_switch = ToggleSwitch(self)
+        self.power_switch.setOnText("")
+        self.power_switch.setOffText("")
+        self.power_switch.setToolTip("关闭后不执行任何电源动作")
+        self.power_switch.setChecked(current["after_run_sleep"])
+        power_row.addWidget(self.power_switch)
+
+        self.viewLayout.addLayout(power_row)
+
+        self.power_combo.setEnabled(self.power_switch.isChecked())
+        self.power_switch.checkedChanged.connect(self.power_combo.setEnabled)
 
         self.yesButton.setText("保存")
         self.cancelButton.setText("取消")
         self.widget.setMinimumWidth(420)
 
     def values(self):
-        """当前对话框中的两个动作开关"""
+        """当前对话框中的动作开关与电源动作"""
         return {
             "after_run_close_emulator": self.close_emulator_switch.isChecked(),
-            "after_run_sleep": self.sleep_switch.isChecked(),
+            "after_run_sleep": self.power_switch.isChecked(),
+            "after_run_power": POWER_ORDER[self.power_combo.currentIndex()],
         }

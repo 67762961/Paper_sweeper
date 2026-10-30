@@ -94,6 +94,10 @@ class CloseEmulatorThread(QThread):
 class MainWindow(MSFluentWindow):
     """主窗口：Fluent 外壳 + 双栏内容（左侧任务列表 / 右侧日志控制台）"""
 
+    # 电源动作的界面文案：短名用于日志与提示，长名用于倒计时弹窗
+    _POWER_LABELS = {"logoff": "注销", "sleep": "睡眠", "shutdown": "关机"}
+    _POWER_TEXT = {"logoff": "注销当前用户", "sleep": "让电脑进入睡眠", "shutdown": "关闭电脑"}
+
     def __init__(self):
         super().__init__()
         self.left_panel = None
@@ -106,7 +110,7 @@ class MainWindow(MSFluentWindow):
         self._pending_after_run = False
         # 后台关闭模拟器的线程与「关完要做什么」的回调
         self._close_thread = None
-        self._close_then_sleep = False
+        self._close_then_power = None
         self.init_ui()
 
     def init_ui(self):
@@ -313,15 +317,16 @@ class MainWindow(MSFluentWindow):
             return
 
         close_emulator = bool(prefs.get("after_run_close_emulator"))
-        sleep = bool(prefs.get("after_run_sleep"))
-        if not close_emulator and not sleep:
+        # 开关决定是否启用电源动作；启用时再按下拉框取值
+        power = prefs.get("after_run_power", "sleep") if prefs.get("after_run_sleep") else "none"
+        if not close_emulator and power == "none":
             return
 
         actions = []
         if close_emulator:
             actions.append("关闭模拟器")
-        if sleep:
-            actions.append("让电脑进入睡眠")
+        if power != "none":
+            actions.append(self._POWER_TEXT.get(power, "执行电源动作"))
         action_text = "并".join(actions)
 
         # 给一段可取消的缓冲期：这两个动作一个会丢进度、一个会黑屏
@@ -334,24 +339,24 @@ class MainWindow(MSFluentWindow):
         # 但这里同步做的那点事（写日志、建线程）也会打断动画，留下半透明残影
         QApplication.processEvents()
 
-        self._do_after_actions(close_emulator, sleep)
+        self._do_after_actions(close_emulator, power)
 
-    def _do_after_actions(self, close_emulator, sleep):
-        """真正执行完成动作：先关模拟器，等 3 秒，再睡眠"""
+    def _do_after_actions(self, close_emulator, power):
+        """真正执行完成动作：先关模拟器，等 3 秒，再执行电源动作"""
         if close_emulator:
             # 关模拟器放到后台线程：MuMuManager 关机要等虚拟机真正退出（实测约 4 秒），
             # 同步跑会把界面冻住
-            self._close_then_sleep = bool(sleep)
+            self._close_then_power = power if power != "none" else None
             self._start_close_emulators()
             return
 
-        if not sleep:
+        if power == "none":
             return
 
-        self._sleep_system()
+        self._sleep_system(power)
 
     def _start_close_emulators(self, silent=True):
-        """在后台线程里关闭模拟器；关完后按 _close_then_sleep 决定是否接着睡眠"""
+        """在后台线程里关闭模拟器；关完后按 _close_then_power 决定是否接着执行电源动作"""
         if self._close_thread is not None and self._close_thread.isRunning():
             return
 
@@ -379,11 +384,12 @@ class MainWindow(MSFluentWindow):
         else:
             self._report_close_result(payload.get("result") or {}, self._close_silent)
 
-        if not self._close_then_sleep:
+        if not self._close_then_power:
             return
-        self._close_then_sleep = False
+        action = self._close_then_power
+        self._close_then_power = None
         # 给 MuMu 一点时间回收虚拟机：它持有唤醒请求时系统睡不下去
-        QTimer.singleShot(3000, self._sleep_system)
+        QTimer.singleShot(3000, lambda: self._sleep_system(action))
 
     def _on_close_thread_finished(self):
         """后台线程真正退出后再断开引用"""
@@ -393,15 +399,24 @@ class MainWindow(MSFluentWindow):
         if thread is not None:
             thread.deleteLater()
 
-    def _sleep_system(self):
-        """让电脑进入睡眠；失败时明确提示，不要静默什么都不发生"""
-        self.right_panel.append_separator("完成动作：正在请求系统睡眠")
-        if Lib.sleep_system():
+    def _sleep_system(self, action="sleep"):
+        """执行电源动作；失败时明确提示，不要静默什么都不发生
+
+        名字沿用 sleep：早期只有睡眠一种动作，改成三种后没改名，
+        免得把测试里那些 `fake._sleep_system` 的引用全部改一遍。
+        """
+        label = self._POWER_LABELS.get(action, "电源动作")
+        self.right_panel.append_separator(f"完成动作：正在请求{label}")
+        # 注销/关机会立刻结束本进程，先把界面刷出去，至少让日志留在屏幕上
+        QApplication.processEvents()
+
+        if Lib.power_action(action):
             return
-        self.right_panel.append_separator("完成动作：睡眠请求失败")
+
+        self.right_panel.append_separator(f"完成动作：{label}请求失败")
         InfoBar.error(
-            "睡眠失败",
-            "系统拒绝了睡眠请求，请检查电源设置或当前账户权限",
+            f"{label}失败",
+            "系统拒绝了请求，请检查电源设置或当前账户权限",
             parent=self,
             duration=6000,
             position=InfoBarPosition.TOP_RIGHT,
@@ -434,7 +449,7 @@ class MainWindow(MSFluentWindow):
         """
         if self.busy:
             return
-        self._close_then_sleep = False   # 手动点按钮不联动睡眠
+        self._close_then_power = None   # 手动点按钮不联动电源动作
         self._start_close_emulators(silent=silent)
 
     def _report_close_result(self, result, silent=False):

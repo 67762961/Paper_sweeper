@@ -43,15 +43,18 @@ class FakeWindow:
         self.dialog_result = 1        # QDialog.exec()：1 = Accepted（确认），0 = Rejected（取消）
         self.dialog_calls = []
         self.close_calls = []         # 记录「启动了后台关闭」
-        self.sleep_calls = []
+        self.sleep_calls = []         # 记录传入的电源动作
         self.scheduled = []
-        self._close_then_sleep = False
+        self._close_then_power = None
         self._close_silent = True
 
     # 从 MainWindow 借来的方法（逻辑原样，避免重复实现）
     _run_after_actions = None
     _do_after_actions = None
     _sleep_system = None
+    # 文案表与真实实现保持一致
+    _POWER_LABELS = {"logoff": "注销", "sleep": "睡眠", "shutdown": "关机"}
+    _POWER_TEXT = {"logoff": "注销当前用户", "sleep": "让电脑进入睡眠", "shutdown": "关闭电脑"}
 
 
 @pytest.fixture()
@@ -77,7 +80,8 @@ def window(monkeypatch, tmp_config_dir):
         fake._close_silent = silent
 
     fake._start_close_emulators = fake_start_close
-    fake._sleep_system = lambda: fake.sleep_calls.append(True)
+    # 记录传进来的电源动作（"logoff" / "sleep" / "shutdown"）
+    fake._sleep_system = lambda action="sleep": fake.sleep_calls.append(action)
 
     # 绑定真实的完成动作逻辑
     fake._run_after_actions = window_module.MainWindow._run_after_actions.__get__(fake)
@@ -150,7 +154,7 @@ def test_只开睡眠(window):
     window._run_after_actions()
 
     assert window.close_calls == []
-    assert window.sleep_calls == [True]
+    assert window.sleep_calls == ["sleep"]
 
 
 def test_两个都开时先关再睡(window):
@@ -159,15 +163,15 @@ def test_两个都开时先关再睡(window):
 
     window._run_after_actions()
 
-    # 关模拟器现在是异步的：启动后台线程后立即返回，此时还没排睡眠
+    # 关模拟器现在是异步的：启动后台线程后立即返回，此时还没排电源动作
     assert window.close_calls == [True]
-    assert window._close_then_sleep is True
+    assert window._close_then_power == "sleep"
     assert window.scheduled == []
     assert window.sleep_calls == []
 
 
 def test_关闭完成后才排睡眠(window, monkeypatch):
-    """关模拟器在后台线程跑完 → 回调里才排 3 秒后的睡眠"""
+    """关模拟器在后台线程跑完 → 回调里才排 3 秒后的电源动作"""
     from ui import window as window_module
 
     _set_prefs(after_run_close_emulator=True, after_run_sleep=True)
@@ -183,7 +187,7 @@ def test_关闭完成后才排睡眠(window, monkeypatch):
     assert window.sleep_calls == []
 
     window.scheduled[0][1]()
-    assert window.sleep_calls == [True]
+    assert window.sleep_calls == ["sleep"]
 
 
 def test_只关不睡时关闭完成不排睡眠(window):
@@ -265,7 +269,7 @@ def test_只开睡眠时文案不含关闭模拟器(window):
     assert "睡眠" in action_text
 
 
-# ------------------------------------------------------------ 睡眠失败
+# ------------------------------------------------------------ 电源动作失败
 
 
 def test_睡眠失败时给出明确提示(monkeypatch):
@@ -278,12 +282,12 @@ def test_睡眠失败时给出明确提示(monkeypatch):
         "error",
         lambda title, content, **kwargs: bars.append((title, content)),
     )
-    monkeypatch.setattr(window_module.Lib, "sleep_system", lambda: False)
+    monkeypatch.setattr(window_module.Lib, "power_action", lambda action: False)
 
     fake = FakeWindow()
     fake._sleep_system = window_module.MainWindow._sleep_system.__get__(fake)
 
-    fake._sleep_system()
+    fake._sleep_system("sleep")
 
     assert bars and bars[0][0] == "睡眠失败"
     assert any("失败" in line for line in fake.right_panel.lines)
@@ -298,12 +302,102 @@ def test_睡眠成功时不报错(monkeypatch):
         "error",
         lambda title, content, **kwargs: bars.append(title),
     )
-    monkeypatch.setattr(window_module.Lib, "sleep_system", lambda: True)
+    monkeypatch.setattr(window_module.Lib, "power_action", lambda action: True)
 
     fake = FakeWindow()
     fake._sleep_system = window_module.MainWindow._sleep_system.__get__(fake)
 
-    fake._sleep_system()
+    fake._sleep_system("sleep")
 
     assert bars == []
-    assert any("正在请求系统睡眠" in line for line in fake.right_panel.lines)
+    assert any("正在请求睡眠" in line for line in fake.right_panel.lines)
+
+
+# ------------------------------------------------------------ 三种电源动作
+
+
+def test_选注销时传logoff(window):
+    _set_prefs(
+        after_run_close_emulator=False, after_run_sleep=True, after_run_power="logoff"
+    )
+    window._pending_after_run = True
+
+    window._run_after_actions()
+
+    assert window.sleep_calls == ["logoff"]
+
+
+def test_选关机时传shutdown(window):
+    _set_prefs(
+        after_run_close_emulator=False, after_run_sleep=True, after_run_power="shutdown"
+    )
+    window._pending_after_run = True
+
+    window._run_after_actions()
+
+    assert window.sleep_calls == ["shutdown"]
+
+
+def test_开关关闭时选了动作也不执行(window):
+    """after_run_sleep=False 时，after_run_power 有值也不该动电脑"""
+    _set_prefs(
+        after_run_close_emulator=False, after_run_sleep=False, after_run_power="shutdown"
+    )
+    window._pending_after_run = True
+
+    window._run_after_actions()
+
+    assert window.dialog_calls == []
+    assert window.sleep_calls == []
+
+
+def test_关模拟器加注销时先关再注销(window):
+    from ui import window as window_module
+
+    _set_prefs(
+        after_run_close_emulator=True, after_run_sleep=True, after_run_power="logoff"
+    )
+    window._pending_after_run = True
+    window._run_after_actions()
+
+    assert window._close_then_power == "logoff"
+
+    report = window_module.MainWindow._on_close_emulators_finished.__get__(window)
+    report({"result": {"closed": ["master"], "missing": [], "stuck": []}, "error": None})
+    window.scheduled[0][1]()
+
+    assert window.sleep_calls == ["logoff"]
+
+
+def test_倒计时文案区分三种动作(window):
+    for action, keyword in (("logoff", "注销"), ("sleep", "睡眠"), ("shutdown", "关闭电脑")):
+        window.dialog_calls.clear()
+        _set_prefs(
+            after_run_close_emulator=False, after_run_sleep=True, after_run_power=action
+        )
+        window._pending_after_run = True
+
+        window._run_after_actions()
+
+        _, action_text = window.dialog_calls[0]
+        assert keyword in action_text
+
+
+def test_电源动作失败时提示用对应名字(monkeypatch):
+    """选关机时提示「关机失败」，不能一律说「睡眠失败」"""
+    from ui import window as window_module
+
+    bars = []
+    monkeypatch.setattr(
+        window_module.InfoBar,
+        "error",
+        lambda title, content, **kwargs: bars.append(title),
+    )
+    monkeypatch.setattr(window_module.Lib, "power_action", lambda action: False)
+
+    fake = FakeWindow()
+    fake._sleep_system = window_module.MainWindow._sleep_system.__get__(fake)
+
+    fake._sleep_system("shutdown")
+
+    assert bars == ["关机失败"]
