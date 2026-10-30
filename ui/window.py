@@ -3,8 +3,8 @@
 
 import logging
 
-from PyQt6.QtCore import QThread, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QMessageBox, QWidget
+from PyQt6.QtCore import QThread, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QApplication, QHBoxLayout, QMessageBox, QWidget
 from qfluentwidgets import (
     FluentIcon,
     InfoBar,
@@ -34,6 +34,8 @@ from . import theme_manager
 from . import theme
 from .panels import LeftPanel, RightPanel
 from .settings_dialog import SettingsDialog
+from .after_run_dialog import AfterRunDialog
+from .widgets import CountdownDialog
 
 
 class WorkerThread(QThread):
@@ -67,8 +69,34 @@ class WorkerThread(QThread):
             self.task_finished.emit({"key": self.task_key, "ok": False, "error": str(error), "stopped": False})
 
 
+class CloseEmulatorThread(QThread):
+    """后台关闭模拟器
+
+    **为什么必须用线程**：`MuMuManager control ... shutdown` 会同步阻塞到虚拟机
+    真正关机才返回，本机实测约 4 秒（`info` 只要 0.1 秒，说明是 shutdown 本身在等）。
+    放在主线程里界面会完全冻住——连倒计时弹窗的 100ms 淡出动画都停在中间帧，
+    看起来就是一层半透明虚影，等几秒才「啪」地消失。
+    """
+
+    # 不能叫 finished：QThread 自己已有同名信号，重名会覆盖基类的线程结束通知
+    close_finished = pyqtSignal(object)
+
+    def run(self):
+        # 异常必须在线程内捕获，否则 Qt 线程静默退出、界面一直停在「正在关闭」
+        try:
+            result = Lib.close_emulators()
+            self.close_finished.emit({"result": result, "error": None})
+        except Exception as error:
+            logging.warning("关闭模拟器失败: %s", error)
+            self.close_finished.emit({"result": None, "error": str(error)})
+
+
 class MainWindow(MSFluentWindow):
     """主窗口：Fluent 外壳 + 双栏内容（左侧任务列表 / 右侧日志控制台）"""
+
+    # 电源动作的界面文案：短名用于日志与提示，长名用于倒计时弹窗
+    _POWER_LABELS = {"logoff": "注销", "sleep": "睡眠", "shutdown": "关机"}
+    _POWER_TEXT = {"logoff": "注销当前用户", "sleep": "让电脑进入睡眠", "shutdown": "关闭电脑"}
 
     def __init__(self):
         super().__init__()
@@ -77,6 +105,12 @@ class MainWindow(MSFluentWindow):
         self.thread = None
         self.busy = False
         self.before_snapshot = {}
+        # 完整运行成功后暂存，等线程真正退出（QThread.finished）再执行完成动作：
+        # task_finished 发出时 _log_stream 的日志文件还没关，此时睡眠会截断最后几行
+        self._pending_after_run = False
+        # 后台关闭模拟器的线程与「关完要做什么」的回调
+        self._close_thread = None
+        self._close_then_power = None
         self.init_ui()
 
     def init_ui(self):
@@ -117,6 +151,7 @@ class MainWindow(MSFluentWindow):
         self.right_panel.interrupt_clicked.connect(self.interrupt_job)
         self.right_panel.close_emulator_clicked.connect(self.close_emulators)
         self.right_panel.settings_clicked.connect(self.open_settings)
+        self.right_panel.after_run_settings_clicked.connect(self.open_after_run_settings)
 
         # 主题切换后重新着色日志区已有文本；行内状态图标在 ui/icons.py 内自行重绘，
         # 文字类标签由 Fluent 自动切换浅色 / 深色两套取值
@@ -177,6 +212,33 @@ class MainWindow(MSFluentWindow):
         self.right_panel.apply_prefs(values)
         self._notify_theme(values["theme"])
 
+    def open_after_run_settings(self):
+        """打开「完整运行设置」：只有两个完成动作开关，不改主题与日志偏好"""
+        dialog = AfterRunDialog(self)
+        if not dialog.exec():
+            return
+
+        merged = ui_prefs.load_prefs()
+        merged.update(dialog.values())
+        # 写盘失败必须显式提示：用户改的是「会不会把电脑睡过去」，
+        # 静默失败会让人以为设置已生效
+        if ui_prefs.save_prefs(merged):
+            InfoBar.success(
+                "设置已保存",
+                "完整运行完成后的动作已更新",
+                parent=self,
+                duration=2000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
+        else:
+            InfoBar.error(
+                "保存失败",
+                "无法写入 state/gui.json，请检查目录是否可写",
+                parent=self,
+                duration=4000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
+
     def _notify_theme(self, mode):
         InfoBar.success("主题已切换", theme_manager.THEME_LABELS.get(mode, mode),
                         parent=self, duration=1500, position=InfoBarPosition.TOP_RIGHT)
@@ -194,6 +256,7 @@ class MainWindow(MSFluentWindow):
         self.busy = True
         runtime.stop_thread = False
         reset_stop()  # 清除上一次的中断请求，避免新任务刚开始就被停掉
+        self._pending_after_run = False  # 每次启动都清掉上一轮的完成动作标记
 
         # 运行前快照，结束后用它判断任务是否真正推进了完成时间
         self.before_snapshot = completion_snapshot()
@@ -236,6 +299,128 @@ class MainWindow(MSFluentWindow):
             self.thread = None
         if thread is not None:
             thread.deleteLater()
+        # 日志文件此时已由 _log_stream 关好，可以安全地关模拟器或睡眠
+        self._run_after_actions()
+
+    # ---- 完整运行完成后的动作 ----
+
+    def _run_after_actions(self):
+        """按设置执行完成动作；只有「完整运行成功且未中断」才会走到这里"""
+        if not self._pending_after_run:
+            return
+        self._pending_after_run = False
+
+        try:
+            prefs = ui_prefs.load_prefs()
+        except Exception as error:
+            logging.warning("读取完成动作设置失败: %s", error)
+            return
+
+        close_emulator = bool(prefs.get("after_run_close_emulator"))
+        # 开关决定是否启用电源动作；启用时再按下拉框取值
+        power = prefs.get("after_run_power", "sleep") if prefs.get("after_run_sleep") else "none"
+        if not close_emulator and power == "none":
+            return
+
+        actions = []
+        if close_emulator:
+            actions.append("关闭模拟器")
+        if power != "none":
+            actions.append(self._POWER_TEXT.get(power, "执行电源动作"))
+        action_text = "并".join(actions)
+
+        # 给一段可取消的缓冲期：这两个动作一个会丢进度、一个会黑屏
+        dialog = CountdownDialog(self, seconds=10, action_text=action_text)
+        if not dialog.exec():
+            self.right_panel.append_separator("完成动作：已取消")
+            return
+
+        # 让弹窗的 100ms 淡出动画走完再干活：紧接着的关模拟器虽然已挪到后台线程，
+        # 但这里同步做的那点事（写日志、建线程）也会打断动画，留下半透明残影
+        QApplication.processEvents()
+
+        self._do_after_actions(close_emulator, power)
+
+    def _do_after_actions(self, close_emulator, power):
+        """真正执行完成动作：先关模拟器，等 3 秒，再执行电源动作"""
+        if close_emulator:
+            # 关模拟器放到后台线程：MuMuManager 关机要等虚拟机真正退出（实测约 4 秒），
+            # 同步跑会把界面冻住
+            self._close_then_power = power if power != "none" else None
+            self._start_close_emulators()
+            return
+
+        if power == "none":
+            return
+
+        self._sleep_system(power)
+
+    def _start_close_emulators(self, silent=True):
+        """在后台线程里关闭模拟器；关完后按 _close_then_power 决定是否接着执行电源动作"""
+        if self._close_thread is not None and self._close_thread.isRunning():
+            return
+
+        self.right_panel.append_separator("关闭模拟器：正在关闭受控模拟器窗口")
+        self._close_silent = bool(silent)
+        self._close_thread = CloseEmulatorThread()
+        self._close_thread.close_finished.connect(self._on_close_emulators_finished)
+        # 线程对象在真正退出后再释放，避免 run() 尚未返回就被回收
+        self._close_thread.finished.connect(self._on_close_thread_finished)
+        self._close_thread.start()
+
+    def _on_close_emulators_finished(self, payload):
+        """后台关闭完成：写日志、按需提示、必要时接着睡眠"""
+        error = payload.get("error")
+        if error:
+            self.right_panel.append_separator(f"关闭模拟器：失败 - {error}")
+            if not self._close_silent:
+                InfoBar.error(
+                    "关闭模拟器失败",
+                    error,
+                    parent=self,
+                    duration=5000,
+                    position=InfoBarPosition.TOP_RIGHT,
+                )
+        else:
+            self._report_close_result(payload.get("result") or {}, self._close_silent)
+
+        if not self._close_then_power:
+            return
+        action = self._close_then_power
+        self._close_then_power = None
+        # 给 MuMu 一点时间回收虚拟机：它持有唤醒请求时系统睡不下去
+        QTimer.singleShot(3000, lambda: self._sleep_system(action))
+
+    def _on_close_thread_finished(self):
+        """后台线程真正退出后再断开引用"""
+        thread = self.sender()
+        if thread is self._close_thread:
+            self._close_thread = None
+        if thread is not None:
+            thread.deleteLater()
+
+    def _sleep_system(self, action="sleep"):
+        """执行电源动作；失败时明确提示，不要静默什么都不发生
+
+        名字沿用 sleep：早期只有睡眠一种动作，改成三种后没改名，
+        免得把测试里那些 `fake._sleep_system` 的引用全部改一遍。
+        """
+        label = self._POWER_LABELS.get(action, "电源动作")
+        self.right_panel.append_separator(f"完成动作：正在请求{label}")
+        # 注销/关机会立刻结束本进程，先把界面刷出去，至少让日志留在屏幕上
+        QApplication.processEvents()
+
+        if Lib.power_action(action):
+            return
+
+        self.right_panel.append_separator(f"完成动作：{label}请求失败")
+        InfoBar.error(
+            f"{label}失败",
+            "系统拒绝了请求，请检查电源设置或当前账户权限",
+            parent=self,
+            duration=6000,
+            position=InfoBarPosition.TOP_RIGHT,
+        )
 
     def interrupt_job(self):
         """「中断运行」：请求中断当前任务，任务在下一个检查点退出后回到待机"""
@@ -256,26 +441,19 @@ class MainWindow(MSFluentWindow):
             position=InfoBarPosition.TOP_RIGHT,
         )
 
-    def close_emulators(self):
-        """「关闭模拟器」：关闭受程序管理的模拟器窗口（运行中按钮已禁用，这里再兜一次）"""
+    def close_emulators(self, silent=False):
+        """「关闭模拟器」按钮入口：在后台线程关闭受控模拟器窗口
+
+        :param silent: 由完成动作内部调用时为 True——不弹 InfoBar，
+                       因为紧接着要睡眠，弹窗来不及看，日志留痕就够了
+        """
         if self.busy:
             return
+        self._close_then_power = None   # 手动点按钮不联动电源动作
+        self._start_close_emulators(silent=silent)
 
-        self.right_panel.append_separator("关闭模拟器：正在关闭受控模拟器窗口")
-        try:
-            result = Lib.close_emulators()
-        except Exception as error:
-            logging.warning("关闭模拟器失败: %s", error)
-            self.right_panel.append_separator(f"关闭模拟器：失败 - {error}")
-            InfoBar.error(
-                "关闭模拟器失败",
-                str(error),
-                parent=self,
-                duration=5000,
-                position=InfoBarPosition.TOP_RIGHT,
-            )
-            return
-
+    def _report_close_result(self, result, silent=False):
+        """把关闭结果写成控制台摘要，并按需弹提示"""
         closed = result.get("closed") or []
         missing = result.get("missing") or []
         stuck = result.get("stuck") or []
@@ -289,6 +467,9 @@ class MainWindow(MSFluentWindow):
         if closed:
             summary += f"（{'、'.join(closed)}）"
         self.right_panel.append_separator(summary)
+
+        if silent:
+            return
 
         if stuck:
             InfoBar.warning(
@@ -375,6 +556,9 @@ class MainWindow(MSFluentWindow):
         if task_key is None:
             InfoBar.success("完整运行结束", content, parent=self, duration=4000,
                             position=InfoBarPosition.TOP_RIGHT)
+            # 只有完整运行成功且未中断才标记完成动作；单跑一律不触发。
+            # 这里只打标记，真正执行在 on_thread_finished——那时日志文件已关好
+            self._pending_after_run = True
         else:
             InfoBar.success("单任务结束", content, parent=self, duration=3000,
                             position=InfoBarPosition.TOP_RIGHT)

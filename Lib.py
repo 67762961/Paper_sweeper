@@ -389,6 +389,163 @@ def close_emulators(wait_seconds=2):
     return result
 
 
+# ---- 系统睡眠（GUI「完整运行完成后让电脑睡眠」）----
+# 只用 ctypes 调 powrprof，不依赖第三方包，也不用 rundll32：
+# `rundll32 powrprof.dll,SetSuspendState 0,1,0` 在开启了休眠的机器上
+# 会变成「休眠」而不是「睡眠」，而且返回值不可检测。
+
+_SE_SHUTDOWN_NAME = "SeShutdownPrivilege"
+_TOKEN_ADJUST_PRIVILEGES = 0x0020
+_TOKEN_QUERY = 0x0008
+_ERROR_NOT_ALL_ASSIGNED = 1300
+
+
+class _LUID(ctypes.Structure):
+    _fields_ = [("LowPart", ctypes.c_ulong), ("HighPart", ctypes.c_long)]
+
+
+class _LUID_AND_ATTRIBUTES(ctypes.Structure):
+    _fields_ = [("Luid", _LUID), ("Attributes", ctypes.c_ulong)]
+
+
+class _TOKEN_PRIVILEGES(ctypes.Structure):
+    _fields_ = [
+        ("PrivilegeCount", ctypes.c_ulong),
+        ("Privileges", _LUID_AND_ATTRIBUTES * 1),
+    ]
+
+
+def _enable_shutdown_privilege():
+    """启用 SeShutdownPrivilege（普通用户默认未启用，不启用 SetSuspendState 会静默失败）
+
+    :return: 成功返回 True；拿不到权限返回 False（调用方据此给出明确错误）
+    """
+    try:
+        advapi32 = ctypes.windll.advapi32
+        kernel32 = ctypes.windll.kernel32
+
+        # 必须显式声明签名：GetCurrentProcess 的默认返回类型是 c_int，
+        # 伪句柄 -1 会被截断成 0x00000000FFFFFFFF，传给 OpenProcessToken
+        # 就变成无效句柄（GetLastError 返回 6）
+        kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+        advapi32.OpenProcessToken.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        advapi32.OpenProcessToken.restype = ctypes.c_int
+
+        token = ctypes.c_void_p()
+        if not advapi32.OpenProcessToken(
+            kernel32.GetCurrentProcess(),
+            _TOKEN_ADJUST_PRIVILEGES | _TOKEN_QUERY,
+            ctypes.byref(token),
+        ):
+            print("        WAIT- ----- 打开进程令牌失败:", kernel32.GetLastError())
+            return False
+
+        try:
+            luid = _LUID()
+            if not advapi32.LookupPrivilegeValueW(None, _SE_SHUTDOWN_NAME, ctypes.byref(luid)):
+                print("        WAIT- ----- 查询关机特权失败:", kernel32.GetLastError())
+                return False
+
+            privileges = _TOKEN_PRIVILEGES()
+            privileges.PrivilegeCount = 1
+            privileges.Privileges[0].Luid = luid
+            privileges.Privileges[0].Attributes = 0x0002  # SE_PRIVILEGE_ENABLED
+
+            if not advapi32.AdjustTokenPrivileges(
+                token, False, ctypes.byref(privileges), 0, None, None
+            ):
+                print("        WAIT- ----- 启用关机特权失败:", kernel32.GetLastError())
+                return False
+
+            # AdjustTokenPrivileges 成功但没拿到权限时只置 ERROR_NOT_ALL_ASSIGNED，
+            # 必须单独检查，否则会误以为成功
+            error = kernel32.GetLastError()
+            if error == _ERROR_NOT_ALL_ASSIGNED:
+                print("        WAIT- ----- 关机特权未被授予 当前账户可能无权睡眠")
+                return False
+            return True
+        finally:
+            kernel32.CloseHandle(ctypes.c_void_p(token.value))
+    except Exception as error:
+        print("        WAIT- ----- 启用关机特权时异常:", error)
+        return False
+
+
+def sleep_system():
+    """让电脑进入睡眠（S3）。返回是否调用成功
+
+    False 的常见原因：当前账户没有关机特权、或被组策略禁用。
+    调用方应据此给出可操作的提示，而不是静默什么都不发生。
+    """
+    if not _enable_shutdown_privilege():
+        return False
+
+    try:
+        # 参数依次为：Hibernate=False（睡眠而非休眠）、ForceCritical=False、
+        # DisableWakeEvent=False
+        result = ctypes.windll.powrprof.SetSuspendState(False, False, False)
+    except Exception as error:
+        print("        WAIT- ----- 调用 SetSuspendState 异常:", error)
+        return False
+
+    if not result:
+        print("        WAIT- ----- 睡眠请求被拒绝:", ctypes.windll.kernel32.GetLastError())
+        return False
+    print("        INFO- ----- 已请求系统进入睡眠")
+    return True
+
+
+# ExitWindowsEx 标志位：0x0 = 注销，0x8 = 关机（后者才真正切断电源）
+_EWX_LOGOFF = 0x00000000
+_EWX_POWEROFF = 0x00000008
+
+POWER_ACTIONS = ("logoff", "sleep", "shutdown")
+
+
+def power_action(action):
+    """执行电源动作：logoff / sleep / shutdown。返回是否调用成功
+
+    **注销与关机会结束本进程**，调用后不要指望还能执行任何代码。
+    睡眠走 SetSuspendState，其余走 ExitWindowsEx —— 两者都需要
+    SeShutdownPrivilege，统一在这里启用。
+
+    不加 EWX_FORCE / EWX_FORCEIFHUNG：强制标志会杀掉所有未保存的工作
+    （包括用户开着的文档）。此时模拟器已关，正常不会有阻拦者；
+    万一有程序阻拦，系统会弹确认框，让用户自己决定。
+
+    注销与睡眠的关键差别：注销**不挂起内核**，Session 0 的服务
+    （如远程控制软件）继续运行，因此注销后仍可远程接管。
+    """
+    if action not in POWER_ACTIONS:
+        print("        WAIT- ----- 未知的电源动作:", action)
+        return False
+
+    if not _enable_shutdown_privilege():
+        return False
+
+    try:
+        if action == "sleep":
+            # 参数依次为：Hibernate=False（睡眠而非休眠）、ForceCritical=False、
+            # DisableWakeEvent=False
+            result = ctypes.windll.powrprof.SetSuspendState(False, False, False)
+        else:
+            flag = _EWX_LOGOFF if action == "logoff" else _EWX_POWEROFF
+            result = ctypes.windll.user32.ExitWindowsEx(flag, 0)
+    except Exception as error:
+        print("        WAIT- ----- 执行电源动作异常:", action, error)
+        return False
+
+    if not result:
+        print("        WAIT- ----- 电源动作被拒绝:", action, ctypes.windll.kernel32.GetLastError())
+        return False
+    print("        INFO- ----- 已请求电源动作:", action)
+    return True
+
+
 def Img_read_ch(file_path):
     """读取包含中文路径的图片"""
     # 使用numpy从二进制数据读取

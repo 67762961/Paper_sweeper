@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
-"""基础组件：整跑开关与任务行（均已 Fluent 化）。"""
+"""基础组件：整跑开关、任务行与倒计时对话框（均已 Fluent 化）。"""
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QVBoxLayout
-from qfluentwidgets import BodyLabel, CaptionLabel, SimpleCardWidget, SwitchButton
+from qfluentwidgets import (
+    BodyLabel,
+    CaptionLabel,
+    MessageBoxBase,
+    SimpleCardWidget,
+    SubtitleLabel,
+    SwitchButton,
+)
 
 from . import theme
 from .icons import IconButton, StatusIcon
@@ -150,3 +157,77 @@ class TaskRow(SimpleCardWidget):
     def visual_opacity(self):
         """当前行透明度（供测试断言使用）"""
         return self._opacity_effect.opacity() if hasattr(self, "_opacity_effect") else 1.0
+
+
+class CountdownDialog(MessageBoxBase):
+    """倒计时确认框：N 秒后自动执行，期间可以取消
+
+    用在「完整运行结束后关闭模拟器 / 睡眠」之前——那两个动作一个会丢进度、
+    一个会让屏幕黑掉，直接执行容易让人措手不及。给一段可取消的缓冲期。
+
+    为什么不用 InfoBar：InfoBar 没有「倒计时结束回调 + 可取消」的组合能力，
+    关闭 InfoBar 也无法可靠地通知调用方。
+
+    **倒计时在 exec() 里启动，不在单独的 start() 里**：调用方拿到对话框后
+    按 QDialog 的惯例直接 exec()，如果定时器只在别的方法里启动，就会漏掉，
+    表现为「弹窗出来了但数字一直停在 N 秒、也不会自动关闭」。
+    """
+
+    def __init__(self, parent=None, seconds=10, action_text=""):
+        super().__init__(parent)
+        self.remaining = int(seconds)
+        self.action_text = action_text or "执行后续动作"
+
+        self.titleLabel = SubtitleLabel("完整运行已结束", self)
+        self.viewLayout.addWidget(self.titleLabel)
+
+        self.countdown_label = BodyLabel("", self)
+        self.viewLayout.addWidget(self.countdown_label)
+
+        self.hint_label = CaptionLabel("点击「立即执行」跳过等待，或点「取消」放弃本次动作", self)
+        self.hint_label.setWordWrap(True)
+        self.hint_label.setTextColor(
+            theme.light_color("COLOR_TEXT_TERTIARY"), theme.dark_color("COLOR_TEXT_TERTIARY")
+        )
+        self.viewLayout.addWidget(self.hint_label)
+
+        self.yesButton.setText("立即执行")
+        self.cancelButton.setText("取消")
+        self.widget.setMinimumWidth(440)
+
+        self._timer = QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._tick)
+        self._refresh_text()
+
+    # ---- 倒计时 ----
+
+    def exec(self):
+        """显示对话框并开始倒计时（阻塞到用户选择或倒计时归零）
+
+        重写而不是新增一个 start()：调用方按 QDialog 惯例直接 exec()，
+        把倒计时绑在这里才不会漏启动。
+        """
+        self._timer.start()
+        try:
+            return super().exec()
+        finally:
+            # 用户点按钮、倒计时归零、或窗口被外部关闭都要停表，
+            # 否则对话框已销毁而定时器还在跑
+            self._timer.stop()
+
+    def _tick(self):
+        """每秒递减；归零自动接受"""
+        self.remaining -= 1
+        if self.remaining <= 0:
+            self._timer.stop()
+            self.accept()
+            return
+        self._refresh_text()
+
+    def _refresh_text(self):
+        self.countdown_label.setText(f"{self.remaining} 秒后将{self.action_text}")
+
+    def stop(self):
+        """停止倒计时（窗口被外部关闭时用，避免定时器继续跑）"""
+        self._timer.stop()

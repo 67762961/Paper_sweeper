@@ -54,14 +54,19 @@ def test_load_prefs_accepts_valid_values(tmp_config_dir, tmp_state_dir):
         encoding="utf-8",
     )
     loaded = prefs.load_prefs()
-    assert loaded == {"theme": "dark", "log_auto_scroll": False, "log_font_size": 14}
+    # 文件里没写的键回落到默认值，因此只断言文件里给出的这三个
+    assert loaded["theme"] == "dark"
+    assert loaded["log_auto_scroll"] is False
+    assert loaded["log_font_size"] == 14
 
 
 def test_save_prefs_roundtrip(tmp_config_dir, tmp_state_dir):
     saved = {"theme": "dark", "log_auto_scroll": False, "log_font_size": 13}
     assert prefs.save_prefs(saved) is True
     assert (tmp_state_dir / "gui.json").exists()
-    assert prefs.load_prefs() == saved
+    loaded = prefs.load_prefs()
+    # 只比较传入的键：save_prefs 会补齐其它默认键，这是既有行为
+    assert {key: loaded[key] for key in saved} == saved
 
 
 def test_save_prefs_drops_unknown_keys(tmp_config_dir, tmp_state_dir):

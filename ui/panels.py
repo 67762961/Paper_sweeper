@@ -274,6 +274,7 @@ class RightPanel(QFrame):
     interrupt_clicked = pyqtSignal()
     close_emulator_clicked = pyqtSignal()
     settings_clicked = pyqtSignal()
+    after_run_settings_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -284,6 +285,7 @@ class RightPanel(QFrame):
         self.run_button = None
         self.interrupt_button = None
         self.close_emulator_button = None
+        self.button_settings_button = None
         self.progress = None
         self.init_ui()
 
@@ -343,7 +345,7 @@ class RightPanel(QFrame):
         parent_layout.addWidget(self.progress)
 
     def create_button_area(self, parent_layout):
-        """创建主操作按钮：左起「关闭模拟器」「中断运行」，右侧「完整运行」"""
+        """创建主操作按钮：左起「关闭模拟器」「中断运行」「完整运行」，末尾是设置齿轮"""
         self.run_button = PushButton("完整运行")
         self.run_button.setFixedHeight(theme.SIZE_RUN_BUTTON_HEIGHT)
         # 用 Fluent 的「浅色 / 深色两套自定义样式」而不是一次性 setStyleSheet：
@@ -377,15 +379,25 @@ class RightPanel(QFrame):
             danger_button_qss(dark=True),
         )
 
+        # 完整运行设置的入口：与日志区顶部齿轮同款（默认尺寸，不放大）。
+        # 走独立信号，与日志齿轮各进各的弹窗
+        self.button_settings_button = TransparentToolButton(FluentIcon.SETTING, self)
+        self.button_settings_button.setToolTip("完整运行完成后的动作")
+        self.button_settings_button.clicked.connect(self.after_run_settings_clicked)
+
         button_container = QFrame()
         button_container.setStyleSheet("background: transparent;")
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, theme.SPACE_MD, 0, 0)
         button_layout.setSpacing(theme.SPACE_SM)
+        # 左侧 stretch 吃掉剩余空间，整组右对齐；末尾追加齿轮后
+        # 前面三个按钮会被自然向左推，不需要额外调整
         button_layout.addStretch()
         button_layout.addWidget(self.close_emulator_button)
         button_layout.addWidget(self.interrupt_button)
         button_layout.addWidget(self.run_button)
+        button_layout.addSpacing(theme.SPACE_MD)
+        button_layout.addWidget(self.button_settings_button)
         button_container.setLayout(button_layout)
 
         parent_layout.addWidget(button_container)

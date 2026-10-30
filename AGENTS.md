@@ -65,8 +65,15 @@
 - 今日状态由 `main.entry_done_today` 判定（`check_keys` 全部为今天才 ✓）；它只读 `Last_times.yml`，因此「被冷却/时间窗跳过」的任务仍显示 `!`。
 - 行内状态图标（对勾 / 感叹号 / 播放三角）用 `QPainter` 绘制，保证任意 DPI 清晰；齿轮与运行按钮使用 `FluentIcon`；不要往 `pic/` 塞 UI 素材。
 - 界面组件使用 Fluent 控件（`SimpleCardWidget`、`SwitchButton`、`TextEdit`、`PushButton`、`IndeterminateProgressBar`、`InfoBar` 等），不要在 `ui/` 里重复实现库中已有的控件；「完整运行」用轮廓按钮，不要实心主色块。
-- 右侧按钮区顺序固定为「关闭模拟器 / 中断运行 / 完整运行」，三者样式按语义分层：完整运行用主色（`run_button_qss`）、关闭模拟器用危险色（`danger_button_qss`，红）、中断运行用次要色（`interrupt_button_qss`，灰）。「关闭模拟器」是破坏性动作，**仅空闲时可点**（运行中禁用），点击**不弹二次确认**；它只关 `Setting.yml.启动项` 登记账号的窗口，且**必须用 `Lib.find_windows_silent`**，禁止复用会启动游戏的 `Find_windows`。
+- 右侧按钮区顺序固定为「关闭模拟器 / 中断运行 / 完整运行 / 设置齿轮」，三者样式按语义分层：完整运行用主色（`run_button_qss`）、关闭模拟器用危险色（`danger_button_qss`，红）、中断运行用次要色（`interrupt_button_qss`，灰）。「关闭模拟器」是破坏性动作，**仅空闲时可点**（运行中禁用），点击**不弹二次确认**；它只关 `Setting.yml.启动项` 登记账号的窗口，且**必须用 `Lib.find_windows_silent`**，禁止复用会启动游戏的 `Find_windows`。
+- 两个设置齿轮**各进各的弹窗**，不要合并：日志区齿轮 → `ui/settings_dialog.py`（主题 / 日志偏好 / 打开日志目录），按钮区齿轮 → `ui/after_run_dialog.py`（只有完成动作：关闭模拟器开关 + 电源动作开关与下拉框）。弹窗里不混放无关项，进错了页面要能一眼看出；按钮区齿轮走独立信号 `after_run_settings_clicked`，不要复用 `settings_clicked`。
 - `MuMuManager.exe` 的路径**不要写死**：从 `Setting.yml.启动项.<账号>.启动命令` 里的 exe 推导目录（同目录 → 上一级 → `shell/`），找不到就降级为发 `WM_CLOSE`；用户可用可选键 `模拟器.MuMuManager` 显式覆盖。
+- 「完整运行完成后的动作」（关模拟器 / 注销 / 睡眠 / 关机）的触发条件严格为 `task_key is None` + `ok` + `not stopped`，**单跑、中断、异常一律不触发**。执行时机必须是 `QThread.finished`（`on_thread_finished`），不能是 `task_finished`——后者发出时 `main._log_stream` 的日志文件还没关，此时睡眠会截断日志。
+- 电源动作是**开关 + 下拉框两个键**：`after_run_sleep`（bool，是否启用）+ `after_run_power`（`logoff` / `sleep` / `shutdown`，启用时用哪个）。**不要合并成一个四值枚举**——分开后老配置升级零迁移，「不执行」由开关表达，下拉框不必塞 `"none"`。开关关闭时下拉框 `setEnabled(False)` 灰化。
+- 注销与睡眠的**关键差别**（决定各自适用场景）：注销只结束用户会话，**内核继续运行**，Session 0 的服务（远程控制软件如 UU 远程的 `GameViewerService`）仍在，所以**注销后可以远程接管**；睡眠/关机时内核挂起或停止，服务不存在，远程连不上。
+- 电源动作统一走 `Lib.power_action(action)`（`logoff` → `ExitWindowsEx(EWX_LOGOFF)`、`sleep` → `SetSuspendState(False, ...)`、`shutdown` → `ExitWindowsEx(EWX_POWEROFF)`），共用 `_enable_shutdown_privilege()`。**不要**用 `rundll32 powrprof.dll,SetSuspendState 0,1,0`（开了休眠的机器会变成休眠）；**不要**加 `EWX_FORCE` / `EWX_FORCEIFHUNG`（会杀掉用户未保存的工作）。ctypes 调 Win32 时必须显式声明 `restype` / `argtypes`，否则伪句柄会被截断（`GetCurrentProcess` 的 `-1` 变成 `0xFFFFFFFF`，`OpenProcessToken` 报错误 6）。
+- 注销/关机**会立刻结束本进程**，调用前必须 `QApplication.processEvents()` 把日志刷到屏幕上，否则用户永远看不到「正在请求注销」那一行。
+- **关模拟器必须跑在后台线程**（`CloseEmulatorThread`）：`MuMuManager control ... shutdown` 同步阻塞约 4 秒，放主线程会让界面冻住，并让倒计时弹窗的 100ms 淡出动画停在中间帧（半透明虚影）。`dialog.exec()` 返回后先 `processEvents()` 让动画走完再启线程。QThread 子类的结果信号**不要叫 `finished`**（会覆盖基类的线程结束通知），本项目用 `close_finished`。
 - 配色统一从 `ui/theme.py` 取：`COLOR_*` 是浅色取值、深色覆盖在 `_DARK_COLORS`；组件取色用 `theme.color()` / `light_color()` / `dark_color()`，不要在组件里写死十六进制。
 - 会随主题变化的元素不要用裸 `QLabel` 承载文字（深色下会变黑看不清）：文字用 Fluent 标签并 `setTextColor(浅色, 深色)`；轮廓按钮用 `setCustomStyleSheet(light_qss, dark_qss)` 注册；自绘控件连接 `qconfig.themeChangedFinished` 后重绘。
 - `Full_operation` 与 `Single_operation` 共用 `main._log_stream`；日志收尾必须先恢复 `sys.stdout` 再冲刷，避免打包版（`console=False`，`sys.stdout` 为 `None`）下抛出异常导致 GUI 卡在「运行中」。
