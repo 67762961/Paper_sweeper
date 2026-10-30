@@ -1,4 +1,5 @@
 import win32gui
+import win32con
 import ctypes
 import cv2
 import pyautogui
@@ -6,6 +7,8 @@ import pydirectinput
 import time
 import numpy as np
 import random
+import re
+import json
 from datetime import datetime, timedelta
 import os
 import paths
@@ -148,6 +151,242 @@ def Log_in(title):
             print("        INFO-", Matchs, "未检测到适龄提示界面")
             print("        WAIT- wwwww 等待准备 已等待 {waittime} 秒".format(waittime=Wait * 1 + 20))
             Sleep_print(1)
+
+
+# ---- 系统动作（GUI「关闭模拟器」按钮）----
+# 与任务流程完全解耦：这些函数不在任务线程里跑，也不依赖中断机制。
+# 关键约束：**只读枚举窗口，绝不调用 Find_windows**——那个函数找不到窗口时会去
+# 启动游戏（Log_in），"关闭"场景一旦复用它就变成"先启动再关闭"，还会卡 25 秒以上。
+
+
+def find_windows_silent(title):
+    """按标题子串只读枚举可见窗口，找不到返回 None
+
+    与 Find_windows 的唯一区别：**不启动游戏**。关闭模拟器只能用它。
+    """
+    hwnds = []
+
+    def callback(hwnd, collected):
+        if win32gui.IsWindowVisible(hwnd) and title in win32gui.GetWindowText(hwnd):
+            collected.append(hwnd)
+        return True
+
+    win32gui.EnumWindows(callback, hwnds)
+    return hwnds[0] if hwnds else None
+
+
+def controlled_accounts(config=None):
+    """受程序管理的账号名列表（即 Setting.yml 里 启动项 的 key）
+
+    这是"受程序掌握"的唯一判定依据：只有登记过的账号窗口才会被关闭，
+    用户手动开的、标题不匹配的窗口一律不碰。
+    """
+    config = read_config(paths.SETTING) if config is None else config
+    launch_items = (config or {}).get("启动项") or {}
+    if not isinstance(launch_items, dict):
+        return []
+    return [account for account in launch_items.keys()]
+
+
+def _launch_commands(config=None):
+    """返回 {账号: 启动命令字符串}；缺失或格式异常时跳过该账号"""
+    config = read_config(paths.SETTING) if config is None else config
+    launch_items = (config or {}).get("启动项") or {}
+    if not isinstance(launch_items, dict):
+        return {}
+    commands = {}
+    for account, item in launch_items.items():
+        if isinstance(item, dict):
+            command = item.get("启动命令")
+            if isinstance(command, str) and command.strip():
+                commands[account] = command.strip()
+    return commands
+
+
+def parse_instance_number(launch_cmd):
+    """从启动命令里取出 MuMu 实例号（-v N 的 N），解析失败返回 None
+
+    形如 "...MuMuNxMain.exe -p com.xxx -v 1" -> 1
+    """
+    if not launch_cmd:
+        return None
+    match = re.search(r"-v\s+(\d+)", launch_cmd)
+    return match.group(1) if match else None
+
+
+def _launch_exe_dir(launch_cmd):
+    """从启动命令里取出主程序所在目录，解析失败返回 None
+
+    不写死任何安装路径：MuMu 装在哪、换盘符、升级换目录都从
+    Setting.yml 的启动命令推导，那里已经是权威来源。
+    """
+    if not launch_cmd:
+        return None
+    match = re.search(r'"?([A-Za-z]:[^"]*?\.exe)"?', launch_cmd, re.IGNORECASE)
+    if not match:
+        return None
+    return os.path.dirname(match.group(1).replace("\\", os.sep).replace("/", os.sep))
+
+
+def find_mumu_manager(launch_cmd, config=None):
+    """定位 MuMuManager.exe，找不到返回 None
+
+    优先级：
+    1. Setting.yml 的 模拟器.MuMuManager（可选键，用户想显式指定时的逃生口）
+    2. 从启动命令推导出的主程序目录 → 同目录 / 上一级 / shell 子目录
+    3. 都找不到 → None（调用方降级为关窗口）
+    """
+    explicit = (read_config(paths.SETTING) if config is None else config) or {}
+    simulator = explicit.get("模拟器") or {}
+    if isinstance(simulator, dict):
+        manual = simulator.get("MuMuManager")
+        if isinstance(manual, str) and manual.strip() and os.path.isfile(manual.strip()):
+            return manual.strip()
+
+    exe_dir = _launch_exe_dir(launch_cmd)
+    if not exe_dir:
+        return None
+
+    parent = os.path.dirname(exe_dir)
+    candidates = (
+        os.path.join(exe_dir, "MuMuManager.exe"),
+        os.path.join(parent, "MuMuManager.exe"),
+        os.path.join(parent, "shell", "MuMuManager.exe"),
+    )
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def _run_manager(manager_path, args, timeout=15):
+    """调用 MuMuManager 并解析其 JSON 输出，成功返回 True
+
+    MuMuManager 的约定是输出 {"errcode": 0, "errmsg": ""}，errcode 为 0 表示成功。
+    进程起不来、超时、输出不是 JSON 都按失败处理，由调用方降级。
+    """
+    try:
+        completed = subprocess.run(
+            [manager_path] + list(args),
+            capture_output=True,
+            timeout=timeout,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        print("        WAIT- ----- MuMuManager 调用失败:", error)
+        return False
+
+    output = (completed.stdout or b"").decode("utf-8", errors="replace").strip()
+    if not output:
+        return False
+    try:
+        payload = json.loads(output)
+    except ValueError:
+        # 老版本可能直接输出纯文本，返回码为 0 也认
+        return completed.returncode == 0
+    if isinstance(payload, dict):
+        return payload.get("errcode", 0) == 0
+    return completed.returncode == 0
+
+
+def shutdown_via_manager(manager_path, indexes):
+    """按实例号关机；两种子命令顺序都试，任一成功即返回 True
+
+    不同 MuMu 大版本的参数位置不同（control -v N shutdown / control shutdown -v N），
+    这里不猜版本，两种都试一遍，都失败再由调用方降级为关窗口。
+    """
+    index_arg = ",".join(str(index) for index in indexes)
+    attempts = (
+        ["control", "-v", index_arg, "shutdown"],
+        ["control", "shutdown", "-v", index_arg],
+    )
+    for args in attempts:
+        if _run_manager(manager_path, args):
+            print("        INFO- ----- 已通过 MuMuManager 请求关机 实例:", index_arg)
+            return True
+        print("        INFO- ----- MuMuManager 关机命令未成功 尝试下一种写法:", " ".join(args))
+    return False
+
+
+def close_emulators(wait_seconds=2):
+    """关闭所有受程序管理的模拟器窗口
+
+    流程：MuMuManager 按实例号关机（最干净）→ 等待 → 复查
+          仍在的窗口逐个发 WM_CLOSE（兜底）
+
+    :return: {"closed": [账号...], "missing": [...], "stuck": [...]}
+             closed  本次确认已关闭的账号
+             missing 本来就没在运行的账号
+             stuck   发了 WM_CLOSE 但窗口仍在的账号
+    """
+    result = {"closed": [], "missing": [], "stuck": []}
+
+    config = read_config(paths.SETTING) or {}
+    commands = _launch_commands(config)
+    accounts = controlled_accounts(config)
+    if not accounts:
+        print("        INFO- ----- Setting.yml 未登记任何启动项 无可关闭的模拟器")
+        return result
+
+    # 关闭前先记录哪些账号本来就在跑，用来区分 closed 与 missing
+    running_before = {account: find_windows_silent(account) for account in accounts}
+    alive = [account for account, hwnd in running_before.items() if hwnd]
+
+    if not alive:
+        print("        INFO- ----- 未发现正在运行的受控模拟器窗口")
+        result["missing"] = list(accounts)
+        return result
+
+    # 第一级：MuMuManager 按实例号关机（虚拟机正常退出，最干净）
+    manager_path = None
+    for account in alive:
+        manager_path = find_mumu_manager(commands.get(account), config)
+        if manager_path:
+            break
+
+    if manager_path:
+        print("        INFO- ----- 使用 MuMuManager:", manager_path)
+        indexes = [parse_instance_number(commands.get(account)) for account in alive]
+        indexes = [index for index in indexes if index is not None]
+        if indexes:
+            shutdown_via_manager(manager_path, indexes)
+            try:
+                _sleep_with_stop(wait_seconds)
+            except TaskStopped:
+                print("        QUIT- ----- 关闭模拟器收到中断请求 已停止")
+                return result
+    else:
+        print("        INFO- ----- 未找到 MuMuManager 降级为关窗口")
+
+    # 第二级：仍在的窗口逐个发 WM_CLOSE（只关窗口，虚拟机由 MuMu 自己回收）
+    for account in alive:
+        hwnd = find_windows_silent(account)
+        if hwnd is None:
+            continue
+        try:
+            win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+            print("        INFO- ----- 已向窗口发送关闭消息:", account)
+        except Exception as error:
+            print("        WAIT- ----- 发送关闭消息失败:", account, error)
+
+    # 复查：关掉的算 closed，仍在的算 stuck，原本没开的算 missing
+    for account in accounts:
+        if account not in alive:
+            result["missing"].append(account)
+            continue
+        if find_windows_silent(account) is None:
+            result["closed"].append(account)
+        else:
+            result["stuck"].append(account)
+
+    print(
+        "        INFO- ----- 关闭模拟器完成 已关闭 {closed} 个 未运行 {missing} 个 仍残留 {stuck} 个".format(
+            closed=len(result["closed"]),
+            missing=len(result["missing"]),
+            stuck=len(result["stuck"]),
+        )
+    )
+    return result
 
 
 def Img_read_ch(file_path):
