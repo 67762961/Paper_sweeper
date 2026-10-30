@@ -159,12 +159,13 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | ---- | ---- |
 | `ui/theme.py` | 设计 token：颜色、间距、圆角、字号；`COLOR_*` 为浅色取值、深色覆盖在 `_DARK_COLORS`，组件用 `theme.color()` / `light_color()` / `dark_color()` 取色 |
 | `ui/icons.py` | `StatusIcon`（QPainter 绘制对勾/感叹号/播放三角）、`IconButton`（FluentIcon 图标按钮） |
-| `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`） |
-| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 「关闭模拟器 / 中断运行 / 完整运行」按钮组） |
+| `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`）、`CountdownDialog`（可取消的倒计时确认框） |
+| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 「关闭模拟器 / 中断运行 / 完整运行 / 设置齿轮」按钮组） |
 | `ui/theme_manager.py` | Fluent 主题初始化与深浅色切换（主题偏好存 `state/gui.json`） |
-| `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号） |
-| `ui/settings_dialog.py` | 设置弹窗：主题、日志偏好与「打开日志目录」 |
-| `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + 中断入口 + `InfoBar` 结果提示） |
+| `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号 / 两个完成动作开关） |
+| `ui/settings_dialog.py` | 日志设置弹窗：主题、日志偏好与「打开日志目录」（日志区齿轮进入） |
+| `ui/after_run_dialog.py` | 完整运行设置弹窗：只有「关闭模拟器」「让电脑睡眠」两个开关（按钮区齿轮进入） |
+| `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + 中断入口 + 完成动作触发 + `InfoBar` 结果提示） |
 
 窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
 `mainPage` 加入后**隐藏左侧导航**，因此保留参考项目的 Fluent 观感与无边框窗口，
@@ -198,7 +199,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 
 图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为**主色**轮廓按钮（主色描边 + 主色文字，悬停同色系浅底），其左侧「中断运行」为**次要色**轮廓按钮（带 `FluentIcon.PAUSE`），再左侧「关闭模拟器」为**危险色**轮廓按钮（红色描边 + 红色文字，带 `FluentIcon.POWER_BUTTON`），都不使用实心主色块；轮廓按钮用 Fluent 的「浅色 / 深色两套自定义样式」注册，主题切换后不会退回默认实心按钮。
 
-按钮区从左到右：**关闭模拟器 / 中断运行 / 完整运行**。三者样式刻意拉开层次——完整运行是主色（主动作），关闭模拟器是危险色红（破坏性），中断运行是次要色灰（常规停止）。红色取值 `COLOR_DANGER` 浅色为 `#c42b1c`、深色为柔和浅红 `#ff8b82`，与 `COLOR_LOG_ERROR` 保持一致，避免深色下刺眼。
+按钮区从左到右：**关闭模拟器 / 中断运行 / 完整运行 / 设置齿轮**。前三个按钮样式刻意拉开层次——完整运行是主色（主动作），关闭模拟器是危险色红（破坏性），中断运行是次要色灰（常规停止）。红色取值 `COLOR_DANGER` 浅色为 `#c42b1c`、深色为柔和浅红 `#ff8b82`，与 `COLOR_LOG_ERROR` 保持一致，避免深色下刺眼。末尾齿轮与日志区顶部那个同款（默认尺寸，不放大），但**走独立信号**：日志齿轮进「设置」（主题 / 日志），按钮区齿轮进「完整运行设置」（两个完成动作），两个弹窗不混放无关项，进错了页面一眼能看出。
 
 交互约定：
 
@@ -210,6 +211,8 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | 点击「完整运行」 | 按 `TASK_REGISTRY` 顺序执行**开关开启**的任务 |
 | 点击「中断运行」 | 立即置位停止请求；任务在下一个检查点抛 `TaskStopped` 退出，界面回到待机。**不做断点续跑**，下次运行即新的一轮 |
 | 点击「关闭模拟器」 | 关闭 `Setting.yml.启动项` 里登记账号对应的模拟器窗口（详见 §5.6）。**不弹二次确认**，关闭后控制台输出摘要并用 `InfoBar` 提示 |
+| 点击按钮区齿轮 | 打开「完整运行设置」：只有两个完成动作开关（详见 §5.7）。写盘失败会明确提示 |
+| 点击日志区齿轮 | 打开「设置」：主题、日志自动滚动、日志字号、打开日志目录（与按钮区齿轮各管一摊） |
 | 运行中再次点击 | 被 `busy` 互斥拒绝，不会启动第二个线程 |
 | 运行中关闭窗口 | 弹确认框；确认后同样走 `request_stop()` 并等待线程收尾 |
 
@@ -394,6 +397,47 @@ GUI「关闭模拟器」按钮走 `Lib.close_emulators()`，与任务流程**完
 - 关闭过程中的等待走 `_sleep_with_stop`，不写裸 `time.sleep`；
 - 关闭失败不抛异常到 GUI，返回分类结果由 `InfoBar` 提示。
 
+### 5.7 完整运行完成后的动作
+
+按钮区的设置齿轮打开 `ui/after_run_dialog.py` 的 `AfterRunDialog`，里面只有两个开关，都存在 `state/gui.json`：
+
+| 键 | 默认 | 含义 |
+| ---- | ---- | ---- |
+| `after_run_close_emulator` | `False` | 完整运行结束后关闭受控模拟器窗口 |
+| `after_run_sleep` | `False` | 完整运行结束后让电脑进入睡眠（S3） |
+
+**触发条件（严格）**：`task_key is None` **且** `payload["ok"]` **且** `not payload["stopped"]`。即只有「完整运行 + 成功 + 未中断」才触发；**单跑、中断、异常一律不触发**。全部任务被冷却 SKIP 也算成功完成，**仍会触发**——语义是「完整运行这一轮走完了」，而不是「至少干成了一件事」。
+
+**执行时机**：`QThread.finished` → `on_thread_finished()`，**不是** `task_finished`。因为 `task_finished` 在 `WorkerThread.run()` 内部就发出，此时 `main._log_stream` 的 `finally` 还没执行，日志文件未关；在那个时点睡眠会把最后几行日志截掉。
+
+**执行顺序**：
+
+```
+on_job_finished（成功分支）→ 打 _pending_after_run 标记
+  ↓
+QThread.finished → on_thread_finished → _run_after_actions()
+  ↓ 读 gui.json 两个开关
+  ├ 都关 → 直接返回，行为与没有该功能时完全一致
+  └ 至少一个开 → CountdownDialog（10 秒，可取消）
+        ↓ 取消 → 日志记「完成动作：已取消」
+        ↓ 确认/倒计时归零
+              ↓ 关模拟器（silent=True，不弹 InfoBar）
+              ↓ QTimer 3 秒
+              ↓ 睡眠（SetSuspendState）
+```
+
+3 秒间隔是给 MuMu 回收虚拟机的时间：它持有系统唤醒请求时系统睡不下去，所以顺序必须是**先关模拟器再睡眠**。
+
+**睡眠实现**：`Lib.sleep_system()` 用 ctypes 调 `powrprof.SetSuspendState(False, False, False)`，第一个参数 `False` 表示**睡眠（S3）而非休眠（S4）**。
+
+- **不用** `rundll32 powrprof.dll,SetSuspendState 0,1,0`：第二个参数为 1 时，开了休眠的机器会变成休眠而不是睡眠，且返回值不可检测；
+- 调用前必须 `Lib._enable_shutdown_privilege()` 启用 `SeShutdownPrivilege`，否则静默失败（返回 0 无异常）；
+- **坑**：`GetCurrentProcess` / `OpenProcessToken` 必须显式声明 `restype` / `argtypes`，否则伪句柄 `-1` 被截断成 `0xFFFFFFFF`，`OpenProcessToken` 报错误 6（无效句柄）；
+- `AdjustTokenPrivileges` 成功但未授予权限时只置 `ERROR_NOT_ALL_ASSIGNED`，必须单独检查；
+- 睡眠失败时用 `InfoBar.error` 明确提示，不静默什么都不发生。
+
+**倒计时对话框**：`ui/widgets.py` 的 `CountdownDialog(MessageBoxBase)`，每秒刷新剩余秒数，归零自动 `accept()`。为什么不用 `InfoBar`：它没有「倒计时结束回调 + 可取消」的组合能力，关闭 InfoBar 也无法可靠地通知调用方。
+
 ## 6. 配置体系
 
 ### 6.0 目录划分：config/ 与 state/
@@ -481,19 +525,25 @@ GUI「关闭模拟器」按钮走 `Lib.close_emulators()`，与任务流程**完
 {
   "theme": "light",
   "log_auto_scroll": true,
-  "log_font_size": 12
+  "log_font_size": 12,
+  "after_run_close_emulator": false,
+  "after_run_sleep": false
 }
 ```
 
-| 键 | 含义 |
-| ---- | ---- |
-| `theme` | `light` / `dark` / `auto`（跟随系统） |
-| `log_auto_scroll` | 新日志是否自动滚动到底部 |
-| `log_font_size` | 日志字号，取值 11 / 12 / 13 / 14 |
+| 键 | 含义 | 由哪个弹窗写 |
+| ---- | ---- | ---- |
+| `theme` | `light` / `dark` / `auto`（跟随系统） | `SettingsDialog`（日志区齿轮） |
+| `log_auto_scroll` | 新日志是否自动滚动到底部 | `SettingsDialog`（日志区齿轮） |
+| `log_font_size` | 日志字号，取值 11 / 12 / 13 / 14 | `SettingsDialog`（日志区齿轮） |
+| `after_run_close_emulator` | 完整运行结束后关闭受控模拟器窗口（详见 §5.7） | `AfterRunDialog`（按钮区齿轮） |
+| `after_run_sleep` | 完整运行结束后让电脑进入睡眠 | `AfterRunDialog`（按钮区齿轮） |
 
 约定：
 
-- 文件缺失或字段非法时回落默认值（浅色、自动滚动、12 pt），不阻塞启动；
+- 文件缺失或字段非法时回落默认值（浅色、自动滚动、12 pt、两个完成动作都关闭），不阻塞启动；
+- 布尔类偏好（`log_auto_scroll` / `after_run_close_emulator` / `after_run_sleep`）统一按 `BOOL_PREF_KEYS` 校验：**只认真正的布尔值**，字符串 `"false"`、数字 `0`/`1`、`null` 一律回落默认。手改 `gui.json` 写出字符串是常见错误，不做类型校验会被当成真值而误触发睡眠；
+- 两个完成动作键**由 `AfterRunDialog` 写**，`SettingsDialog` 完全不碰；反过来 `AfterRunDialog` 也不碰主题与日志偏好；
 - `qconfig` 只负责运行时主题状态，不再托管配置文件，避免被覆写；
 - 主题切换后日志区按新主题重新着色、自绘状态图标同步重绘，Fluent 控件由库自动换肤；
 - 与 `Setting.yml`（任务参数）、`Gui_state.yml`（任务开关）互不干扰。
