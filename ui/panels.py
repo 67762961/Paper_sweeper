@@ -106,6 +106,47 @@ def interrupt_button_qss(dark):
     """
 
 
+def danger_button_qss(dark):
+    """「关闭模拟器」危险色轮廓按钮：红色描边 + 红色文字，悬停/按下用同色系浅底
+
+    与「中断运行」的次要色刻意拉开层次：中断只是停下，关模拟器会结束虚拟机、
+    未保存的进度可能丢失，用红色提示这个差别。
+    """
+    text = theme.dark_color("COLOR_DANGER") if dark else theme.light_color("COLOR_DANGER")
+    hover = (
+        theme.dark_color("COLOR_DANGER_HOVER_BG")
+        if dark
+        else theme.light_color("COLOR_DANGER_HOVER_BG")
+    )
+    pressed = (
+        theme.dark_color("COLOR_DANGER_PRESSED_BG")
+        if dark
+        else theme.light_color("COLOR_DANGER_PRESSED_BG")
+    )
+    disabled = theme.dark_color("COLOR_TEXT_DISABLED") if dark else theme.light_color("COLOR_TEXT_DISABLED")
+    border = theme.dark_color("COLOR_ROW_BORDER") if dark else theme.light_color("COLOR_ROW_BORDER")
+    return f"""
+        QPushButton {{
+            background-color: transparent;
+            color: {text};
+            border: 1px solid {text};
+            border-radius: {theme.RADIUS_CARD}px;
+            font-size: {theme.FONT_SIZE_RUN_BUTTON}px;
+            padding: 0 {theme.SPACE_XL}px;
+        }}
+        QPushButton:hover {{
+            background-color: {hover};
+        }}
+        QPushButton:pressed {{
+            background-color: {pressed};
+        }}
+        QPushButton:disabled {{
+            color: {disabled};
+            border-color: {border};
+        }}
+    """
+
+
 class LeftPanel(QFrame):
     """左侧任务列表面板：7 行对应 TASK_REGISTRY，行内提供单跑与整跑开关"""
 
@@ -231,6 +272,7 @@ class RightPanel(QFrame):
 
     run_button_clicked = pyqtSignal()
     interrupt_clicked = pyqtSignal()
+    close_emulator_clicked = pyqtSignal()
     settings_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -241,6 +283,7 @@ class RightPanel(QFrame):
         self.textbox = None
         self.run_button = None
         self.interrupt_button = None
+        self.close_emulator_button = None
         self.progress = None
         self.init_ui()
 
@@ -300,7 +343,7 @@ class RightPanel(QFrame):
         parent_layout.addWidget(self.progress)
 
     def create_button_area(self, parent_layout):
-        """创建主操作按钮：左侧「中断运行」，右侧「完整运行」"""
+        """创建主操作按钮：左起「关闭模拟器」「中断运行」，右侧「完整运行」"""
         self.run_button = PushButton("完整运行")
         self.run_button.setFixedHeight(theme.SIZE_RUN_BUTTON_HEIGHT)
         # 用 Fluent 的「浅色 / 深色两套自定义样式」而不是一次性 setStyleSheet：
@@ -321,12 +364,26 @@ class RightPanel(QFrame):
             interrupt_button_qss(dark=True),
         )
 
+        # 危险动作：红色轮廓，与灰色的「中断运行」拉开层次
+        self.close_emulator_button = PushButton("关闭模拟器", self, FluentIcon.POWER_BUTTON)
+        self.close_emulator_button.setFixedHeight(theme.SIZE_RUN_BUTTON_HEIGHT)
+        self.close_emulator_button.setToolTip(
+            "关闭所有由本程序管理的模拟器窗口（master / slaves），未保存的进度会丢失"
+        )
+        self.close_emulator_button.setEnabled(True)  # 仅空闲时可点
+        setCustomStyleSheet(
+            self.close_emulator_button,
+            danger_button_qss(dark=False),
+            danger_button_qss(dark=True),
+        )
+
         button_container = QFrame()
         button_container.setStyleSheet("background: transparent;")
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, theme.SPACE_MD, 0, 0)
         button_layout.setSpacing(theme.SPACE_SM)
         button_layout.addStretch()
+        button_layout.addWidget(self.close_emulator_button)
         button_layout.addWidget(self.interrupt_button)
         button_layout.addWidget(self.run_button)
         button_container.setLayout(button_layout)
@@ -335,6 +392,7 @@ class RightPanel(QFrame):
 
         self.run_button.clicked.connect(self.run_button_clicked)
         self.interrupt_button.clicked.connect(self.interrupt_clicked)
+        self.close_emulator_button.clicked.connect(self.close_emulator_clicked)
 
     def set_running(self, running):
         """运行期间禁用完整运行按钮、启用中断按钮、显示进度条"""
@@ -342,6 +400,9 @@ class RightPanel(QFrame):
         self.run_button.setText("运行中…" if running else "完整运行")
         self.interrupt_button.setEnabled(running)
         self.interrupt_button.setText("中断运行")
+        # 关闭模拟器是破坏性动作，运行中一律禁用：正在抢占键鼠时关窗口
+        # 会让任务在半途失去目标，后续每一步都必然失败
+        self.close_emulator_button.setEnabled(not running)
         if running:
             self.progress.setVisible(True)
             self.progress.start()

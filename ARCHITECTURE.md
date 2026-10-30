@@ -160,7 +160,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | `ui/theme.py` | 设计 token：颜色、间距、圆角、字号；`COLOR_*` 为浅色取值、深色覆盖在 `_DARK_COLORS`，组件用 `theme.color()` / `light_color()` / `dark_color()` 取色 |
 | `ui/icons.py` | `StatusIcon`（QPainter 绘制对勾/感叹号/播放三角）、`IconButton`（FluentIcon 图标按钮） |
 | `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`） |
-| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 「中断运行 / 完整运行」按钮组） |
+| `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 「关闭模拟器 / 中断运行 / 完整运行」按钮组） |
 | `ui/theme_manager.py` | Fluent 主题初始化与深浅色切换（主题偏好存 `state/gui.json`） |
 | `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号） |
 | `ui/settings_dialog.py` | 设置弹窗：主题、日志偏好与「打开日志目录」 |
@@ -172,17 +172,19 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 
 主体职责：
 
-- 左侧 7 行任务（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「中断运行 + 完整运行」按钮组；
+- 左侧 7 行任务（由 `main.TASK_REGISTRY` 驱动，与完整运行同顺序），右侧控制台与「关闭模拟器 + 中断运行 + 完整运行」按钮组；
 - `WorkerThread` 持有 `task_key`：`None` 时调用 `main.Full_operation`，否则调用 `main.Single_operation`；返回值里的 `stopped` 会带进 `task_finished` 的 payload；
-- 运行期间所有行的交互控件与「完整运行」按钮一起禁用（`MainWindow.busy` 互斥），仅「中断运行」可用，并显示不确定进度条；
+- 运行期间所有行的交互控件与「完整运行」「关闭模拟器」按钮一起禁用（`MainWindow.busy` 互斥），仅「中断运行」可用，并显示不确定进度条；
 - 点「中断运行」→ `request_stop()` + 按钮变「中断中…」→ 线程在检查点退出 → `on_job_finished` 按 `stopped` 走「已中断」收尾（不报错、不统计完成数），界面回到待机；
+- 点「关闭模拟器」→ `Lib.close_emulators()` 关闭受控模拟器窗口（详见 §5.6），控制台输出 `closed/missing/stuck` 摘要并用 `InfoBar` 提示；
 - 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果；
 - 顶栏右侧提供深浅色主题快捷切换按钮，右侧日志区提供「清空 / 自动滚动 / 设置」工具条；
 - 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号，并提供「打开日志目录」入口；
 - 界面偏好写入 `state/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `Setting.yml` / `Gui_state.yml`；
 - 深浅色主题各有独立配色：文字类控件用 Fluent 标签（浅色 / 深色两套文字色由库自动切换），
   自绘状态图标、日志行着色与轮廓按钮在切换后按当前主题重新取色；主强调色是比原 `#007BFF`
-  深一档的蓝（浅色 `#0d6bc2`，深色 `#3d8bd6`），避免浅色下过艳、深色下发灰看不清。
+  深一档的蓝（浅色 `#0d6bc2`，深色 `#3d8bd6`），避免浅色下过艳、深色下发灰看不清；
+  危险色（`COLOR_DANGER` 系列）浅色 `#c42b1c`、深色柔和浅红 `#ff8b82`，与 `COLOR_LOG_ERROR` 同取值。
 
 单行结构（从左到右）：
 
@@ -194,7 +196,9 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | 单跑 | `IconButton(kind="play")` | `FluentIcon.PLAY`；点击只运行该任务（等价于 `Single_operation`） |
 | 开关 | `ToggleSwitch` | Fluent `SwitchButton`（不显示 On/Off 文案）；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `state/Gui_state.yml` |
 
-图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为**主色**轮廓按钮（主色描边 + 主色文字，悬停同色系浅底），其左侧「中断运行」为**次要色**轮廓按钮（带 `FluentIcon.PAUSE`），都不使用实心主色块；轮廓按钮用 Fluent 的「浅色 / 深色两套自定义样式」注册，主题切换后不会退回默认实心按钮。
+图标：齿轮与运行按钮使用 `FluentIcon`；今日状态（对勾/感叹号/播放三角）用 `QPainter` 绘制，保证任意 DPI 下清晰。右上「完整运行」为**主色**轮廓按钮（主色描边 + 主色文字，悬停同色系浅底），其左侧「中断运行」为**次要色**轮廓按钮（带 `FluentIcon.PAUSE`），再左侧「关闭模拟器」为**危险色**轮廓按钮（红色描边 + 红色文字，带 `FluentIcon.POWER_BUTTON`），都不使用实心主色块；轮廓按钮用 Fluent 的「浅色 / 深色两套自定义样式」注册，主题切换后不会退回默认实心按钮。
+
+按钮区从左到右：**关闭模拟器 / 中断运行 / 完整运行**。三者样式刻意拉开层次——完整运行是主色（主动作），关闭模拟器是危险色红（破坏性），中断运行是次要色灰（常规停止）。红色取值 `COLOR_DANGER` 浅色为 `#c42b1c`、深色为柔和浅红 `#ff8b82`，与 `COLOR_LOG_ERROR` 保持一致，避免深色下刺眼。
 
 交互约定：
 
@@ -205,10 +209,13 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | 拨动行内开关 | 写入 `state/Gui_state.yml`；关闭时该行灰化，且在「完整运行」中被跳过 |
 | 点击「完整运行」 | 按 `TASK_REGISTRY` 顺序执行**开关开启**的任务 |
 | 点击「中断运行」 | 立即置位停止请求；任务在下一个检查点抛 `TaskStopped` 退出，界面回到待机。**不做断点续跑**，下次运行即新的一轮 |
+| 点击「关闭模拟器」 | 关闭 `Setting.yml.启动项` 里登记账号对应的模拟器窗口（详见 §5.6）。**不弹二次确认**，关闭后控制台输出摘要并用 `InfoBar` 提示 |
 | 运行中再次点击 | 被 `busy` 互斥拒绝，不会启动第二个线程 |
 | 运行中关闭窗口 | 弹确认框；确认后同样走 `request_stop()` 并等待线程收尾 |
 
 「中断运行」按钮位于「完整运行」左侧，为次要色轮廓按钮，**仅运行中可点**；点击后按钮变「中断中…」并禁用，防止连点。中断不处理游戏内状态（不拉回庭院、不做收尾操作），任务停在哪就是哪。
+
+「关闭模拟器」按钮位于「中断运行」左侧，为危险色轮廓按钮，**仅空闲时可点**（运行中禁用）——正在抢占键鼠时关窗口会让任务在半途失去目标，后续每一步都必然失败。它不复用 `Find_windows`（那个函数找不到窗口会去启动游戏），改用只读枚举，详见 §5.6。
 
 注意：`ui/window.py` 与 `Lib.py` 会在运行时 `import runtime`（`GUI.py` 本身不直接引入）。该文件属于运行期本地模块，**已被 `.gitignore` 忽略、不在版本库中**；本地运行前需在项目根目录自备，至少包含：
 
@@ -300,6 +307,12 @@ Single_operation(task_key, console_signal=None)  # 单任务运行
 | 编排 | `skip_text` | 按准入策略生成 SKIP 日志文案 |
 | 编排 | `write_task_time` / `write_task_time_pair` | 写回单个账号 / 双账号的完成时间 |
 | 中断 | `TaskStopped` / `request_stop` / `reset_stop` / `stop_requested` / `check_stop` / `_sleep_with_stop` | 中断信号与检查点：`check_stop` 在已请求时抛 `TaskStopped`；`_sleep_with_stop` 按 0.2s 切片睡眠 |
+| 系统动作 | `find_windows_silent` | **只读**枚举可见窗口，找不到返回 `None`。与 `Find_windows` 的唯一区别是**不启动游戏**，关闭模拟器只能用这个 |
+| 系统动作 | `controlled_accounts` / `_launch_commands` | 受控账号 = `Setting.yml.启动项` 的 key；同时取出各账号的启动命令 |
+| 系统动作 | `parse_instance_number` | 从启动命令解析 `-v N` 的实例号，解析失败返回 `None` |
+| 系统动作 | `find_mumu_manager` | 定位 `MuMuManager.exe`：`模拟器.MuMuManager` 显式指定 → 从启动命令推导目录后探测「同目录 / 上一级 / `shell/`」→ 都没有返回 `None`。**不写死任何安装路径** |
+| 系统动作 | `shutdown_via_manager` / `_run_manager` | 按实例号关机；两种 `control` 子命令顺序都试（`control -v N shutdown` / `control shutdown -v N`），解析 JSON 的 `errcode` 判断成功 |
+| 系统动作 | `close_emulators` | 关闭受控模拟器：MuMuManager 关机 → 等待 → 复查 → 仍在的逐个 `WM_CLOSE`。返回 `{"closed", "missing", "stuck"}` 三分类 |
 
 #### 任务入口编写约定（PR2 起）
 
@@ -348,6 +361,38 @@ GUI 的「中断运行」走**协作式中断**，不用 `QThread.terminate()`�
 模板匹配阈值约定：`Match_model` 使用 `cv2.TM_SQDIFF_NORMED`，**数值越小越相似**；`min_val > Threshold` 视为未命中。任务代码中的阈值多在 `0.01～0.07`。
 
 点击坐标约定：匹配框 `[(Left_up), (Right_down)]` 的中心 1/4～3/4 区域内随机点；全局坐标特例见 `Itface_scroll`（卷轴约 `((1780, 970), (1910, 1120))`）。
+
+### 5.6 关闭模拟器（破坏性动作）
+
+GUI「关闭模拟器」按钮走 `Lib.close_emulators()`，与任务流程**完全解耦**：不在任务线程里跑、不依赖中断机制、不参与 `Full_operation` 编排。
+
+**受控范围**：只关 `config/Setting.yml` 里 `启动项` 登记账号（当前 `master` / `slaves`）对应标题的窗口。用户手动开的、标题不匹配任何账号的窗口**一律不碰**。这条边界是「受程序掌握」的唯一判定依据。
+
+**为什么必须另写枚举**：`Find_windows` 找不到窗口时会调 `Log_in` 启动游戏再递归重找。关闭场景一旦复用它，"关一个本来没开的模拟器" 就变成 "先启动、等 25 秒、再关闭"。因此新增 `find_windows_silent`——同样的标题子串匹配，但**只读**，找不到返回 `None`。
+
+**关闭手段（两级降级）**：
+
+| 级别 | 手段 | 条件 |
+| ---- | ---- | ---- |
+| ① | `MuMuManager.exe control -v <实例号> shutdown` | 能找到 `MuMuManager.exe` 且实例号可解析 |
+| ② | `PostMessage(hwnd, WM_CLOSE, 0, 0)` | ①不可用或失败 |
+
+**`MuMuManager.exe` 不写死路径**——它是第三方软件，装在哪、换盘符、升级换目录都可能变，而且 `Setting.yml.启动项` 里已经是权威来源，再存一份就是两个事实源。定位规则：
+
+1. `Setting.yml` 的 `模拟器.MuMuManager`（**可选键**，用户想显式指定时的逃生口）；
+2. 否则从启动命令里的 `.exe` 路径取所在目录，依次探测：**同目录** → 上一级 → `shell/` 子目录；
+3. 都不存在 → 跳过 ①，直接走 ②（功能不失效）。
+
+实例号取自同一条启动命令的 `-v N`。不同 MuMu 大版本的 `control` 子命令顺序不同，代码里**两种顺序都试**（`control -v N shutdown` / `control shutdown -v N`），看 `errcode` 判断，都失败才降级。
+
+**流程**：关闭前先枚举记录哪些账号在跑 → MuMuManager 关机 → 等 2 秒 → 复查 → 仍在的逐个发 `WM_CLOSE` → 再复查分类。返回 `{"closed": [...], "missing": [...], "stuck": [...]}`，GUI 据此拼控制台摘要与 `InfoBar` 提示。
+
+**约束**：
+
+- 按钮**仅空闲时可点**，运行中禁用（正在抢占键鼠时关窗口会让任务在半途失去目标）；
+- 点击**不弹二次确认**，直接执行（ToolTip 里写明「未保存的进度会丢失」）；
+- 关闭过程中的等待走 `_sleep_with_stop`，不写裸 `time.sleep`；
+- 关闭失败不抛异常到 GUI，返回分类结果由 `InfoBar` 提示。
 
 ## 6. 配置体系
 

@@ -16,6 +16,7 @@ from qfluentwidgets import (
 )
 
 import runtime
+import Lib
 from main import (
     Full_operation,
     Single_operation,
@@ -114,6 +115,7 @@ class MainWindow(MSFluentWindow):
         self.left_panel.task_toggled.connect(self.on_task_toggled)
         self.right_panel.run_button_clicked.connect(self.run_button_clicked)
         self.right_panel.interrupt_clicked.connect(self.interrupt_job)
+        self.right_panel.close_emulator_clicked.connect(self.close_emulators)
         self.right_panel.settings_clicked.connect(self.open_settings)
 
         # 主题切换后重新着色日志区已有文本；行内状态图标在 ui/icons.py 内自行重绘，
@@ -253,6 +255,65 @@ class MainWindow(MSFluentWindow):
             duration=2500,
             position=InfoBarPosition.TOP_RIGHT,
         )
+
+    def close_emulators(self):
+        """「关闭模拟器」：关闭受程序管理的模拟器窗口（运行中按钮已禁用，这里再兜一次）"""
+        if self.busy:
+            return
+
+        self.right_panel.append_separator("关闭模拟器：正在关闭受控模拟器窗口")
+        try:
+            result = Lib.close_emulators()
+        except Exception as error:
+            logging.warning("关闭模拟器失败: %s", error)
+            self.right_panel.append_separator(f"关闭模拟器：失败 - {error}")
+            InfoBar.error(
+                "关闭模拟器失败",
+                str(error),
+                parent=self,
+                duration=5000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
+            return
+
+        closed = result.get("closed") or []
+        missing = result.get("missing") or []
+        stuck = result.get("stuck") or []
+
+        parts = [f"已关闭 {len(closed)} 个"]
+        if missing:
+            parts.append(f"未运行 {len(missing)} 个")
+        if stuck:
+            parts.append(f"仍残留 {len(stuck)} 个")
+        summary = "关闭模拟器：" + "，".join(parts)
+        if closed:
+            summary += f"（{'、'.join(closed)}）"
+        self.right_panel.append_separator(summary)
+
+        if stuck:
+            InfoBar.warning(
+                "部分模拟器未关闭",
+                f"{'、'.join(stuck)} 仍在运行，可能需要手动关闭",
+                parent=self,
+                duration=5000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
+        elif closed:
+            InfoBar.success(
+                "模拟器已关闭",
+                f"已关闭 {len(closed)} 个模拟器窗口",
+                parent=self,
+                duration=3000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
+        else:
+            InfoBar.info(
+                "没有需要关闭的模拟器",
+                "未发现正在运行的受控模拟器窗口",
+                parent=self,
+                duration=3000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
 
     def on_job_finished(self, payload):
         """任务结束：恢复界面、刷新时间与今日状态、输出本次结果摘要"""
