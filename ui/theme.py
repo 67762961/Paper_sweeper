@@ -32,6 +32,12 @@ COLOR_ACCENT_PRESSED_BG = "#cfe0f2"  # 轮廓按钮按下底
 COLOR_HOVER_BG = "#e9ecef"          # 图标按钮悬停底
 COLOR_PRESSED_BG = "#dee2e6"        # 图标按钮按下底
 
+# ---- 危险动作（关闭模拟器等破坏性操作）----
+# 浅色取值与 COLOR_LOG_ERROR 保持一致，红色语义在全局统一
+COLOR_DANGER = "#c42b1c"             # 危险按钮描边 + 文字
+COLOR_DANGER_HOVER_BG = "#fdeceb"    # 危险按钮悬停底
+COLOR_DANGER_PRESSED_BG = "#f9d9d6"  # 危险按钮按下底
+
 # ---- 任务行状态 ----
 COLOR_ROW_BORDER = "#e3e6ea"        # 常规边框
 COLOR_ROW_BG_OFF = "#f7f8fa"        # 关闭开关后的底色
@@ -69,6 +75,10 @@ _DARK_COLORS = {
     "COLOR_ACCENT_PRESSED_BG": "#24466a",
     "COLOR_HOVER_BG": "#333333",
     "COLOR_PRESSED_BG": "#3d3d3d",
+    # 危险色：深色下用柔和浅红（与 COLOR_LOG_ERROR 深色取值一致），不用刺眼的纯红
+    "COLOR_DANGER": "#ff8b82",
+    "COLOR_DANGER_HOVER_BG": "#4a1f1c",
+    "COLOR_DANGER_PRESSED_BG": "#5c2622",
     "COLOR_ROW_BORDER": "#3a3a3a",
     "COLOR_ROW_BG_OFF": "#242424",
     "COLOR_ROW_BORDER_OFF": "#303030",
