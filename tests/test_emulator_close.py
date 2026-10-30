@@ -366,3 +366,133 @@ def test_close_emulators_不关未登记的窗口(monkeypatch, tmp_config_dir):
     Lib.close_emulators()
 
     assert set(queried) == {"master"}
+
+
+# ------------------------------------------------------------ 电源动作
+# 与「关闭模拟器」同属系统动作，放同一个文件。
+# 全部 mock ctypes，绝不真的注销/关机。
+
+
+@pytest.fixture()
+def fake_power(monkeypatch):
+    """把 ctypes 的三个入口换成记录器，避免真的动电脑"""
+
+    class Recorder:
+        def __init__(self):
+            self.suspend_calls = []
+            self.exit_calls = []
+            self.suspend_result = True
+            self.exit_result = True
+
+    rec = Recorder()
+
+    class FakePowrProf:
+        @staticmethod
+        def SetSuspendState(*args):
+            rec.suspend_calls.append(args)
+            return rec.suspend_result
+
+    class FakeUser32:
+        @staticmethod
+        def ExitWindowsEx(*args):
+            rec.exit_calls.append(args)
+            return rec.exit_result
+
+    class FakeKernel32:
+        @staticmethod
+        def GetLastError():
+            return 0
+
+    class FakeWindll:
+        powrprof = FakePowrProf()
+        user32 = FakeUser32()
+        kernel32 = FakeKernel32()
+
+    monkeypatch.setattr(Lib.ctypes, "windll", FakeWindll())
+    monkeypatch.setattr(Lib, "_enable_shutdown_privilege", lambda: True)
+    return rec
+
+
+def test_power_action_睡眠走SetSuspendState(fake_power):
+    assert Lib.power_action("sleep") is True
+
+    assert fake_power.suspend_calls == [(False, False, False)]
+    assert fake_power.exit_calls == []
+
+
+def test_power_action_睡眠不是休眠(fake_power):
+    """第一个参数必须是 False，True 会变成休眠"""
+    Lib.power_action("sleep")
+
+    assert fake_power.suspend_calls[0][0] is False
+
+
+def test_power_action_注销走ExitWindowsEx_logoff(fake_power):
+    assert Lib.power_action("logoff") is True
+
+    assert fake_power.exit_calls == [(Lib._EWX_LOGOFF, 0)]
+    assert fake_power.suspend_calls == []
+
+
+def test_power_action_关机走ExitWindowsEx_poweroff(fake_power):
+    assert Lib.power_action("shutdown") is True
+
+    assert fake_power.exit_calls == [(Lib._EWX_POWEROFF, 0)]
+
+
+def test_power_action_关机标志不是注销标志():
+    """EWX_POWEROFF 才是真正切断电源；EWX_SHUTDOWN 只做到「可安全断电」"""
+    assert Lib._EWX_POWEROFF == 0x00000008
+    assert Lib._EWX_LOGOFF == 0x00000000
+
+
+def test_power_action_不加强制标志(fake_power):
+    """按用户要求不加 EWX_FORCEIFHUNG，避免杀掉未保存的工作"""
+    Lib.power_action("shutdown")
+
+    flag, reserved = fake_power.exit_calls[0]
+    assert flag & 0x10 == 0    # EWX_FORCE
+    assert flag & 0x20 == 0    # EWX_FORCEIFHUNG
+    assert reserved == 0
+
+
+def test_power_action_未知动作直接返回False(fake_power):
+    assert Lib.power_action("hibernate") is False
+    assert Lib.power_action("") is False
+    assert fake_power.suspend_calls == []
+    assert fake_power.exit_calls == []
+
+
+def test_power_action_特权启用失败时不调用API(fake_power, monkeypatch):
+    monkeypatch.setattr(Lib, "_enable_shutdown_privilege", lambda: False)
+
+    assert Lib.power_action("sleep") is False
+    assert fake_power.suspend_calls == []
+    assert fake_power.exit_calls == []
+
+
+def test_power_action_API返回0视为失败(fake_power):
+    fake_power.suspend_result = False
+
+    assert Lib.power_action("sleep") is False
+
+
+def test_power_action_调用抛异常时返回False(monkeypatch):
+    def boom(*args):
+        raise OSError("接口不可用")
+
+    class FakeWindll:
+        powrprof = type("P", (), {"SetSuspendState": staticmethod(boom)})()
+        user32 = type("U", (), {"ExitWindowsEx": staticmethod(boom)})()
+        kernel32 = type("K", (), {"GetLastError": staticmethod(lambda: 0)})()
+
+    monkeypatch.setattr(Lib.ctypes, "windll", FakeWindll())
+    monkeypatch.setattr(Lib, "_enable_shutdown_privilege", lambda: True)
+
+    assert Lib.power_action("sleep") is False
+    assert Lib.power_action("logoff") is False
+
+
+def test_power_action_常量表完整():
+    assert Lib.POWER_ACTIONS == ("logoff", "sleep", "shutdown")
+

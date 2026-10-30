@@ -499,6 +499,53 @@ def sleep_system():
     return True
 
 
+# ExitWindowsEx 标志位：0x0 = 注销，0x8 = 关机（后者才真正切断电源）
+_EWX_LOGOFF = 0x00000000
+_EWX_POWEROFF = 0x00000008
+
+POWER_ACTIONS = ("logoff", "sleep", "shutdown")
+
+
+def power_action(action):
+    """执行电源动作：logoff / sleep / shutdown。返回是否调用成功
+
+    **注销与关机会结束本进程**，调用后不要指望还能执行任何代码。
+    睡眠走 SetSuspendState，其余走 ExitWindowsEx —— 两者都需要
+    SeShutdownPrivilege，统一在这里启用。
+
+    不加 EWX_FORCE / EWX_FORCEIFHUNG：强制标志会杀掉所有未保存的工作
+    （包括用户开着的文档）。此时模拟器已关，正常不会有阻拦者；
+    万一有程序阻拦，系统会弹确认框，让用户自己决定。
+
+    注销与睡眠的关键差别：注销**不挂起内核**，Session 0 的服务
+    （如远程控制软件）继续运行，因此注销后仍可远程接管。
+    """
+    if action not in POWER_ACTIONS:
+        print("        WAIT- ----- 未知的电源动作:", action)
+        return False
+
+    if not _enable_shutdown_privilege():
+        return False
+
+    try:
+        if action == "sleep":
+            # 参数依次为：Hibernate=False（睡眠而非休眠）、ForceCritical=False、
+            # DisableWakeEvent=False
+            result = ctypes.windll.powrprof.SetSuspendState(False, False, False)
+        else:
+            flag = _EWX_LOGOFF if action == "logoff" else _EWX_POWEROFF
+            result = ctypes.windll.user32.ExitWindowsEx(flag, 0)
+    except Exception as error:
+        print("        WAIT- ----- 执行电源动作异常:", action, error)
+        return False
+
+    if not result:
+        print("        WAIT- ----- 电源动作被拒绝:", action, ctypes.windll.kernel32.GetLastError())
+        return False
+    print("        INFO- ----- 已请求电源动作:", action)
+    return True
+
+
 def Img_read_ch(file_path):
     """读取包含中文路径的图片"""
     # 使用numpy从二进制数据读取
