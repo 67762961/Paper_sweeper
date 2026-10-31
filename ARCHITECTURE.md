@@ -106,7 +106,7 @@ flowchart LR
 ├── tools/                         开发辅助脚本（不参与打包）
 │   ├── check_pics.py              模板图引用检查
 │   └── gen_pic_readme.py          生成 pic/README.md 索引
-├── tests/                         pytest 用例（324 个，纯逻辑不碰窗口）
+├── tests/                         pytest 用例（329 个，纯逻辑不碰窗口）
 ├── logs/<YYYY-MM>/<YYYY-MM-DD>/   运行日志（console_output_*.log / single_<key>_*.log）
 ├── logs/app_crash.log             崩溃日志（随 exe 目录）
 └── __pycache__/ .venv/            环境产物
@@ -170,7 +170,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | `ui/settings_dialog.py` | 日志设置弹窗：主题、日志偏好与「打开日志目录」（日志区齿轮进入） |
 | `ui/after_run_dialog.py` | 完整运行设置弹窗：只有「关闭模拟器」「让电脑睡眠」两个开关（按钮区齿轮进入） |
 | `ui/thirty_settings.py` | 寮三十配置的**纯逻辑**读写：常量、7 项归一化、非法值回落、账号校验、YAML 保真写回。不依赖 Qt，可被 pytest 直接测 |
-| `ui/thirty_dialog.py` | 「寮三十设置」弹窗：主副账号互斥 + 一周七天横排的副本/次数下拉（`thirty` 行齿轮进入） |
+| `ui/thirty_dialog.py` | 「寮三十设置」弹窗：主副账号（单向约束，副账号自动跟随）+ 一周七天横排的副本/次数下拉（`thirty` 行齿轮进入） |
 | `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + 中断入口 + 完成动作触发 + `InfoBar` 结果提示） |
 
 窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
@@ -500,9 +500,13 @@ TaskRow.config_button（ui/widgets.py）
 
 **其它数字为什么不给**：`match Times` 没有默认分支，填 `7` 会静默跳过「小纸人计数」这一步，流程随后失效——所以只做枚举下拉，不做自由输入。
 
-**布局**：主副账号一行（两个 `ComboBox`，互斥）+ 表头周一～周日 7 列 + 「副本」「次数」两行各 7 个下拉。弹窗自然尺寸约 836×366（`widget.setMinimumWidth(800)`）。
+**布局**：主副账号一行（两个 `ComboBox` + 右侧角色提示）+ 表头周一～周日 7 列 + 「副本」「次数」两行各 7 个下拉。弹窗自然尺寸约 836×366（`widget.setMinimumWidth(800)`）。
 
-**主副账号互斥**：一方改选后，对方若撞车则自动切到另一个账号，然后把「对方当前选中项」在自己下拉里 `setItemEnabled(False)` 灰掉。`_syncing` 标志防递归（程序化 `setCurrentIndex` 会再次触发 `currentIndexChanged`）。`启动项` 只有一个账号时互斥自动退化，弹窗照常可保存。
+**主副账号约束是单向的**：主账号可任意选，副账号只避开「主账号当前值」；撞车时**只让副账号**自动换成「列表里第一个不是主账号的账号」，主账号不动。副账号右侧有一句 `主账号作为打手，副账号作为司机`（`CaptionLabel` + 深浅两套文字色）——两个账号在游戏里分工确实不同：副账号开房（选副本 / 创建队伍 / 邀请），主账号进队开打（加入队伍 / 开加成 / 自动战斗），对着 `Task_Thirty.py` 的状态机核过。
+
+> **为什么不能双向灰化**：双向是「每个下拉都禁用对方当前选中项」。只有两个账号时，主框只剩自己、副框只剩自己，两边都被锁死——**主副互换这个最常见的操作反而做不了**。早期版本就是这么写的，用例只守住了「不会撞车」，没守住「能互换」，所以漏了。现在 `tests/test_thirty_dialog.py` 里有 `test_主账号下拉全部可选` 和 `test_两个账号能互换主副` 两条直接守住它。
+
+`_syncing` 标志防递归（程序化 `setCurrentText` 会再次触发 `currentIndexChanged`）。`启动项` 只有一个账号时无处可让，主副相同、弹窗照常可保存（`save_thirty_settings` 对单账号已放行）。
 
 **落盘在 `validate()` 里**：`MessageBoxBase.__onYesButtonClicked` 是 `if self.validate(): self.accept()`，所以写盘失败只需返回 `False`，弹窗自然不关闭，用户可以重试或去修文件。
 

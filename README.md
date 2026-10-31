@@ -249,7 +249,7 @@ python -m pytest
 python tools/check_pics.py
 ```
 
-`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 324 个用例：
+`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 329 个用例：
 
 | 文件 | 用例数 | 覆盖内容 |
 |---|---|---|
@@ -269,7 +269,7 @@ python tools/check_pics.py
 | `tests/test_countdown_dialog.py` | 14 | **倒计时弹窗本身**（用真实 `QTimer`，不用替身）：`exec()` 会启动定时器、结束后一定停止、归零会 `accept()`、文案随秒数变化；源码级回归保护 `window.py` 必须调 `dialog.exec()` |
 | `tests/test_close_emulator_thread.py` | 5 | **关模拟器在后台线程**（用真实 `QThread`）：能发出结果、异常不静默退出、信号名不与 `QThread.finished` 冲突；核心断言「关闭期间主线程仍在处理事件」，并配一条反证用例——同样的假实现同步跑一遍心跳数必须是 0 |
 | `tests/test_thirty_settings.py` | 28 | **寮三十配置读写层**（纯逻辑）：缺失/损坏/长度不是 7 都能回落、**次数 0 保留为 0**、非法值回落并给出提示、只改四个键、主副账号校验、**YAML 保真**（flow 单行、引号、注释、长命令不折行）、配置损坏时拒绝写入而不是覆盖 |
-| `tests/test_thirty_dialog.py` | 13 | **「寮三十设置」弹窗**（真实控件）：7 列下拉、选项只有代码支持的那几个、**主副账号互斥**（一方改选另一方自动让开、交替切换不撞车、单账号时退化）、`values()` 次数是整数、`validate()` 成功写盘/失败返回 False 不关窗、配置损坏时仍能打开 |
+| `tests/test_thirty_dialog.py` | 18 | **「寮三十设置」弹窗**（真实控件）：7 列下拉、选项只有代码支持的那几个、**主副账号单向约束**（主账号全放开、副账号自动让开、**两个账号能互换**、三个账号时取第一个不同的、单账号时退化）、角色提示语、`values()` 次数是整数、`validate()` 成功写盘/失败返回 False 不关窗、配置损坏时仍能打开 |
 | `tests/test_示例_教学用.py` | 10 | 教学示例（不计入上表的覆盖统计，但会被 `pytest` 一起跑） |
 
 > 新增任务时，先跑 `python -m pytest tests/test_task_registry.py` —— 忘记登记注册表或状态键写错会立刻失败。

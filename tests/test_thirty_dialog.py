@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""「寮三十设置」弹窗：真实控件的布局、互斥与落盘（不真的点保存）。
+"""「寮三十设置」弹窗：真实控件的布局、账号约束与落盘（不真的点保存）。
 
 守住四件事：
 
 1. 横着铺：表头 7 列，副本/次数各 7 个下拉，选项只有代码支持的那几个；
-2. 主副账号互斥：一方改选，另一方自动让开，且下拉里对方那一项灰掉；
+2. 账号约束是**单向**的：主账号可任意选，副账号只避开主账号当前值，撞车时副账号自己让开
+   ——双向灰化在只有两个账号时会把两个下拉锁死，主副互换就做不到了；
 3. ``values()`` 的下标与 `WEEK_LABELS` 一一对应，次数按整数返回；
 4. ``validate()`` 成功时返回 True 并写盘，失败时返回 False（弹窗不关）。
 
@@ -95,12 +96,46 @@ def test_默认值与配置一致(dialog):
     assert values["times"] == [30] * 7
 
 
-# ------------------------------------------------------------ 主副账号互斥
+# ------------------------------------------------------------ 主副账号约束
+
+
+def _enabled(combo):
+    """读回每一项是否可点
+
+    qfluentwidgets 的 ComboBox 只有 setItemEnabled，**没有** isItemEnabled，
+    所以直接读 items 列表。
+    """
+    return [item.isEnabled for item in combo.items]
+
+
+def _enabled_texts(combo):
+    return [item.text for item in combo.items if item.isEnabled]
 
 
 def test_账号下拉来自启动项(dialog):
     texts = [dialog.primary_combo.itemText(i) for i in range(dialog.primary_combo.count())]
     assert texts == ["master", "slaves"]
+
+
+def test_主账号下拉全部可选(dialog):
+    """两个账号时主框两项都能点——双向灰化会把这里锁成只剩自己"""
+    assert _enabled(dialog.primary_combo) == [True, True]
+    assert _enabled_texts(dialog.primary_combo) == ["master", "slaves"]
+
+
+def test_副账号灰掉主账号当前值(dialog):
+    assert dialog.primary_combo.currentText() == "master"
+
+    assert _enabled_texts(dialog.secondary_combo) == ["slaves"]
+
+
+def test_两个账号能互换主副(dialog):
+    """这是最常用的操作：之前两个下拉都被锁死，根本换不了"""
+    dialog.primary_combo.setCurrentText("slaves")
+    assert (dialog.primary_combo.currentText(), dialog.secondary_combo.currentText()) == ("slaves", "master")
+
+    dialog.primary_combo.setCurrentText("master")
+    assert (dialog.primary_combo.currentText(), dialog.secondary_combo.currentText()) == ("master", "slaves")
 
 
 def test_主账号改选后副账号自动让开(dialog):
@@ -110,11 +145,12 @@ def test_主账号改选后副账号自动让开(dialog):
     assert dialog.secondary_combo.currentText() == "master"
 
 
-def test_副账号改选后主账号自动让开(dialog):
+def test_副账号撞车时自己让开(dialog):
+    """副账号选到主账号的值：副账号自己被弹回，主账号不动"""
     dialog.secondary_combo.setCurrentText("master")
 
-    assert dialog.secondary_combo.currentText() == "master"
-    assert dialog.primary_combo.currentText() == "slaves"
+    assert dialog.primary_combo.currentText() == "master"
+    assert dialog.secondary_combo.currentText() == "slaves"
 
 
 def test_交替切换不会撞车(dialog):
@@ -123,6 +159,44 @@ def test_交替切换不会撞车(dialog):
         dialog.primary_combo.setCurrentText("slaves")
         dialog.secondary_combo.setCurrentText("slaves")
         assert dialog.primary_combo.currentText() != dialog.secondary_combo.currentText()
+
+
+def test_三个账号时副账号跳到第一个不同的(dialog):
+    """多账号时「下一个」的定义：列表里第一个 != 主账号的，不跟着副账号当前下标走"""
+    _write_setting(
+        '启动项:\n  "master":\n    启动命令: "a.exe -v 0"\n'
+        '  "slaves":\n    启动命令: "a.exe -v 1"\n'
+        '  "third":\n    启动命令: "a.exe -v 2"\n'
+    )
+
+    from ui.thirty_dialog import ThirtySettingsDialog
+
+    host = QWidget()
+    three = ThirtySettingsDialog(host)
+    try:
+        assert three.primary_combo.currentText() == "master"
+        assert three.secondary_combo.currentText() == "slaves"
+
+        # 主账号改成 slaves → 副账号取「第一个不是 slaves 的」= master
+        three.primary_combo.setCurrentText("slaves")
+        assert three.secondary_combo.currentText() == "master"
+
+        # 主账号改成 third → 副账号取「第一个不是 third 的」= master
+        three.primary_combo.setCurrentText("third")
+        assert three.secondary_combo.currentText() == "master"
+    finally:
+        three.setParent(None)
+        three.deleteLater()
+        host.setParent(None)
+        host.deleteLater()
+        _APP.processEvents()
+
+
+def test_副账号右侧有角色提示(dialog):
+    from qfluentwidgets import CaptionLabel
+
+    texts = [child.text() for child in dialog.findChildren(CaptionLabel)]
+    assert "主账号作为打手，副账号作为司机" in texts
 
 
 def test_只有一列账号时互斥退化(dialog):
