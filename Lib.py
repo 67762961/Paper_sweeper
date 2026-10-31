@@ -1056,6 +1056,177 @@ def check_lasttime(Account, Times_name):
         return Initial_time
 
 
+# ---- 结界养成配置（config/Setting.yml 的「结界养成」段）----
+# 段名与 run_accounts_task 的任务键同名，便于日志对照；段内每个账号一组配置。
+#
+# **为什么放这里而不是 ui/**：任务层不能 import ui/（ui → main → 任务模块会成环），
+# 根目录白名单也不允许新增顶层模块。枚举与归一化留在这里，界面层
+# （ui/jiejie_settings.py）反向复用它，从而保证「弹窗能选出来的」与
+# 「任务层能接受的」永远是同一套规则。
+
+JIEJIE_SECTION = "结界养成"
+JIEJIE_KEY_CARD = "优先结界卡"       # 太鼓 / 斗鱼
+JIEJIE_KEY_PRIORITY = "寄养优先级"   # 4 项，越靠左越优先
+
+JIEJIE_CARD_OPTIONS = ("太鼓", "斗鱼")
+JIEJIE_PRIORITY_OPTIONS = ("六星太鼓", "六星斗鱼", "五星太鼓", "五星斗鱼")
+JIEJIE_PRIORITY_COUNT = 4
+
+# 默认值 = 本次改动之前写死的行为，老配置缺段缺键时零迁移
+JIEJIE_DEFAULT_CARD = "太鼓"
+JIEJIE_DEFAULT_PRIORITY = ("六星太鼓", "六星斗鱼", "五星太鼓", "五星斗鱼")
+
+# 配置值就是模板文件名（pic/guild/ 下的同名图片），不另设显示名
+JIEJIE_PRIORITY_PICS = {
+    "六星太鼓": "./pic/guild/六星太鼓.png",
+    "六星斗鱼": "./pic/guild/六星斗鱼.png",
+    "五星太鼓": "./pic/guild/五星太鼓.png",
+    "五星斗鱼": "./pic/guild/五星斗鱼.png",
+}
+
+# 结界卡池的列表页签（放置结界卡时按优先顺序点开）
+JIEJIE_CARD_LIST_PICS = {
+    "太鼓": "./pic/guild/太鼓列表.png",
+    "斗鱼": "./pic/guild/斗鱼列表.png",
+}
+
+
+def normalize_jiejie_card(value, warnings=None):
+    """把「优先结界卡」修成太鼓或斗鱼
+
+    只有两项，没有「不放置」这个第三态：「今天不放卡」是「结界卡未耗尽」这条
+    既有判据自己得出的结果，不需要用户配置。
+
+    :param value:    配置里的原始值
+    :param warnings: 可选列表，非法取值会追加一条回落原因
+    :return:         ``太鼓`` 或 ``斗鱼``
+    """
+    if isinstance(value, str) and value in JIEJIE_CARD_OPTIONS:
+        return value
+    if value is not None and warnings is not None:
+        warnings.append(
+            f"「{JIEJIE_KEY_CARD}」取值 {value!r} 不受支持，已按 {JIEJIE_DEFAULT_CARD!r} 执行"
+        )
+    return JIEJIE_DEFAULT_CARD
+
+
+def normalize_jiejie_priority(values, warnings=None):
+    """把「寄养优先级」修成恰好 4 项、互不相同、都在枚举内
+
+    规则：**先出现者保留**——后出现的重复项换成池中第一个还没被占用的值；
+    非法值视同缺位，同样按 ``JIEJIE_PRIORITY_OPTIONS`` 的顺序补。
+    输出永远是那 4 个卡名的一个排列。
+
+    弹窗的「撞车自动改派」也走这个函数：第 N 级抢了第 M 级（M > N）的值时，
+    第 M 级作为较后者被改派，效果正好是需求里的「后面的让位」。
+
+    :param values:   配置里的原始值（列表 / 元组 / 其它任意值）
+    :param warnings: 可选列表，回落原因会追加进去
+    :return:         长度恒为 4 的新列表
+    """
+    if values is None:
+        items = []
+    elif isinstance(values, (list, tuple)):
+        items = list(values)
+    else:
+        if warnings is not None:
+            warnings.append(
+                f"「{JIEJIE_KEY_PRIORITY}」不是列表，已按默认值执行"
+            )
+        items = []
+
+    if items and len(items) != JIEJIE_PRIORITY_COUNT and warnings is not None:
+        warnings.append(
+            f"「{JIEJIE_KEY_PRIORITY}」应为 {JIEJIE_PRIORITY_COUNT} 项，"
+            f"实际 {len(items)} 项，已按 {JIEJIE_PRIORITY_COUNT} 项执行"
+        )
+
+    result = [None] * JIEJIE_PRIORITY_COUNT
+    taken = set()
+    for index in range(JIEJIE_PRIORITY_COUNT):
+        if index >= len(items):
+            continue
+        value = items[index]
+        if not isinstance(value, str) or value not in JIEJIE_PRIORITY_OPTIONS:
+            if warnings is not None:
+                warnings.append(
+                    f"寄养优先级第 {index + 1} 项 {value!r} 不受支持，已按顺序补默认值"
+                )
+            continue
+        if value in taken:
+            if warnings is not None:
+                warnings.append(
+                    f"寄养优先级第 {index + 1} 项 {value!r} 与更靠前的项重复，已换成一个未占用的值"
+                )
+            continue
+        result[index] = value
+        taken.add(value)
+
+    # 空位按池序补齐：空位数恒等于池中剩余项数（4 个选项、4 个位置）
+    pool = [option for option in JIEJIE_PRIORITY_OPTIONS if option not in taken]
+    for index in range(JIEJIE_PRIORITY_COUNT):
+        if result[index] is None:
+            result[index] = pool.pop(0)
+    return result
+
+
+def jiejie_card_order(card):
+    """两张结界卡的尝试顺序：优先的那张在前
+
+    :param card: ``太鼓`` 或 ``斗鱼``（非法值按默认的太鼓处理）
+    :return:     二元组，如 ``("太鼓", "斗鱼")``
+    """
+    first = normalize_jiejie_card(card)
+    rest = [option for option in JIEJIE_CARD_OPTIONS if option != first]
+    return (first, rest[0])
+
+
+def jiejie_priority_cards(priority):
+    """把寄养优先级转成 ((卡名, 模板路径), ...)，顺序即尝试顺序
+
+    :param priority: 4 项配置值（会被归一化，非法/重复自动修正）
+    :return:         元组，每项 ``(卡名, "./pic/guild/<卡名>.png")``
+    """
+    return tuple(
+        (name, JIEJIE_PRIORITY_PICS[name])
+        for name in normalize_jiejie_priority(priority)
+    )
+
+
+def load_jiejie_settings(Account=None, path=None):
+    """读取某账号的结界养成配置；任何异常都回落默认值，绝不抛
+
+    默认值就是本次改动之前写死的行为，所以老配置（没有「结界养成」段）
+    跑起来与以前完全一致。
+
+    :param Account: 账号名（「结界养成」段的子键，与「启动项」同名）；
+                    None 表示不区分账号，直接取默认值
+    :param path:    配置文件路径，默认 ``config/Setting.yml``
+    :return:        ``{"card": str, "priority": list[str], "warnings": [str]}``
+    """
+    warnings = []
+    try:
+        config = read_config(path or paths.SETTING)
+    except Exception as error:      # read_config 已兜住常见异常，这里只是不信任
+        config = {}
+        warnings.append(f"读取结界养成配置失败：{error}")
+
+    section = config.get(JIEJIE_SECTION) if isinstance(config, dict) else None
+    account_config = None
+    if isinstance(section, dict) and Account is not None:
+        account_config = section.get(Account)
+    if not isinstance(account_config, dict):
+        account_config = {}
+
+    return {
+        "card": normalize_jiejie_card(account_config.get(JIEJIE_KEY_CARD), warnings),
+        "priority": normalize_jiejie_priority(
+            account_config.get(JIEJIE_KEY_PRIORITY), warnings
+        ),
+        "warnings": warnings,
+    }
+
+
 # ---- 任务准入策略（供 run_accounts_task 使用）----
 # 每个策略接收 (上次完成时间, 当前时间)，返回 True 表示本次可以执行。
 

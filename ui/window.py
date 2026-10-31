@@ -36,10 +36,11 @@ from .panels import LeftPanel, RightPanel
 from .settings_dialog import SettingsDialog
 from .after_run_dialog import AfterRunDialog
 from .thirty_dialog import ThirtySettingsDialog
+from .jiejie_dialog import JiejieSettingsDialog
 from .widgets import CountdownDialog
 
 # 行内齿轮的配置弹窗：只登记"哪个任务有配置界面"，不复制 TASK_REGISTRY
-CONFIG_DIALOGS = {"thirty": ThirtySettingsDialog}
+CONFIG_DIALOGS = {"thirty": ThirtySettingsDialog, "jiejieyangcheng": JiejieSettingsDialog}
 
 
 class WorkerThread(QThread):
@@ -182,8 +183,10 @@ class MainWindow(MSFluentWindow):
         dialog = dialog_class(self)
         if not dialog.exec():
             return
-        # 落盘在弹窗的 validate() 里完成，这里只补一条控制台反馈
-        self.right_panel.update_console("INFO- ----- 寮三十设置已保存到 config/Setting.yml\n")
+        # 落盘在弹窗的 validate() 里完成，这里只补一条控制台反馈；
+        # 文案由弹窗自己给出（SAVED_MESSAGE），不再写死寮三十。
+        message = getattr(dialog_class, "SAVED_MESSAGE", "任务设置已保存到 config/Setting.yml")
+        self.right_panel.update_console(f"INFO- ----- {message}\n")
 
     def on_task_toggled(self, task_key, enabled):
         """拨动行内开关：写入 config/Gui_state.yml，决定是否参与完整运行"""

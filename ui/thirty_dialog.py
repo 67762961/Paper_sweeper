@@ -23,6 +23,9 @@ LABEL_WIDTH = 40
 class ThirtySettingsDialog(MessageBoxBase):
     """寮三十配置弹窗；确定后由 ``validate()`` 直接落盘"""
 
+    # 保存成功后的控制台反馈，由 ui/window.on_task_config 读取（不要写死在那一边）
+    SAVED_MESSAGE = "寮三十设置已保存到 config/Setting.yml"
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._syncing = False
