@@ -16,6 +16,16 @@ from qfluentwidgets import (
 from . import theme
 from .icons import IconButton, StatusIcon
 
+# 已接入配置弹窗的任务：齿轮提示语要如实说明，不能再写「暂未开放」
+CONFIG_READY_KEYS = ("thirty",)
+
+
+def config_tooltip(task_key):
+    """行内齿轮的提示语：按任务区分，避免把已可配置的任务说成占位"""
+    if task_key in CONFIG_READY_KEYS:
+        return "配置寮三十副本/次数与主副账号"
+    return "配置该任务（暂未开放）"
+
 
 class ToggleSwitch(SwitchButton):
     """Fluent 开关包装：补齐 isCheckable()/click()，与旧代码的按钮语义保持一致"""
@@ -84,7 +94,8 @@ class TaskRow(SimpleCardWidget):
         layout.addLayout(text_layout, 1)
 
         # 右侧：齿轮 / 运行 / 开关
-        self.config_button = IconButton("gear", "配置该任务（暂未开放）")
+        # 齿轮提示语按任务区分：已接入配置弹窗的任务如实说明，其余仍是占位
+        self.config_button = IconButton("gear", config_tooltip(self.key))
         self.run_button = IconButton("play", "单独运行该任务")
         self.switch = ToggleSwitch()
         self.switch.setOnText("")

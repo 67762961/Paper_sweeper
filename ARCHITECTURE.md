@@ -62,6 +62,9 @@ flowchart LR
 │   ├── theme_manager.py           Fluent 主题初始化与深浅色切换
 │   ├── prefs.py                   界面偏好读写（state/gui.json）
 │   ├── settings_dialog.py         设置弹窗（主题 / 日志偏好 / 日志目录）
+│   ├── after_run_dialog.py        完整运行设置弹窗（关闭模拟器 / 电源动作）
+│   ├── thirty_settings.py         寮三十配置读写层（纯逻辑，不依赖 Qt）
+│   ├── thirty_dialog.py           寮三十设置弹窗（副本 / 次数 / 主副账号）
 │   ├── icons.py                   今日状态图标与齿轮/运行按钮（QPainter 绘制）
 │   ├── widgets.py                 整跑开关、任务行
 │   ├── panels.py                  左侧任务列表、右侧日志控制台
@@ -83,11 +86,12 @@ flowchart LR
 │   ├── check_pics.py              模板图引用检查：失效引用 / 大小写不一致 / 死图
 │   ├── clean_logs.py              旧日志清理（按年月分层，默认预览）
 │   └── gen_pic_readme.py          生成 pic/README.md 索引
-├── config/                        运行配置（默认忽略）
-│   ├── Setting.yml                启动项、结界突破、寮三十副本表
+├── config/                        静态配置（默认忽略）
+│   └── Setting.yml                启动项、结界突破、寮三十副本表
+├── state/                         运行期状态（默认忽略，删除即恢复初始状态）
 │   ├── Last_times.yml             各账号各任务上次完成时间
 │   ├── Gui_state.yml              GUI 任务开关（是否参与完整运行，缺失默认全开）
-│   └── gui.json                   界面偏好（主题 / 日志自动滚动 / 日志字号）
+│   └── gui.json                   界面偏好（主题 / 日志 / 完成动作）
 ├── pic/                           界面模板图（目录英文、文件名中文，详见 pic/README.md）
 │   ├── common/                    公用元素（确定/关闭/获得奖励/退出标志等）
 │   ├── courtyard/                 庭院主界面与功能入口
@@ -102,7 +106,7 @@ flowchart LR
 ├── tools/                         开发辅助脚本（不参与打包）
 │   ├── check_pics.py              模板图引用检查
 │   └── gen_pic_readme.py          生成 pic/README.md 索引
-├── tests/                         pytest 用例（68 个，纯逻辑不碰窗口）
+├── tests/                         pytest 用例（329 个，纯逻辑不碰窗口）
 ├── logs/<YYYY-MM>/<YYYY-MM-DD>/   运行日志（console_output_*.log / single_<key>_*.log）
 ├── logs/app_crash.log             崩溃日志（随 exe 目录）
 └── __pycache__/ .venv/            环境产物
@@ -165,6 +169,8 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号 / 两个完成动作开关） |
 | `ui/settings_dialog.py` | 日志设置弹窗：主题、日志偏好与「打开日志目录」（日志区齿轮进入） |
 | `ui/after_run_dialog.py` | 完整运行设置弹窗：只有「关闭模拟器」「让电脑睡眠」两个开关（按钮区齿轮进入） |
+| `ui/thirty_settings.py` | 寮三十配置的**纯逻辑**读写：常量、7 项归一化、非法值回落、账号校验、YAML 保真写回。不依赖 Qt，可被 pytest 直接测 |
+| `ui/thirty_dialog.py` | 「寮三十设置」弹窗：主副账号（单向约束，副账号自动跟随）+ 一周七天横排的副本/次数下拉（`thirty` 行齿轮进入） |
 | `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + 中断入口 + 完成动作触发 + `InfoBar` 结果提示） |
 
 窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
@@ -181,7 +187,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 - 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果；
 - 顶栏右侧提供深浅色主题快捷切换按钮，右侧日志区提供「清空 / 自动滚动 / 设置」工具条；
 - 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号，并提供「打开日志目录」入口；
-- 界面偏好写入 `state/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `Setting.yml` / `Gui_state.yml`；
+- 界面偏好写入 `state/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `config/Setting.yml` / `state/Gui_state.yml`；
 - 深浅色主题各有独立配色：文字类控件用 Fluent 标签（浅色 / 深色两套文字色由库自动切换），
   自绘状态图标、日志行着色与轮廓按钮在切换后按当前主题重新取色；主强调色是比原 `#007BFF`
   深一档的蓝（浅色 `#0d6bc2`，深色 `#3d8bd6`），避免浅色下过艳、深色下发灰看不清；
@@ -193,7 +199,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | ---- | ---- | ---- |
 | 今日状态 | `StatusIcon` | 今日已完成 → 绿色对勾；今日未完成 → 橙色 `!`；运行中 → 蓝色播放三角（均为 QPainter 绘制，无底色圆圈；深色主题下自动换成更亮的绿 / 橙 / 蓝） |
 | 任务信息 | 名称 + 「上次运行 MM-DD HH:MM」 | 时间取该任务所有账号、所有状态键中的最新值 |
-| 配置 | `IconButton(kind="gear")` | `FluentIcon.SETTING`；本期为**占位**：弹「配置功能暂未开放」，不写盘 |
+| 配置 | `IconButton(kind="gear")` | `FluentIcon.SETTING`；**按任务区分**：`thirty` 行直接打开「寮三十设置」弹窗（§5.8），其余 6 行仍是占位（弹「配置功能暂未开放」，不写盘）。提示语由 `ui/widgets.config_tooltip()` 统一给出 |
 | 单跑 | `IconButton(kind="play")` | `FluentIcon.PLAY`；点击只运行该任务（等价于 `Single_operation`） |
 | 开关 | `ToggleSwitch` | Fluent `SwitchButton`（不显示 On/Off 文案）；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `state/Gui_state.yml` |
 
@@ -206,7 +212,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | 操作 | 行为 |
 | ---- | ---- |
 | 点击行内 ▶ | 只运行该行对应的顶层任务（对 `Last_times.yml` 全部账号），冷却与时间窗照旧生效 |
-| 点击行内齿轮 | 弹出占位提示，不写任何配置 |
+| 点击行内齿轮 | `thirty` 行打开「寮三十设置」（详见 §5.8），保存后写 `config/Setting.yml` 并在控制台打 `INFO-`；其余 6 行弹占位提示，不写任何配置 |
 | 拨动行内开关 | 写入 `state/Gui_state.yml`；关闭时该行灰化，且在「完整运行」中被跳过 |
 | 点击「完整运行」 | 按 `TASK_REGISTRY` 顺序执行**开关开启**的任务 |
 | 点击「中断运行」 | 立即置位停止请求；任务在下一个检查点抛 `TaskStopped` 退出，界面回到待机。**不做断点续跑**，下次运行即新的一轮 |
@@ -472,6 +478,54 @@ QThread.finished → on_thread_finished → _run_after_actions()
 
 **倒计时对话框**：`ui/widgets.py` 的 `CountdownDialog(MessageBoxBase)`，每秒刷新剩余秒数，归零自动 `accept()`。为什么不用 `InfoBar`：它没有「倒计时结束回调 + 可取消」的组合能力，关闭 InfoBar 也无法可靠地通知调用方。
 
+### 5.8 寮三十配置弹窗（行内齿轮）
+
+`thirty` 这一行的齿轮是**唯一**已接入配置界面的行，其余 6 行仍是占位提示。入口链路：
+
+```
+TaskRow.config_button（ui/widgets.py）
+  → config_clicked(str) → LeftPanel.task_config_clicked → MainWindow.on_task_config(task_key)
+      → CONFIG_DIALOGS["thirty"] → ThirtySettingsDialog(self).exec()
+```
+
+`CONFIG_DIALOGS` 是 `ui/window.py` 里的一张两行小表，只登记「哪个任务有配置界面」，**不复制 `TASK_REGISTRY`**（任务列表仍然只有一个事实源）。
+
+**只管一件事**：`config/Setting.yml` 的 `寮三十.主账号` / `副账号` / `副本` / `次数`。界面偏好（`state/gui.json`）与任务开关（`state/Gui_state.yml`）都不在这里，四个入口（行内齿轮 / 日志区齿轮 / 按钮区齿轮 / 行内开关）各管一摊。
+
+| 维度 | 可选值 | 依据 |
+| ---- | ---- | ---- |
+| 副本 | `魂虚` / `魂王` / `魂海` / `日蚀` | `Task_Thirty.py` 的 `match Fuben` 只有这 4 个分支 |
+| 次数 | `0` / `1` / `30` / `50` | `Times == 0` 提前返回；`match Times` 只认 1 / 30 / 50 |
+| 主副账号 | `启动项` 的 key | `Lib.Log_in` 用 `config["启动项"][title]` 取启动命令，用不存在的名字会 KeyError |
+
+**其它数字为什么不给**：`match Times` 没有默认分支，填 `7` 会静默跳过「小纸人计数」这一步，流程随后失效——所以只做枚举下拉，不做自由输入。
+
+**布局**：主副账号一行（两个 `ComboBox` + 右侧角色提示）+ 表头周一～周日 7 列 + 「副本」「次数」两行各 7 个下拉。弹窗自然尺寸约 836×366（`widget.setMinimumWidth(800)`）。
+
+**主副账号约束是单向的**：主账号可任意选，副账号只避开「主账号当前值」；撞车时**只让副账号**自动换成「列表里第一个不是主账号的账号」，主账号不动。副账号右侧有一句 `主账号作为打手，副账号作为司机`（`CaptionLabel` + 深浅两套文字色）——两个账号在游戏里分工确实不同：副账号开房（选副本 / 创建队伍 / 邀请），主账号进队开打（加入队伍 / 开加成 / 自动战斗），对着 `Task_Thirty.py` 的状态机核过。
+
+> **为什么不能双向灰化**：双向是「每个下拉都禁用对方当前选中项」。只有两个账号时，主框只剩自己、副框只剩自己，两边都被锁死——**主副互换这个最常见的操作反而做不了**。早期版本就是这么写的，用例只守住了「不会撞车」，没守住「能互换」，所以漏了。现在 `tests/test_thirty_dialog.py` 里有 `test_主账号下拉全部可选` 和 `test_两个账号能互换主副` 两条直接守住它。
+
+`_syncing` 标志防递归（程序化 `setCurrentText` 会再次触发 `currentIndexChanged`）。`启动项` 只有一个账号时无处可让，主副相同、弹窗照常可保存（`save_thirty_settings` 对单账号已放行）。
+
+**落盘在 `validate()` 里**：`MessageBoxBase.__onYesButtonClicked` 是 `if self.validate(): self.accept()`，所以写盘失败只需返回 `False`，弹窗自然不关闭，用户可以重试或去修文件。
+
+**读写层单独成模块**（`ui/thirty_settings.py`，不依赖 Qt）：`MessageBoxBase` 没有 parent 会崩（`parent.width()` AttributeError），纯逻辑留在弹窗里就没法脱离 GUI 测试。
+
+**YAML 保真（三个坑，都必须绕开 `Lib.read_config` / `Lib.write_config`）**：
+
+| 现象 | 真正的原因 | 对策 |
+| ---- | ---- | ---- |
+| `"master"` 的引号没了 | `Lib.read_config` 不设 `preserve_quotes`，**读**的时候就丢了 | 自建 `YAML()`，`preserve_quotes=True` |
+| 长启动命令被折成两行 | `Lib.write_config` 不设 `width`（默认 80） | 自建 `YAML()`，`width=4096` |
+| `副本: [...]` 变成每项一行 | **整体替换列表对象**（与哪个 writer 无关） | 写回时**原地切片** `sec["副本"][:] = [...]` |
+
+新建 `寮三十` 段时没有可复用的列表对象，要显式 flow：`CommentedSeq(values)` + `.fa.set_flow_style()`，否则会写成块状多行。
+
+**容错**：配置缺失 / 损坏 / 长度不是 7 / 单项取值非法 / 账号名不在 `启动项` 里，一律回落默认值并让弹窗照常打开，同时把回落原因用小字列在弹窗里（不静默改用户配置）。**配置解析失败时拒绝写入**——写回等于把用户原内容抹掉。
+
+**一个已知的既有瑕疵（本次不改）**：某天次数设 `0` 时 `Task_Liao_30` 返回 `0`，`run_shared_task` 会判为失败、打印「执行过程中出现错误 中断任务」且不写回完成时间。日志看起来像报错，但行为本身是「当天不刷」，属于既有语义问题，单独议。
+
 ## 6. 配置体系
 
 ### 6.0 目录划分：config/ 与 state/
@@ -502,10 +556,13 @@ QThread.finished → on_thread_finished → _run_after_actions()
 | ---- | ---- |
 | `启动项.<账号>.启动命令` | MuMu 启动命令；账号名为窗口标题关键字 |
 | `结界突破.<账号>.退出次数` / `开打勋章` | 结界突破策略参数 |
-| `寮三十.主账号` / `副账号` | 协作刷本的两个窗口 |
-| `寮三十.副本` / `次数` | 按星期（一～日）配置的副本类型与次数 |
+| `寮三十.主账号` / `副账号` | 协作刷本的两个窗口，取值必须是 `启动项` 里存在的账号 |
+| `寮三十.副本` / `次数` | 按星期（一～日）配置的副本类型与次数，各 7 项 |
+| `模拟器.MuMuManager`（可选） | 显式指定 `MuMuManager.exe`；不写则从启动命令推导（见 §5.6） |
 
-寮三十副本类型当前支持：`魂虚`、`魂海`、`日蚀` 等；次数填 `0` 表示当日跳过。
+寮三十这四项**已可在界面里改**：点左侧「寮三十 / 真蛇」行的齿轮，弹窗里选完保存即可（详见 §5.8），不必再手改本文件。手改也仍然有效，两种方式写的是同一份配置。
+
+寮三十副本类型只支持 `魂虚`（虚无）、`魂王`（神罚）、`魂海`（永生之海）、`日蚀`（日轮之陨）四种；次数只支持 `0`（当日跳过）/ `1` / `30` / `50`。填其它值会让「小纸人计数」那一步静默跳过、流程失效。
 
 ### 6.2 `state/Last_times.yml`（运行期状态）
 
@@ -736,7 +793,12 @@ python tools/check_pics.py --quiet    # 只输出错误（适合接 CI / pre-com
 3. 识别阈值、点击等待写在调用处，修改后需用真实窗口回归；调试可临时 `Flag_show=1` 弹出标注框。
 4. 时间窗、星期分支写在 `MainTask_*` 入口层，不要埋进底层 `Lib` 点击函数。
 5. 冷却成功写回、失败不写回；`Setting.yml` 只放用户可改的静态配置，GUI 偏好分别写 `Gui_state.yml`（任务开关）与 `gui.json`（主题），三者不要混用。
-6. `config/`、`logs/`、`.dsh-scratch/`、`GUI.exe`、`dev/` 下的调试脚本默认不入库；需要跟踪的新源码与文档请在 `.gitignore` 中显式排除忽略。根目录只允许放源码、子目录与工程配置（见 `AGENTS.md` 的「根目录白名单」）。
+6. 给某个任务接入配置界面时，必须同时更新：
+   - 新增弹窗模块（参考 `ui/thirty_dialog.py`）与纯逻辑读写层（参考 `ui/thirty_settings.py`，不依赖 Qt 才可测）；
+   - `ui/window.CONFIG_DIALOGS` 登记 key → 弹窗类（**不要**另立任务列表）；
+   - `ui/widgets.CONFIG_READY_KEYS` 加上该 key，让齿轮 tooltip 不再写「暂未开放」；
+   - 涉及写 `Setting.yml` 时按 §5.8 的「三个坑」自己读写，不要直接复用 `Lib.read_config` / `Lib.write_config`。
+7. `config/`、`logs/`、`.dsh-scratch/`、`GUI.exe`、`dev/` 下的调试脚本默认不入库；需要跟踪的新源码与文档请在 `.gitignore` 中显式排除忽略。根目录只允许放源码、子目录与工程配置（见 `AGENTS.md` 的「根目录白名单」）。
 7. 修改 `Lib.py` 公共匹配/点击/界面函数前，确认所有 `Task_*` 调用方语义不变，尤其是返回值 `1/0` 与 `Range/Matchs` 约定。
 8. 新增界面依赖（如 Fluent 组件库）时，必须同步 `requirements.txt` 与 `GUI.spec` 的 `hiddenimports`，并用 `python build_exe.py` 验证打包产物可启动。
 9. 本项目通过公开 UI 自动化交互，不修改游戏文件；文档与注释避免暗示注入、外挂或协议破解能力。

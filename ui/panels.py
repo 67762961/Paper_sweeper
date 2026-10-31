@@ -180,7 +180,7 @@ class LeftPanel(QFrame):
         layout.addWidget(self.create_scroll_area())
 
         self.hint_label = CaptionLabel(
-            "运行按钮单独执行 · 齿轮为配置入口（暂未开放）· 开关决定是否参与完整运行", self
+            "运行按钮单独执行 · 齿轮为配置入口（寮三十已支持）· 开关决定是否参与完整运行", self
         )
         self.hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.hint_label.setFont(QFont(theme.FONT_FAMILY_UI, 9))

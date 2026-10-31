@@ -35,7 +35,11 @@ from . import theme
 from .panels import LeftPanel, RightPanel
 from .settings_dialog import SettingsDialog
 from .after_run_dialog import AfterRunDialog
+from .thirty_dialog import ThirtySettingsDialog
 from .widgets import CountdownDialog
+
+# 行内齿轮的配置弹窗：只登记"哪个任务有配置界面"，不复制 TASK_REGISTRY
+CONFIG_DIALOGS = {"thirty": ThirtySettingsDialog}
 
 
 class WorkerThread(QThread):
@@ -164,13 +168,22 @@ class MainWindow(MSFluentWindow):
         self.start_job(task_key)
 
     def on_task_config(self, task_key):
-        """点击行内齿轮：配置入口占位，暂不实现具体配置"""
-        title = self._task_title(task_key)
-        QMessageBox.information(
-            self,
-            "配置功能暂未开放",
-            f"「{title}」的配置功能将在后续版本提供。\n\n当前可在 config/Setting.yml 中调整该任务的参数。",
-        )
+        """点击行内齿轮：已接入配置弹窗的任务直接打开，其余仍是占位提示"""
+        dialog_class = CONFIG_DIALOGS.get(task_key)
+        if dialog_class is None:
+            title = self._task_title(task_key)
+            QMessageBox.information(
+                self,
+                "配置功能暂未开放",
+                f"「{title}」的配置功能将在后续版本提供。\n\n当前可在 config/Setting.yml 中调整该任务的参数。",
+            )
+            return
+
+        dialog = dialog_class(self)
+        if not dialog.exec():
+            return
+        # 落盘在弹窗的 validate() 里完成，这里只补一条控制台反馈
+        self.right_panel.update_console("INFO- ----- 寮三十设置已保存到 config/Setting.yml\n")
 
     def on_task_toggled(self, task_key, enabled):
         """拨动行内开关：写入 config/Gui_state.yml，决定是否参与完整运行"""
