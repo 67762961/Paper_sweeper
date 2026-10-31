@@ -14,6 +14,7 @@
 import os
 
 import pytest
+import ruamel.yaml
 
 import Lib
 import paths
@@ -272,3 +273,274 @@ def test_脏配置能读出四条可用路径(tmp_config_dir):
     assert len(cards) == 4
     assert all(os.path.basename(pic) for _, pic in cards)
     assert settings["warnings"], "回落必须留下提示，便于用户发现配置写错了"
+
+
+# ------------------------------------------------------------ 界面读写层（ui/jiejie_settings.py）
+# 与 Lib 层分开断言：Lib 保证「任务层拿到的东西是对的」，这里保证
+# 「弹窗读到的与任务层一致」且「写回不伤及配置里的其它段」。
+
+from ui import jiejie_settings as js  # noqa: E402  （放这里是为了让上面 Lib 部分先跑）
+
+UI_SAMPLE = """# 用户手写的说明，不能被抹掉
+启动项:
+  "master":            # 主账号
+    启动命令: "a.exe -v 0"
+  "slaves":
+    启动命令: "a.exe -v 1"
+
+结界突破:
+  "master":
+    退出次数: 3
+    开打勋章: 15
+
+寮三十:
+  主账号: "master"
+  副账号: "slaves"
+  副本: ["魂虚", "魂虚", "魂虚", "魂虚", "魂虚", "魂海", "日蚀"]
+  次数: [30, 30, 30, 30, 30, 30, 30]
+
+结界养成:
+  "master":
+    优先结界卡: "斗鱼"
+    寄养优先级: [六星斗鱼, 六星太鼓, 五星斗鱼, 五星太鼓]
+  "slaves":
+    优先结界卡: "太鼓"
+    寄养优先级: [五星太鼓, 五星斗鱼, 六星太鼓, 六星斗鱼]
+"""
+
+
+def _read_raw_yaml(path=None):
+    """用与实现相同的 YAML 设置读回，便于断言引号等格式信息"""
+    yaml = ruamel.yaml.YAML()
+    yaml.preserve_quotes = True
+    with open(path or paths.SETTING, "r", encoding="utf-8") as handle:
+        return yaml.load(handle)
+
+
+def _read_text(path=None):
+    with open(path or paths.SETTING, "r", encoding="utf-8") as handle:
+        return handle.read()
+
+
+def test_界面层枚举与Lib一致():
+    """弹窗能选出来的必须正好是任务层能接受的，不能各写一份"""
+    assert js.CARD_OPTIONS == Lib.JIEJIE_CARD_OPTIONS
+    assert js.PRIORITY_OPTIONS == Lib.JIEJIE_PRIORITY_OPTIONS
+    assert js.PRIORITY_COUNT == Lib.JIEJIE_PRIORITY_COUNT
+    assert js.DEFAULT_CARD == Lib.JIEJIE_DEFAULT_CARD
+    assert js.DEFAULT_PRIORITY == list(Lib.JIEJIE_DEFAULT_PRIORITY)
+    assert len(js.PRIORITY_LABELS) == Lib.JIEJIE_PRIORITY_COUNT
+
+
+def test_界面读取与任务层读取一致(tmp_config_dir):
+    _write_setting(UI_SAMPLE)
+
+    ui_data = js.load_jiejie_settings()
+
+    for account in ui_data["accounts"]:
+        assert ui_data["settings"][account] == {
+            key: value
+            for key, value in Lib.load_jiejie_settings(account).items()
+            if key != "warnings"
+        }
+
+
+def test_账号列表来自启动项且保持顺序(tmp_config_dir):
+    _write_setting(UI_SAMPLE)
+
+    data = js.load_jiejie_settings()
+
+    assert data["accounts"] == ["master", "slaves"]
+    assert set(data["settings"]) == {"master", "slaves"}
+
+
+def test_主副角色只作装饰且不落盘(tmp_config_dir):
+    _write_setting(UI_SAMPLE)
+
+    data = js.load_jiejie_settings()
+
+    assert data["roles"] == {"master": "主", "slaves": "副"}
+
+
+def test_没有寮三十段时角色为空(tmp_config_dir):
+    _write_setting('启动项:\n  "master":\n    启动命令: "a.exe -v 0"\n')
+
+    data = js.load_jiejie_settings()
+
+    assert data["roles"] == {}
+
+
+def test_配置缺失时每个账号都给默认值(tmp_config_dir):
+    data = js.load_jiejie_settings()
+
+    assert data["accounts"] == ["master", "slaves"]
+    for account in data["accounts"]:
+        assert data["settings"][account]["card"] == js.DEFAULT_CARD
+        assert data["settings"][account]["priority"] == js.DEFAULT_PRIORITY
+
+
+def test_配置损坏时不抛异常(tmp_config_dir):
+    _write_setting("结界养成: [这不是: 合法\n  - yaml")
+
+    data = js.load_jiejie_settings()
+
+    assert data["settings"]["master"]["card"] == js.DEFAULT_CARD
+
+
+def test_保存只改结界养成段(tmp_config_dir):
+    _write_setting(UI_SAMPLE)
+    before = _read_raw_yaml()
+
+    per_account = {
+        "master": {"card": "太鼓", "priority": ["六星太鼓", "六星斗鱼", "五星太鼓", "五星斗鱼"]},
+        "slaves": {"card": "斗鱼", "priority": ["五星斗鱼", "五星太鼓", "六星斗鱼", "六星太鼓"]},
+    }
+    assert js.save_jiejie_settings(per_account) is True
+
+    after = _read_raw_yaml()
+    assert dict(after["启动项"]) == dict(before["启动项"])
+    assert dict(after["结界突破"]) == dict(before["结界突破"])
+    assert dict(after["寮三十"]) == dict(before["寮三十"])
+    assert after["结界养成"]["master"]["优先结界卡"] == "太鼓"
+    assert after["结界养成"]["slaves"]["寄养优先级"] == ["五星斗鱼", "五星太鼓", "六星斗鱼", "六星太鼓"]
+
+
+def test_保存后能读回(tmp_config_dir):
+    _write_setting(UI_SAMPLE)
+
+    per_account = {
+        "master": {"card": "太鼓", "priority": ["五星斗鱼", "五星太鼓", "六星斗鱼", "六星太鼓"]},
+        "slaves": {"card": "斗鱼", "priority": ["六星斗鱼", "六星太鼓", "五星斗鱼", "五星太鼓"]},
+    }
+    js.save_jiejie_settings(per_account)
+    data = js.load_jiejie_settings()
+
+    assert data["settings"]["master"]["card"] == "太鼓"
+    assert data["settings"]["master"]["priority"] == ["五星斗鱼", "五星太鼓", "六星斗鱼", "六星太鼓"]
+    assert data["settings"]["slaves"]["priority"] == ["六星斗鱼", "六星太鼓", "五星斗鱼", "五星太鼓"]
+
+
+def test_段缺失时能新建(tmp_config_dir):
+    _write_setting('启动项:\n  "master":\n    启动命令: "a.exe -v 0"\n  "slaves":\n    启动命令: "a.exe -v 1"\n')
+
+    per_account = {
+        "master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY},
+        "slaves": {"card": "斗鱼", "priority": js.DEFAULT_PRIORITY},
+    }
+    assert js.save_jiejie_settings(per_account) is True
+
+    after = _read_raw_yaml()
+    assert after["结界养成"]["master"]["优先结界卡"] == "太鼓"
+    assert "启动项" in after
+
+
+def test_新建的优先级列表也是单行flow(tmp_config_dir):
+    """段缺失时塞普通 list 会被写成块状多行，必须显式 flow"""
+    _write_setting('启动项:\n  "master":\n    启动命令: "a.exe -v 0"\n')
+
+    js.save_jiejie_settings({"master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY}})
+    text = _read_text()
+
+    assert "寄养优先级: [六星太鼓, 六星斗鱼, 五星太鼓, 五星斗鱼]" in text
+    assert "    - 六星太鼓" not in text
+
+
+def test_新建段与上一段之间空一行(tmp_config_dir):
+    """手写的 Setting.yml 段与段之间空一行，新建段不能紧贴上去"""
+    _write_setting('启动项:\n  "master":\n    启动命令: "a.exe -v 0"\n\n寮三十:\n  主账号: "master"\n')
+
+    js.save_jiejie_settings({"master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY}})
+    text = _read_text()
+
+    assert '\n\n结界养成:\n  "master":\n' in text
+
+
+def test_重复保存不会累积空行(tmp_config_dir):
+    """空行只在新建段时补一次；段已存在时再加一次会变成两个空行"""
+    _write_setting('启动项:\n  "master":\n    启动命令: "a.exe -v 0"\n\n寮三十:\n  主账号: "master"\n')
+    per_account = {"master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY}}
+
+    js.save_jiejie_settings(per_account)
+    first = _read_text()
+    js.save_jiejie_settings(per_account)
+    second = _read_text()
+
+    assert first == second
+    assert "\n\n\n结界养成:" not in second
+
+
+def test_新建段的账号名带引号(tmp_config_dir):
+    """与「启动项」的写法保持一致；不带引号的话手写风格会不一致"""
+    _write_setting('启动项:\n  "master":\n    启动命令: "a.exe -v 0"\n')
+
+    js.save_jiejie_settings({"master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY}})
+    text = _read_text()
+
+    assert '结界养成:\n  "master":\n' in text
+    # 加引号不能影响读取
+    assert js.load_jiejie_settings()["settings"]["master"]["card"] == "太鼓"
+
+
+def test_引号与注释保持(tmp_config_dir):
+    """Lib.read_config 不带 preserve_quotes，引号会丢；本模块必须自己保住"""
+    _write_setting(UI_SAMPLE)
+
+    js.save_jiejie_settings({"master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY}})
+    text = _read_text()
+
+    assert "用户手写的说明" in text
+    assert "# 主账号" in text
+    assert '"master"' in text
+    assert '"slaves"' in text
+
+
+def test_长命令不被折行(tmp_config_dir):
+    """Lib.write_config 不设 width（默认 80），会把启动命令折成两行"""
+    _write_setting(UI_SAMPLE)
+
+    js.save_jiejie_settings({"master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY}})
+    command_lines = [line for line in _read_text().splitlines() if "a.exe -v 0" in line]
+
+    assert len(command_lines) == 1
+    assert command_lines[0].strip().endswith('-v 0"')
+
+
+def test_配置损坏时拒绝保存而不是覆盖(tmp_config_dir):
+    broken = "结界养成: [这不是: 合法\n  - yaml"
+    _write_setting(broken)
+
+    assert js.save_jiejie_settings({"master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY}}) is False
+    assert _read_text() == broken
+
+
+def test_非法取值拒绝保存(tmp_config_dir):
+    _write_setting(UI_SAMPLE)
+
+    assert js.save_jiejie_settings({"master": {"card": "不放置", "priority": js.DEFAULT_PRIORITY}}) is False
+    assert js.save_jiejie_settings({"master": {"card": "太鼓", "priority": ["六星太鼓"] * 4}}) is False
+    assert js.save_jiejie_settings({"master": {"card": "太鼓", "priority": ["六星太鼓", "六星太鼓", "五星太鼓", "五星斗鱼"]}}) is False
+    assert js.save_jiejie_settings({"master": {"card": "太鼓", "priority": ["六星白达摩", "六星斗鱼", "五星太鼓", "五星斗鱼"]}}) is False
+
+
+def test_没有可保存的账号时拒绝(tmp_config_dir):
+    _write_setting(UI_SAMPLE)
+    before = _read_text()
+
+    assert js.save_jiejie_settings({}) is False
+    assert _read_text() == before
+
+
+def test_启动项里没有的账号被忽略(tmp_config_dir):
+    """界面不该出现这类账号，但落盘层不能因为多传就崩或写脏配置"""
+    _write_setting(UI_SAMPLE)
+
+    per_account = {
+        "master": {"card": "太鼓", "priority": js.DEFAULT_PRIORITY},
+        "ghost": {"card": "斗鱼", "priority": js.DEFAULT_PRIORITY},
+    }
+    assert js.save_jiejie_settings(per_account) is True
+
+    after = _read_raw_yaml()
+    assert "ghost" not in after["结界养成"]
+    assert after["结界养成"]["master"]["优先结界卡"] == "太鼓"
+
