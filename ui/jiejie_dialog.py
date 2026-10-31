@@ -29,6 +29,19 @@ from . import theme
 COMBO_WIDTH = 132
 CARD_LABEL_WIDTH = 108
 
+# 下拉的**固定高度**：父窗口偏矮时，Qt 的布局会突破 minimumSizeHint 继续压缩，
+# 把下拉压成 6px 的细条（真机上就是这么糊掉的）。高度钉死才能保住可读性，
+# 代价是弹窗总高必须够——所以下面把其余纵向间距整体收紧了一档。
+COMBO_HEIGHT = 32
+LABEL_HEIGHT = 20
+
+# 纵向留白：比 MessageBoxBase 的默认值（上下 24）紧一档，让两个账号卡片
+# 在 600px 出头的窗口里也放得下；横向保持 24，与库的观感一致。
+VIEW_MARGIN_V = 16
+CARD_VIEW_MARGIN_V = 14
+CARD_HEADER_HEIGHT = 40
+BUTTON_GROUP_HEIGHT = 69
+
 
 class _AccountCard(QWidget):
     """单个账号的配置卡片：一个放置下拉 + 四个优先级下拉
@@ -51,13 +64,17 @@ class _AccountCard(QWidget):
         self.header = HeaderCardWidget(title, self)
         # 便于测试与外部读取卡片标题（与 HeaderCardWidget 的属性同名）
         self.headerLabel = self.header.headerLabel
+        # 表头 48 → 40：省下的 16px（两张卡）留给下面的下拉
+        self.header.headerView.setFixedHeight(CARD_HEADER_HEIGHT)
+        # 卡片内容区的上下留白也收紧
+        self.header.viewLayout.setContentsMargins(24, CARD_VIEW_MARGIN_V, 24, CARD_VIEW_MARGIN_V)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(self.header)
 
         content = QVBoxLayout()
-        content.setSpacing(theme.SPACE_LG)
+        content.setSpacing(theme.SPACE_MD)
 
         # ---- 第一行：优先放置结界卡 ----
         card_row = QHBoxLayout()
@@ -69,7 +86,7 @@ class _AccountCard(QWidget):
         self.card_combo = ComboBox(self)
         self.card_combo.addItems(list(js.CARD_OPTIONS))
         self.card_combo.setCurrentText(settings["card"])
-        self.card_combo.setFixedWidth(COMBO_WIDTH)
+        self.card_combo.setFixedSize(COMBO_WIDTH, COMBO_HEIGHT)
         card_row.addWidget(self.card_combo)
         card_row.addStretch()
         content.addLayout(card_row)
@@ -91,13 +108,16 @@ class _AccountCard(QWidget):
             cell.setSpacing(theme.SPACE_XS)
 
             item = BodyLabel(label, self)
+            # 标签也钉死高度：父窗口极矮时 Qt 会把它压到 3px（比下拉更早糊）
+            item.setFixedHeight(LABEL_HEIGHT)
             cell.addWidget(item)
             self.priority_labels.append(item)
 
             combo = ComboBox(self)
             combo.addItems(list(js.PRIORITY_OPTIONS))
             combo.setCurrentText(settings["priority"][index])
-            combo.setFixedWidth(COMBO_WIDTH)
+            # 宽高都钉死：宽度不随窗口拉伸，高度不随父窗口变矮而被压扁
+            combo.setFixedSize(COMBO_WIDTH, COMBO_HEIGHT)
             cell.addWidget(combo)
 
             row.addLayout(cell)
@@ -206,6 +226,14 @@ class JiejieSettingsDialog(MessageBoxBase):
         self.yesButton.setText("保存")
         self.cancelButton.setText("取消")
         self.widget.setMinimumWidth(680)
+
+        # 纵向留白整体收紧一档，给钉死高度的下拉腾出空间：
+        # 内容区上下 24 → 16、间距 12 → 8，按钮区 81 → 69（按钮本身高度不变，
+        # 只削掉上下多余的白）。这样两个账号卡片在 600px 出头的窗口也放得下。
+        self.viewLayout.setSpacing(theme.SPACE_MD)
+        self.viewLayout.setContentsMargins(24, VIEW_MARGIN_V, 24, VIEW_MARGIN_V)
+        self.buttonGroup.setFixedHeight(BUTTON_GROUP_HEIGHT)
+        self.buttonLayout.setContentsMargins(24, 12, 24, 12)
 
     def values(self):
         """当前弹窗里全部账号的配置，结构直接喂给 ``save_jiejie_settings``"""

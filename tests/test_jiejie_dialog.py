@@ -177,6 +177,57 @@ def test_优先级下拉固定宽度不随窗口拉伸(dialog):
         assert combo.maximumWidth() == COMBO_WIDTH
 
 
+def test_下拉与标签的高度被钉死(dialog):
+    """高度不能只靠 sizeHint：父窗口偏矮时 Qt 会突破 minimumSizeHint 继续压
+
+    真机截图里四个优先级下拉被压成 6px 的细条（父窗口 560px 高时）。钉死高度
+    之后，即使父窗口只有 420px，下拉仍是 32px、标签仍是 20px。
+
+    **不 show() 弹窗**：``MessageBoxBase`` 带遮罩与淡入动画，离屏下 show() 再
+    teardown 会让进程直接崩（不是断言失败）。这里改成把内容容器压到很矮再
+    强制走一遍布局，等价于「父窗口不够高」。
+    """
+    from ui.jiejie_dialog import COMBO_HEIGHT, LABEL_HEIGHT
+
+    assert COMBO_HEIGHT == 32
+    assert LABEL_HEIGHT == 20
+
+    card = dialog.cards[0]
+    # 先确认是「固定尺寸」而不是「只设了 sizeHint」——这才是压不扁的原因
+    for combo in [card.card_combo] + list(card.priority_combos):
+        assert combo.minimumHeight() == combo.maximumHeight() == COMBO_HEIGHT
+    for label in card.priority_labels:
+        assert label.minimumHeight() == label.maximumHeight() == LABEL_HEIGHT
+
+    # 再把容器压矮，跑一遍布局，确认实际高度仍被固定住
+    dialog.widget.resize(680, 400)
+    dialog.widget.layout().activate()
+    card.layout().activate()
+    _APP.processEvents()
+
+    assert card.card_combo.height() == COMBO_HEIGHT, "放置下拉被压扁了"
+    for combo in card.priority_combos:
+        assert combo.height() == COMBO_HEIGHT, "优先级下拉被压扁了"
+    for label in card.priority_labels:
+        assert label.height() == LABEL_HEIGHT, "标签被压扁了"
+
+
+def test_纵向留白比库默认值收紧(dialog):
+    """下拉钉死高度后，总高必须靠压缩留白找补，否则两个账号一屏放不下"""
+    from qfluentwidgets import MessageBoxBase
+
+    from ui.jiejie_dialog import BUTTON_GROUP_HEIGHT, VIEW_MARGIN_V
+
+    # 库默认 viewLayout 上下各 24、buttonGroup 81；这里必须更紧
+    assert VIEW_MARGIN_V < 24
+    assert BUTTON_GROUP_HEIGHT < 81
+    assert dialog.buttonGroup.height() == BUTTON_GROUP_HEIGHT
+    # 只动纵向，横向仍与库一致
+    margins = dialog.viewLayout.contentsMargins()
+    assert margins.left() == 24 and margins.right() == 24
+    assert MessageBoxBase is not None  # 保持 import 可见，提醒这里是「与库默认值比较」
+
+
 def test_放置下拉只有太鼓与斗鱼(dialog):
     from ui.jiejie_settings import CARD_OPTIONS
 

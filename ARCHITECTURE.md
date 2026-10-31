@@ -559,6 +559,10 @@ TaskRow.config_button（ui/widgets.py）
 
 **弹窗布局**：一个账号一张 `HeaderCardWidget`，卡片内三行——`优先放置结界卡` + 1 个下拉、一句小字说明、四个优先级下拉**横排一行**（标签「第一优先级」…「第四优先级」在下拉框正上方，每格一个 `QVBoxLayout`）。下拉统一**固定宽度** `COMBO_WIDTH = 132`、不随窗口拉伸；4×132 + 3×12 间距 = 564px，卡片左右各 24px 内边距，`widget.setMinimumWidth(680)` 刚好装下。账号只有两个时一屏看完。
 
+**下拉与标签的高度必须钉死**（`setFixedSize` / `setFixedHeight`，不能只靠 `sizeHint`）：Qt 的布局在空间不够时会**突破 `minimumSizeHint` 继续压缩**。实测父窗口 560px 高时，四个下拉被压成 6px 的细条、标签被压成 6px——这就是「下拉框糊掉」的成因。钉死 `COMBO_HEIGHT = 32` / `LABEL_HEIGHT = 20` 之后，父窗口只有 420px 也保持原尺寸（`tests/test_jiejie_dialog.py` 有对应用例）。
+
+代价是弹窗总高固定，所以纵向留白比 `MessageBoxBase` 的默认值收紧一档：`viewLayout` 上下 24 → 16、间距 12 → 8、卡片表头 48 → 40、卡片内容区上下 24 → 14、`buttonGroup` 81 → 69（按钮本身高度不变，只削多余的白）。横向留白保持 24，与库的观感一致。收紧后 `sizeHint` 从 671 降到 569，600px 出头的窗口也能一屏放下两个账号。
+
 > `_AccountCard` 用**组合**而非继承 `HeaderCardWidget`：那个类的 `__init__` 挂了 `@__init__.register` 重载分发，子类一改构造签名，`super().__init__(title, parent)` 就会被分派回子类自己的 `__init__(parent)`，直接 `TypeError: missing required positional arguments`。
 
 **四级下拉的互斥是单向的**：第 N 级的可选项 = 枚举池去掉「第 1..N-1 级当前值」。
