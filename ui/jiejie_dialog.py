@@ -8,7 +8,7 @@
 读写与归一化全在 ``ui/jiejie_settings.py``（不依赖 Qt），这里只负责摆放控件与联动。
 """
 
-from PyQt6.QtWidgets import QGridLayout, QHBoxLayout, QMessageBox, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QMessageBox, QVBoxLayout, QWidget
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
@@ -23,11 +23,11 @@ import Lib
 from . import jiejie_settings as js
 from . import theme
 
-# 控件尺寸：四个优先级下拉按「两行两列」摆放，两列合计约 500px，
-# 加上卡片左右各 24px 内边距，680px 的弹窗宽度刚好不挤。
+# 控件尺寸：四个优先级下拉**横排一行**，标签在下拉框正上方。
+# 4×132 + 3×12 = 564px，加上卡片左右各 24px 内边距，680px 的弹窗宽度装得下。
+# 下拉统一固定宽度（不随窗口拉伸），与「优先放置结界卡」那个下拉的宽度一致。
 COMBO_WIDTH = 132
 CARD_LABEL_WIDTH = 108
-PRIORITY_LABEL_WIDTH = 76
 
 
 class _AccountCard(QWidget):
@@ -74,23 +74,25 @@ class _AccountCard(QWidget):
         card_row.addStretch()
         content.addLayout(card_row)
 
-        # ---- 第二、三行：四级寄养优先级（两行两列，标签写全） ----
+        # ---- 第二行：四级寄养优先级（横排一行，标签在下拉框上方） ----
         hint = CaptionLabel("寄养优先（越靠前越优先，同一张卡不会出现在两级）", self)
         hint.setTextColor(
             theme.light_color("COLOR_TEXT_TERTIARY"), theme.dark_color("COLOR_TEXT_TERTIARY")
         )
         content.addWidget(hint)
 
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(theme.SPACE_XL)
-        grid.setVerticalSpacing(theme.SPACE_MD)
+        row = QHBoxLayout()
+        row.setSpacing(theme.SPACE_XL)
         self.priority_combos = []
+        self.priority_labels = []
         for index, label in enumerate(js.PRIORITY_LABELS):
-            cell = QHBoxLayout()
-            cell.setSpacing(theme.SPACE_SM)
+            # 每格竖排：标签在上、下拉在下
+            cell = QVBoxLayout()
+            cell.setSpacing(theme.SPACE_XS)
+
             item = BodyLabel(label, self)
-            item.setFixedWidth(PRIORITY_LABEL_WIDTH)
             cell.addWidget(item)
+            self.priority_labels.append(item)
 
             combo = ComboBox(self)
             combo.addItems(list(js.PRIORITY_OPTIONS))
@@ -98,10 +100,11 @@ class _AccountCard(QWidget):
             combo.setFixedWidth(COMBO_WIDTH)
             cell.addWidget(combo)
 
-            grid.addLayout(cell, index // 2, index % 2)
+            row.addLayout(cell)
             self.priority_combos.append(combo)
+        row.addStretch()
 
-        content.addLayout(grid)
+        content.addLayout(row)
         self.header.viewLayout.addLayout(content)
 
         self.card_combo.currentIndexChanged.connect(lambda _: self._on_priority_changed())

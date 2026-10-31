@@ -126,6 +126,57 @@ def test_每张卡片一个放置下拉加四个优先级下拉(dialog):
         assert len(card.priority_combos) == 4
 
 
+def test_四个优先级下拉横排一行且标签在上方(dialog):
+    """布局契约：四个下拉同一行、标签各自在下拉框正上方
+
+    用户改过两次布局（先是「标签在左」、再是「两行两列」），最终定为横排一行 +
+    标签在上。这里锁住**布局结构**而不是像素位置——离屏下不 show() 时控件
+    几何还没算出来（全是默认 QRect），断言几何会假失败。
+    """
+    from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout
+
+    from ui import jiejie_settings as js
+
+    card = dialog.cards[0]
+    header_layout = card.header.viewLayout
+    content = header_layout.itemAt(0).layout()
+    assert isinstance(content, QVBoxLayout)
+
+    # 找那一行：横排布局，前 4 项各是一个竖排单元（第 5 项是 addStretch 占位）
+    row = None
+    for index in range(content.count()):
+        item = content.itemAt(index).layout()
+        if isinstance(item, QHBoxLayout) and item.count() >= 4:
+            cells = [item.itemAt(i).layout() for i in range(4)]
+            if all(isinstance(cell, QVBoxLayout) for cell in cells):
+                row = item
+                break
+    assert row is not None, "四个优先级下拉必须放在一个横排布局里"
+
+    for index, cell in enumerate(row.itemAt(i).layout() for i in range(4)):
+        assert isinstance(cell, QVBoxLayout), "每格是竖排：标签在上、下拉在下"
+        assert cell.count() == 2
+        label_widget = cell.itemAt(0).widget()
+        combo_widget = cell.itemAt(1).widget()
+        # 第 0 项是标签、第 1 项是下拉 —— 顺序即「标签在上」
+        assert label_widget.text() == js.PRIORITY_LABELS[index]
+        assert combo_widget is card.priority_combos[index]
+
+    assert [label.text() for label in card.priority_labels] == list(js.PRIORITY_LABELS)
+
+
+def test_优先级下拉固定宽度不随窗口拉伸(dialog):
+    """宽度固定 132：四个等宽下拉，不会因为窗口拉宽而变形"""
+    from ui.jiejie_dialog import COMBO_WIDTH
+
+    card = dialog.cards[0]
+    assert COMBO_WIDTH == 132
+    for combo in card.priority_combos:
+        assert combo.width() == COMBO_WIDTH
+        assert combo.minimumWidth() == COMBO_WIDTH
+        assert combo.maximumWidth() == COMBO_WIDTH
+
+
 def test_放置下拉只有太鼓与斗鱼(dialog):
     from ui.jiejie_settings import CARD_OPTIONS
 

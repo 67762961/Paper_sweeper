@@ -172,7 +172,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | `ui/thirty_settings.py` | 寮三十配置的**纯逻辑**读写：常量、7 项归一化、非法值回落、账号校验、YAML 保真写回。不依赖 Qt，可被 pytest 直接测 |
 | `ui/thirty_dialog.py` | 「寮三十设置」弹窗：主副账号（单向约束，副账号自动跟随）+ 一周七天横排的副本/次数下拉（`thirty` 行齿轮进入） |
 | `ui/jiejie_settings.py` | 结界养成配置的**纯逻辑**读写：按账号读 `优先结界卡` / `寄养优先级`、校验、YAML 保真写回；枚举与归一化复用 `Lib.JIEJIE_*`。不依赖 Qt |
-| `ui/jiejie_dialog.py` | 「结界养成设置」弹窗：每个账号一张卡片（1 个放置下拉 + 两行两列的四个优先级下拉，单向互斥）（`jiejieyangcheng` 行齿轮进入） |
+| `ui/jiejie_dialog.py` | 「结界养成设置」弹窗：每个账号一张卡片（1 个放置下拉 + 横排一行的四个优先级下拉，单向互斥）（`jiejieyangcheng` 行齿轮进入） |
 | `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + 中断入口 + 完成动作触发 + `InfoBar` 结果提示） |
 
 窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
@@ -557,7 +557,7 @@ TaskRow.config_button（ui/widgets.py）
 1. **切家族失败必须 `continue` 而不是 `break`**：原代码在第一张卡的页签点不到时直接跳出循环，结果「太鼓没库存 → 连斗鱼都不试」。改成 `continue` 才真的实现「耗尽再斗鱼」。
 2. **`星级降序` 只点一次**（`sorted_once` 标志），不能绑在「第一轮」上：真机确认过切家族**不会**重置排序，而重复点击是切换型按钮，第二次会把降序翻回升序，拿到的是低星卡。
 
-**弹窗布局**：一个账号一张 `HeaderCardWidget`，卡片内三行——`优先放置结界卡` + 1 个下拉、一句小字说明、四个优先级下拉按**两行两列**摆放（标签写全「第一优先级」…「第四优先级」）。账号只有两个时一屏看完；`widget.setMinimumWidth(680)`。
+**弹窗布局**：一个账号一张 `HeaderCardWidget`，卡片内三行——`优先放置结界卡` + 1 个下拉、一句小字说明、四个优先级下拉**横排一行**（标签「第一优先级」…「第四优先级」在下拉框正上方，每格一个 `QVBoxLayout`）。下拉统一**固定宽度** `COMBO_WIDTH = 132`、不随窗口拉伸；4×132 + 3×12 间距 = 564px，卡片左右各 24px 内边距，`widget.setMinimumWidth(680)` 刚好装下。账号只有两个时一屏看完。
 
 > `_AccountCard` 用**组合**而非继承 `HeaderCardWidget`：那个类的 `__init__` 挂了 `@__init__.register` 重载分发，子类一改构造签名，`super().__init__(title, parent)` 就会被分派回子类自己的 `__init__(parent)`，直接 `TypeError: missing required positional arguments`。
 
