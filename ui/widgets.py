@@ -17,13 +17,19 @@ from . import theme
 from .icons import IconButton, StatusIcon
 
 # 已接入配置弹窗的任务：齿轮提示语要如实说明，不能再写「暂未开放」
-CONFIG_READY_KEYS = ("thirty",)
+CONFIG_READY_KEYS = ("thirty", "jiejieyangcheng")
+
+# 每个任务自己的配置说明；键必须与 CONFIG_READY_KEYS 一致
+CONFIG_TOOLTIPS = {
+    "thirty": "配置寮三十副本/次数与主副账号",
+    "jiejieyangcheng": "配置结界卡放置顺序与寄养优先级",
+}
 
 
 def config_tooltip(task_key):
     """行内齿轮的提示语：按任务区分，避免把已可配置的任务说成占位"""
     if task_key in CONFIG_READY_KEYS:
-        return "配置寮三十副本/次数与主副账号"
+        return CONFIG_TOOLTIPS.get(task_key, "配置该任务")
     return "配置该任务（暂未开放）"
 
 
