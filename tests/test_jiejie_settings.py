@@ -55,6 +55,13 @@ def test_枚举与模板图一一对应():
         assert pic == f"./pic/guild/{name}.png"
 
 
+def test_结界卡池页签覆盖全部放置选项():
+    """放置结界卡时要按顺序点开对应页签，漏一项就会 IndexError / KeyError"""
+    assert set(Lib.JIEJIE_CARD_LIST_PICS) == set(Lib.JIEJIE_CARD_OPTIONS)
+    for card, pic in Lib.JIEJIE_CARD_LIST_PICS.items():
+        assert pic == f"./pic/guild/{card}列表.png"
+
+
 def test_默认值等于改动前的写死行为():
     """默认值必须是「优先太鼓 + 原寄养顺序」，否则老配置会悄悄改变行为"""
     assert Lib.JIEJIE_DEFAULT_CARD == "太鼓"

@@ -1084,6 +1084,12 @@ JIEJIE_PRIORITY_PICS = {
     "五星斗鱼": "./pic/guild/五星斗鱼.png",
 }
 
+# 结界卡池的列表页签（放置结界卡时按优先顺序点开）
+JIEJIE_CARD_LIST_PICS = {
+    "太鼓": "./pic/guild/太鼓列表.png",
+    "斗鱼": "./pic/guild/斗鱼列表.png",
+}
+
 
 def normalize_jiejie_card(value, warnings=None):
     """把「优先结界卡」修成太鼓或斗鱼

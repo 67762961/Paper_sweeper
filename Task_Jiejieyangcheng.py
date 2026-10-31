@@ -15,6 +15,10 @@ from Lib import (
     Click,
     run_accounts_task,
     ready_after,
+    load_jiejie_settings,
+    jiejie_card_order,
+    jiejie_priority_cards,
+    JIEJIE_CARD_LIST_PICS,
 )
 
 
@@ -24,11 +28,30 @@ def MainTask_Jiejieyangcheng():
     """
     run_accounts_task(
         "结界养成", ready_after(6),
-        work=lambda Account: Jiejieyangcheng("庭院界面", Find_windows(Account)),
+        work=lambda Account: Jiejieyangcheng("庭院界面", Find_windows(Account), Account),
     )
 
 
-def Jiejieyangcheng(current_state, Hwnd):
+def Jiejieyangcheng(current_state, Hwnd, Account=None):
+    """
+    结界养成主流程
+    :param current_state:   起始界面状态
+    :param Hwnd:            窗口句柄
+    :param Account:         账号名，用于读取该账号的结界养成配置；
+                            None 表示不区分账号，直接按默认值执行
+    """
+    # 配置在这里读一次往下传：本函数里 Jiejieka / Yucheng 各被调用两次，
+    # 让子函数各读一遍不仅浪费，还会在用户中途改配置时前后不一致。
+    settings = load_jiejie_settings(Account)
+    for warning in settings["warnings"]:
+        print("        INFO- ----- 结界养成配置", warning)
+    card_order = jiejie_card_order(settings["card"])
+    priority_cards = jiejie_priority_cards(settings["priority"])
+    print(
+        "        INFO- ----- 结界卡放置顺序", " → ".join(card_order),
+        "寄养优先级", " → ".join(name for name, _ in priority_cards),
+    )
+
     # 重置结束标记
     Finish = 0
     print("        STEP- vvvvv 从{First_state}开始".format(First_state=current_state))
@@ -94,20 +117,20 @@ def Jiejieyangcheng(current_state, Hwnd):
                 # 领取结界卡奖励 领取后育成
                 flag_Jiejieka = Jiejiekajiangli(Hwnd)
 
-                flag_yucheng = Yucheng("结界界面", Hwnd)
+                flag_yucheng = Yucheng("结界界面", Hwnd, priority_cards)
 
                 # 领取体力食盒
                 Tilishihe(Hwnd)
 
                 # 经验酒壶 领取后育成
                 if Jinyanjiuhu(Hwnd):
-                    flag_yucheng = Yucheng("结界界面", Hwnd)
+                    flag_yucheng = Yucheng("结界界面", Hwnd, priority_cards)
 
                 # 领取体力食盒
                 Tilishihe(Hwnd)
 
                 if flag_Jiejieka:
-                    flag_Jiejieka = Jiejieka(Hwnd)
+                    flag_Jiejieka = Jiejieka(Hwnd, card_order)
                 else:
                     # 新增结界卡运行判据 防止一直不填结界卡
                     Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/结界卡运行中.png", 0.05, 0)
@@ -115,7 +138,7 @@ def Jiejieyangcheng(current_state, Hwnd):
                         print("        INFO-", Matchs, "结界卡依旧生效")
                     else:
                         print("        INFO-", Matchs, "结界卡似乎已耗尽")
-                        flag_Jiejieka = Jiejieka(Hwnd)
+                        flag_Jiejieka = Jiejieka(Hwnd, card_order)
 
                 Finish = flag_yucheng and flag_Jiejieka
                 if Finish:
@@ -255,7 +278,13 @@ def Jiejiekajiangli(Hwnd):
             return 1
 
 
-def Jiejieka(Hwnd):
+def Jiejieka(Hwnd, card_order=("太鼓", "斗鱼")):
+    """
+    放置结界卡
+    :param Hwnd:        窗口句柄
+    :param card_order:  结界卡的尝试顺序，来自配置「优先结界卡」，
+                        默认值与改动前一致（优先太鼓，耗尽再斗鱼）
+    """
     Sleep_print(1)
     # 进入结界卡界面
     for Wait in range(10):
@@ -278,35 +307,56 @@ def Jiejieka(Hwnd):
         else:
             print("        INFO-", Matchs, "结界卡已经耗尽")
 
-            for i in range(1):
+            # 按配置的顺序逐张尝试：前一张没库存就换下一张，
+            # 顺序由 Lib.jiejie_card_order 决定，这里不再写死太鼓在前。
+            placed = 0
+            sorted_once = False
+            for card in card_order:
                 if not Find_Click_windows(Hwnd, "./pic/guild/结界卡列表.png", 0.05, "打开结界卡列表", "打开结界卡列表异常"):
                     break
-                if not Find_Click_windows(Hwnd, "./pic/guild/太鼓列表.png", 0.05, "点击太鼓列表", "点击太鼓列表异常"):
-                    break
-                if not Find_Click_windows(Hwnd, "./pic/guild/星级降序.png", 0.05, "点击星级降序", "点击星级降序异常"):
-                    break
+                if not Find_Click_windows(Hwnd, JIEJIE_CARD_LIST_PICS[card], 0.05, "点击" + card + "列表", "点击" + card + "列表异常"):
+                    print("        INFO- ----- 未找到" + card + "页签 尝试下一张")
+                    continue
+                # 星级降序只需点一次：切家族不会重置排序（已确认真机行为），
+                # 而重复点击是切换型按钮，第二次会把降序翻回升序拿到低星卡。
+                if not sorted_once:
+                    if not Find_Click_windows(Hwnd, "./pic/guild/星级降序.png", 0.05, "点击星级降序", "点击星级降序异常"):
+                        break
+                    sorted_once = True
                 if not Find_Click_windows(Hwnd, "./pic/guild/首张结界卡.png", 0.05, "点击首张结界卡", "点击首张结界卡异常"):
-                    if not Find_Click_windows(Hwnd, "./pic/guild/结界卡列表.png", 0.05, "打开结界卡列表", "打开结界卡列表异常"):
-                        break
-                    if not Find_Click_windows(Hwnd, "./pic/guild/斗鱼列表.png", 0.05, "点击斗鱼列表", "点击斗鱼列表异常"):
-                        break
-                    if not Find_Click_windows(Hwnd, "./pic/guild/首张结界卡.png", 0.05, "点击首张结界卡", "点击首张结界卡异常"):
-                        break
-                if not Find_Click_windows(Hwnd, "./pic/guild/激活.png", 0.05, "点击激活", "点击激活异常"):
-                    break
-                Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/邀请.png", 0.05, 0)
-                if Range:
-                    print("        INFO-", Matchs, "结界卡激活成功")
-                    Sleep_print(1)
-                    Esc_print(Hwnd)
-                    Sleep_print(0.5)
-                    return 1
-                else:
-                    print("        INFO-", Matchs, "结界卡激活失败")
-                    return 0
+                    print("        INFO- ----- 没有可用的" + card + "结界卡 尝试下一张")
+                    continue
+                placed = 1
+                break
+
+            if not placed:
+                print("        INFO- ----- 配置的结界卡都没有库存 放弃放置")
+                return 0
+
+            if not Find_Click_windows(Hwnd, "./pic/guild/激活.png", 0.05, "点击激活", "点击激活异常"):
+                return 0
+            Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/邀请.png", 0.05, 0)
+            if Range:
+                print("        INFO-", Matchs, "结界卡激活成功")
+                Sleep_print(1)
+                Esc_print(Hwnd)
+                Sleep_print(0.5)
+                return 1
+            else:
+                print("        INFO-", Matchs, "结界卡激活失败")
+                return 0
 
 
-def Yucheng(current_state, Hwnd):
+def Yucheng(current_state, Hwnd, priority_cards=None):
+    """
+    结界育成
+    :param current_state:   起始界面状态
+    :param Hwnd:            窗口句柄
+    :param priority_cards:  寄养优先级，``((卡名, 模板路径), ...)``，
+                            来自配置「寄养优先级」；None 表示用默认顺序
+    """
+    if priority_cards is None:
+        priority_cards = jiejie_priority_cards(None)
     Sleep_print(1)
     # 进入结界育成
     print("        STEP- vvvvv 从{First_state}开始育成任务".format(First_state=current_state))
@@ -367,15 +417,11 @@ def Yucheng(current_state, Hwnd):
             case "寄养任务":
                 Find = Find_Click_windows(Hwnd, "./pic/guild/寄养入口.png", 0.05, "检测到寄养空位", "已经有寄养")
                 if Find:
-                    card_handlers = {
-                        "六星太鼓": lambda: Jiyang("寄养列表", Hwnd, "./pic/guild/六星太鼓.png", card),
-                        "六星斗鱼": lambda: Jiyang("寄养列表", Hwnd, "./pic/guild/六星斗鱼.png", card),
-                        "五星太鼓": lambda: Jiyang("寄养列表", Hwnd, "./pic/guild/五星太鼓.png", card),
-                        "五星斗鱼": lambda: Jiyang("寄养列表", Hwnd, "./pic/guild/五星斗鱼.png", card),
-                    }
-
-                    for card in card_handlers:
-                        Finish = card_handlers[card]()
+                    # 按配置的寄养优先级逐个尝试，顺序由 Lib.jiejie_priority_cards
+                    # 归一化后给出（恒为 4 张卡的一个排列，不会重复）。
+                    Finish = 0
+                    for card_name, card_pic in priority_cards:
+                        Finish = Jiyang("寄养列表", Hwnd, card_pic, card_name)
                         if Finish:
                             break
 
