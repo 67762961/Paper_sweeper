@@ -171,6 +171,8 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | `ui/after_run_dialog.py` | 完整运行设置弹窗：只有「关闭模拟器」「让电脑睡眠」两个开关（按钮区齿轮进入） |
 | `ui/thirty_settings.py` | 寮三十配置的**纯逻辑**读写：常量、7 项归一化、非法值回落、账号校验、YAML 保真写回。不依赖 Qt，可被 pytest 直接测 |
 | `ui/thirty_dialog.py` | 「寮三十设置」弹窗：主副账号（单向约束，副账号自动跟随）+ 一周七天横排的副本/次数下拉（`thirty` 行齿轮进入） |
+| `ui/jiejie_settings.py` | 结界养成配置的**纯逻辑**读写：按账号读 `优先结界卡` / `寄养优先级`、校验、YAML 保真写回；枚举与归一化复用 `Lib.JIEJIE_*`。不依赖 Qt |
+| `ui/jiejie_dialog.py` | 「结界养成设置」弹窗：每个账号一张卡片（1 个放置下拉 + 两行两列的四个优先级下拉，单向互斥）（`jiejieyangcheng` 行齿轮进入） |
 | `ui/window.py` | `WorkerThread`、`MainWindow`（Fluent 外壳 + 组装 + 线程调度 + 中断入口 + 完成动作触发 + `InfoBar` 结果提示） |
 
 窗口外壳：`MainWindow` 继承 `qfluentwidgets.MSFluentWindow`，把双栏内容作为唯一子界面
@@ -199,7 +201,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | ---- | ---- | ---- |
 | 今日状态 | `StatusIcon` | 今日已完成 → 绿色对勾；今日未完成 → 橙色 `!`；运行中 → 蓝色播放三角（均为 QPainter 绘制，无底色圆圈；深色主题下自动换成更亮的绿 / 橙 / 蓝） |
 | 任务信息 | 名称 + 「上次运行 MM-DD HH:MM」 | 时间取该任务所有账号、所有状态键中的最新值 |
-| 配置 | `IconButton(kind="gear")` | `FluentIcon.SETTING`；**按任务区分**：`thirty` 行直接打开「寮三十设置」弹窗（§5.8），其余 6 行仍是占位（弹「配置功能暂未开放」，不写盘）。提示语由 `ui/widgets.config_tooltip()` 统一给出 |
+| 配置 | `IconButton(kind="gear")` | `FluentIcon.SETTING`；**按任务区分**：`thirty` 行打开「寮三十设置」弹窗（§5.8）、`jiejieyangcheng` 行打开「结界养成设置」弹窗（§5.9），其余 5 行仍是占位（弹「配置功能暂未开放」，不写盘）。提示语由 `ui/widgets.config_tooltip()` 按任务给出（映射表 `CONFIG_TOOLTIPS`） |
 | 单跑 | `IconButton(kind="play")` | `FluentIcon.PLAY`；点击只运行该任务（等价于 `Single_operation`） |
 | 开关 | `ToggleSwitch` | Fluent `SwitchButton`（不显示 On/Off 文案）；开 → 参与「完整运行」；关 → 完整运行时跳过、整行半透明，并写入 `state/Gui_state.yml` |
 
@@ -212,7 +214,7 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | 操作 | 行为 |
 | ---- | ---- |
 | 点击行内 ▶ | 只运行该行对应的顶层任务（对 `Last_times.yml` 全部账号），冷却与时间窗照旧生效 |
-| 点击行内齿轮 | `thirty` 行打开「寮三十设置」（详见 §5.8），保存后写 `config/Setting.yml` 并在控制台打 `INFO-`；其余 6 行弹占位提示，不写任何配置 |
+| 点击行内齿轮 | `thirty` 行打开「寮三十设置」（§5.8）、`jiejieyangcheng` 行打开「结界养成设置」（§5.9），保存后写 `config/Setting.yml` 并在控制台打 `INFO-`；其余 5 行弹占位提示，不写任何配置 |
 | 拨动行内开关 | 写入 `state/Gui_state.yml`；关闭时该行灰化，且在「完整运行」中被跳过 |
 | 点击「完整运行」 | 按 `TASK_REGISTRY` 顺序执行**开关开启**的任务 |
 | 点击「中断运行」 | 立即置位停止请求；任务在下一个检查点抛 `TaskStopped` 退出，界面回到待机。**不做断点续跑**，下次运行即新的一轮 |
@@ -280,7 +282,7 @@ Single_operation(task_key, console_signal=None)  # 单任务运行
 | 顺序 | 注册表 key | 行标题 | 入口 | 模块 | 今日判定键（`today_keys`） | 说明 |
 | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
 | 1 | `signin` | 登录收菜 | `MainTask_Signin()` | `Task_SignIn.py` | 邮件领取 / 每日一签 / 福袋纸人 / 免费礼包 / 送友情点（全部） | 邮件、每日一签、福袋、纸人、免费礼包、友情点 |
-| 2 | `jiejieyangcheng` | 结界养成 | `MainTask_Jiejieyangcheng()` | `Task_Jiejieyangcheng.py` | 结界养成 | 寮界面：工资/体力、寄养、结界卡、白达摩育成、食盒酒壶 |
+| 2 | `jiejieyangcheng` | 结界养成 | `MainTask_Jiejieyangcheng()` | `Task_Jiejieyangcheng.py` | 结界养成 | 寮界面：工资/体力、寄养、结界卡、白达摩育成、食盒酒壶；放置顺序与寄养优先级**按账号**读 `Setting.yml`（§5.9） |
 | 3 | `digui` | 地域鬼王 | `MainTask_Digui()` | `Task_Digui.py` | 地域鬼王 | 经探索→六道进入地鬼，时间窗 12:00–23:50，当日冷却 |
 | 4 | `thirty` | 寮三十 / 真蛇 | `FullTask_Thirty()` | `Task_Thirty.py` | 寮三十（真蛇为周更，不参与今日判定） | 寮三十协作刷本 + 非周末真蛇（周冷却） |
 | 5 | `jiejiefight` | 结界突破 | `MainTask_JiejieFight()` | `Task_JiejieFight.py` | 结界突破 | 结界突破，时间窗 7:00–23:00，1 小时冷却 |
@@ -480,7 +482,7 @@ QThread.finished → on_thread_finished → _run_after_actions()
 
 ### 5.8 寮三十配置弹窗（行内齿轮）
 
-`thirty` 这一行的齿轮是**唯一**已接入配置界面的行，其余 6 行仍是占位提示。入口链路：
+`thirty` 这一行的齿轮打开「寮三十设置」弹窗（另一个已接入配置界面的是 `jiejieyangcheng` 行，见 §5.9），其余 5 行仍是占位提示。入口链路：
 
 ```
 TaskRow.config_button（ui/widgets.py）
@@ -489,6 +491,8 @@ TaskRow.config_button（ui/widgets.py）
 ```
 
 `CONFIG_DIALOGS` 是 `ui/window.py` 里的一张两行小表，只登记「哪个任务有配置界面」，**不复制 `TASK_REGISTRY`**（任务列表仍然只有一个事实源）。
+
+保存成功后主窗口写的那行控制台提示也**不再写死**：从弹窗类的 `SAVED_MESSAGE` 取（`getattr(dialog_class, "SAVED_MESSAGE", 兜底文案)`），否则接入第二个任务后仍会报「寮三十设置已保存」。
 
 **只管一件事**：`config/Setting.yml` 的 `寮三十.主账号` / `副账号` / `副本` / `次数`。界面偏好（`state/gui.json`）与任务开关（`state/Gui_state.yml`）都不在这里，四个入口（行内齿轮 / 日志区齿轮 / 按钮区齿轮 / 行内开关）各管一摊。
 
@@ -526,6 +530,48 @@ TaskRow.config_button（ui/widgets.py）
 
 **一个已知的既有瑕疵（本次不改）**：某天次数设 `0` 时 `Task_Liao_30` 返回 `0`，`run_shared_task` 会判为失败、打印「执行过程中出现错误 中断任务」且不写回完成时间。日志看起来像报错，但行为本身是「当天不刷」，属于既有语义问题，单独议。
 
+### 5.9 结界养成配置弹窗（行内齿轮）
+
+`jiejieyangcheng` 行的齿轮打开「结界养成设置」。与 §5.8 同构（同样的 `CONFIG_DIALOGS` 登记、同样的「落盘在 `validate()` 里」、同样的读写层与 Qt 分离），差别只在于**配置是按账号分组的**，以及四级下拉的单向互斥。
+
+**只管两件事**，都写在 `config/Setting.yml` 的 `结界养成.<账号>` 下：
+
+| 键 | 取值 | 现状默认 |
+| ---- | ---- | ---- |
+| `优先结界卡` | `太鼓` / `斗鱼`（只有两项，**没有「不放置」第三态**） | `太鼓`（即改动前「优先太鼓、耗尽再斗鱼」） |
+| `寄养优先级` | `六星太鼓` / `六星斗鱼` / `五星太鼓` / `五星斗鱼` 的排列，恰好 4 项，越左越优先 | `[六星太鼓, 六星斗鱼, 五星太鼓, 五星斗鱼]`（改动前写死的顺序） |
+
+> 「高星」在代码里一直就是**五星**（模板图 `pic/guild/五星太鼓.png` / `五星斗鱼.png`），所以枚举里直接写 `五星`，不引入「高星」这个词，避免配置值与模板文件名对不上。
+
+**为什么账号分组而不是主/副两个键**：`结界突破` 段早就是 `<账号> -> {参数}` 的形状（`Task_JiejieFight.py` 读 `config["结界突破"][Account]["退出次数"]`），结界养成照抄同一形状最省事；而「哪个账号是主、哪个是副」已经从 `寮三十.主账号/副账号` 知道了，再存一份就是第二个事实源。弹窗只在**标题**上把角色读出来做装饰（`master（主）`），不新增配置键、不参与落盘。
+
+**运行时怎么取**：`MainTask_Jiejieyangcheng` 把 `Account` 传进业务层，`Jiejieyangcheng(current_state, Hwnd, Account)` 在入口用 `Lib.load_jiejie_settings(Account)` 读一次，把 `card_order` 与 `priority_cards` 往下传给 `Jiejieka` / `Yucheng`。**不能各子函数各读一遍**——`Jiejieka` 与 `Yucheng` 在状态机里各被调用两次，各读一遍会在用户中途改配置时前后不一致。
+
+| 改动点 | 改动前 | 改动后 |
+| ---- | ---- | ---- |
+| `Jiejieka(Hwnd, card_order)` | 太鼓分支写死在前，失败再走斗鱼 | 按 `Lib.jiejie_card_order(优先结界卡)` 的顺序循环，页签路径取自 `Lib.JIEJIE_CARD_LIST_PICS` |
+| `Yucheng(current_state, Hwnd, priority_cards)` | `card_handlers` 字典的字面顺序 | 按 `Lib.jiejie_priority_cards(寄养优先级)` 遍历，命中即 `break` |
+
+**`Jiejieka` 里两个容易写错的细节**（都是本次顺手修的）：
+
+1. **切家族失败必须 `continue` 而不是 `break`**：原代码在第一张卡的页签点不到时直接跳出循环，结果「太鼓没库存 → 连斗鱼都不试」。改成 `continue` 才真的实现「耗尽再斗鱼」。
+2. **`星级降序` 只点一次**（`sorted_once` 标志），不能绑在「第一轮」上：真机确认过切家族**不会**重置排序，而重复点击是切换型按钮，第二次会把降序翻回升序，拿到的是低星卡。
+
+**弹窗布局**：一个账号一张 `HeaderCardWidget`，卡片内三行——`优先放置结界卡` + 1 个下拉、一句小字说明、四个优先级下拉按**两行两列**摆放（标签写全「第一优先级」…「第四优先级」）。账号只有两个时一屏看完；`widget.setMinimumWidth(680)`。
+
+> `_AccountCard` 用**组合**而非继承 `HeaderCardWidget`：那个类的 `__init__` 挂了 `@__init__.register` 重载分发，子类一改构造签名，`super().__init__(title, parent)` 就会被分派回子类自己的 `__init__(parent)`，直接 `TypeError: missing required positional arguments`。
+
+**四级下拉的互斥是单向的**：第 N 级的可选项 = 枚举池去掉「第 1..N-1 级当前值」。
+
+- 第 1 级 4 项全开、第 2 级 3 项、第 3 级 2 项、第 4 级**天然只剩 1 项**（语义就是「剩下的那个」）；
+- 撞车（前级抢了后级的值，或后级主动选了前级的值）时走**同一个** `Lib.normalize_jiejie_priority()`：先出现者保留，较后者让位给池中此刻唯一空闲的值。界面联动与落盘校验共用这一个函数，所以「界面能摆出来的」必然「运行时能接受」；
+- 与 §5.8 的双向灰化**刻意不同**：那边只有 2 个选项，双向会各自只剩自己、把两个下拉锁死；这里单向，第 N 级永远还剩自己的值 + 后面各级的值，改得动；
+- 每张卡片各自持有一份 `_syncing`（`setCurrentText` 会再次触发 `currentIndexChanged`），两个账号互不联动。
+
+**容错**：段缺失 / 账号缺失 / 长度不是 4 / 取值非法 / 有重复项 → 一律回落默认值（= 改动前行为），弹窗照常打开并在底部列出回落原因；配置解析失败时**拒绝写入**。落盘只覆盖 `结界养成` 段，`启动项` / `结界突破` / `寮三十` 与注释逐字不变（YAML 保真的三个坑见 §5.8，对策完全相同）。
+
+首次新建该段时还会补两处手写风格：段前留一个空行（`data.yaml_set_comment_before_after_key(SECTION, before="")`，**只在新建时**做——段已存在时再加一次会累积成两个空行）、账号名写成带引号的 `"master"`（`DoubleQuotedScalarString`，与 `启动项` 一致，加引号不影响读取）。
+
 ## 6. 配置体系
 
 ### 6.0 目录划分：config/ 与 state/
@@ -556,11 +602,15 @@ TaskRow.config_button（ui/widgets.py）
 | ---- | ---- |
 | `启动项.<账号>.启动命令` | MuMu 启动命令；账号名为窗口标题关键字 |
 | `结界突破.<账号>.退出次数` / `开打勋章` | 结界突破策略参数 |
+| `结界养成.<账号>.优先结界卡` | 结界卡放置顺序：`太鼓` / `斗鱼`（哪个先耗尽再试另一个） |
+| `结界养成.<账号>.寄养优先级` | 结界寄养的 4 张卡顺序，越左越优先；取值见 §5.9 |
 | `寮三十.主账号` / `副账号` | 协作刷本的两个窗口，取值必须是 `启动项` 里存在的账号 |
 | `寮三十.副本` / `次数` | 按星期（一～日）配置的副本类型与次数，各 7 项 |
 | `模拟器.MuMuManager`（可选） | 显式指定 `MuMuManager.exe`；不写则从启动命令推导（见 §5.6） |
 
 寮三十这四项**已可在界面里改**：点左侧「寮三十 / 真蛇」行的齿轮，弹窗里选完保存即可（详见 §5.8），不必再手改本文件。手改也仍然有效，两种方式写的是同一份配置。
+
+结界养成的两项同理：点「结界养成」行的齿轮，按账号各配一份（详见 §5.9）。**缺段或取值非法时一律回落默认值**，默认值就是本次改动前的写死行为，所以老配置不写这一段也能正常跑。
 
 寮三十副本类型只支持 `魂虚`（虚无）、`魂王`（神罚）、`魂海`（永生之海）、`日蚀`（日轮之陨）四种；次数只支持 `0`（当日跳过）/ `1` / `30` / `50`。填其它值会让「小纸人计数」那一步静默跳过、流程失效。
 
@@ -794,9 +844,10 @@ python tools/check_pics.py --quiet    # 只输出错误（适合接 CI / pre-com
 4. 时间窗、星期分支写在 `MainTask_*` 入口层，不要埋进底层 `Lib` 点击函数。
 5. 冷却成功写回、失败不写回；`Setting.yml` 只放用户可改的静态配置，GUI 偏好分别写 `Gui_state.yml`（任务开关）与 `gui.json`（主题），三者不要混用。
 6. 给某个任务接入配置界面时，必须同时更新：
-   - 新增弹窗模块（参考 `ui/thirty_dialog.py`）与纯逻辑读写层（参考 `ui/thirty_settings.py`，不依赖 Qt 才可测）；
+   - 新增弹窗模块（参考 `ui/thirty_dialog.py` / `ui/jiejie_dialog.py`）与纯逻辑读写层（参考 `ui/thirty_settings.py` / `ui/jiejie_settings.py`，不依赖 Qt 才可测）；
    - `ui/window.CONFIG_DIALOGS` 登记 key → 弹窗类（**不要**另立任务列表）；
-   - `ui/widgets.CONFIG_READY_KEYS` 加上该 key，让齿轮 tooltip 不再写「暂未开放」；
+   - `ui/widgets.CONFIG_READY_KEYS` 加上该 key、`ui/widgets.CONFIG_TOOLTIPS` 加上该任务自己的提示语（两者键集合必须一致），让齿轮 tooltip 不再写「暂未开放」；
+   - 弹窗类给一个 `SAVED_MESSAGE` 类属性，否则保存后控制台仍会报上一个任务的文案；
    - 涉及写 `Setting.yml` 时按 §5.8 的「三个坑」自己读写，不要直接复用 `Lib.read_config` / `Lib.write_config`。
 7. `config/`、`logs/`、`.dsh-scratch/`、`GUI.exe`、`dev/` 下的调试脚本默认不入库；需要跟踪的新源码与文档请在 `.gitignore` 中显式排除忽略。根目录只允许放源码、子目录与工程配置（见 `AGENTS.md` 的「根目录白名单」）。
 7. 修改 `Lib.py` 公共匹配/点击/界面函数前，确认所有 `Task_*` 调用方语义不变，尤其是返回值 `1/0` 与 `Range/Matchs` 约定。

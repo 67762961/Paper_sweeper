@@ -60,14 +60,14 @@
 - 项目级 `runtime.py` 是**运行期本地模块**（已被 `.gitignore` 忽略，不在版本库中）：`ui/window.py` 与 `Lib.py` 在运行时 `import runtime` 读取 `stop_thread`；本地跑 GUI 前需自备，最小内容 `stop_thread = False`，执行 `python build_exe.py` 时若缺失会自动生成。
 - 注释统一使用中文；修改任务流程后，按实际改动同步 ARCHITECTURE.md 中的入口顺序、冷却策略或目录说明。
 - GUI 左侧 7 行任务与「完整运行」顺序都由 `main.TASK_REGISTRY` 驱动：新增/改名顶层任务入口时，必须同步登记注册表（key / 标题 / 说明 / 入口 / `lasttime_keys` / `today_keys`），不要另写一份任务列表。
-- 左侧行结构固定为「今日状态图标 + 名称/上次运行时间 + 齿轮 + ▶ 单跑 + 整跑开关」；不要恢复整行点击运行，也不要加三点菜单。齿轮**按任务区分**：`thirty` 行打开「寮三十设置」弹窗，其余 6 行仍是占位提示（提示语由 `ui/widgets.config_tooltip()` 统一给出，接入新任务时记得把 key 加进 `CONFIG_READY_KEYS`）。
+- 左侧行结构固定为「今日状态图标 + 名称/上次运行时间 + 齿轮 + ▶ 单跑 + 整跑开关」；不要恢复整行点击运行，也不要加三点菜单。齿轮**按任务区分**：`thirty` 行打开「寮三十设置」弹窗，`jiejieyangcheng` 行打开「结界养成设置」弹窗，其余 5 行仍是占位提示（提示语由 `ui/widgets.config_tooltip()` 按任务给出，接入新任务时记得把 key 加进 `CONFIG_READY_KEYS`，并在 `CONFIG_TOOLTIPS` 里写它自己的文案——两者键集合必须一致）。
 - 界面代码只放 `ui/` 包，单向依赖 `theme → icons → widgets → panels → window`；`GUI.py` 仅保留入口（环境变量、日志、异常钩子）并转出组件，不要在入口里写界面逻辑。
 - 今日状态由 `main.entry_done_today` 判定（`check_keys` 全部为今天才 ✓）；它只读 `Last_times.yml`，因此「被冷却/时间窗跳过」的任务仍显示 `!`。
 - 行内状态图标（对勾 / 感叹号 / 播放三角）用 `QPainter` 绘制，保证任意 DPI 清晰；齿轮与运行按钮使用 `FluentIcon`；不要往 `pic/` 塞 UI 素材。
 - 界面组件使用 Fluent 控件（`SimpleCardWidget`、`SwitchButton`、`TextEdit`、`PushButton`、`IndeterminateProgressBar`、`InfoBar` 等），不要在 `ui/` 里重复实现库中已有的控件；「完整运行」用轮廓按钮，不要实心主色块。
 - 右侧按钮区顺序固定为「关闭模拟器 / 中断运行 / 完整运行 / 设置齿轮」，三者样式按语义分层：完整运行用主色（`run_button_qss`）、关闭模拟器用危险色（`danger_button_qss`，红）、中断运行用次要色（`interrupt_button_qss`，灰）。「关闭模拟器」是破坏性动作，**仅空闲时可点**（运行中禁用），点击**不弹二次确认**；它只关 `Setting.yml.启动项` 登记账号的窗口，且**必须用 `Lib.find_windows_silent`**，禁止复用会启动游戏的 `Find_windows`。
 - 两个设置齿轮**各进各的弹窗**，不要合并：日志区齿轮 → `ui/settings_dialog.py`（主题 / 日志偏好 / 打开日志目录），按钮区齿轮 → `ui/after_run_dialog.py`（只有完成动作：关闭模拟器开关 + 电源动作开关与下拉框）。弹窗里不混放无关项，进错了页面要能一眼看出；按钮区齿轮走独立信号 `after_run_settings_clicked`，不要复用 `settings_clicked`。加上左侧行内齿轮，一共**三个**配置入口，各管一摊，都不得复用对方的信号。
-- 给某个任务接入配置界面：弹窗放 `ui/`，**读写与归一化单独一层且不依赖 Qt**（照 `ui/thirty_settings.py`），否则 `MessageBoxBase` 没有 parent 会崩、逻辑没法测；在 `ui/window.CONFIG_DIALOGS` 登记 key → 弹窗类（不要另写任务列表）；写 `Setting.yml` 时**不要直接复用 `Lib.read_config` / `Lib.write_config`**——前者不设 `preserve_quotes`（引号会在读的时候丢），后者不设 `width`（长命令会被折成两行），列表还要**原地切片**才保得住 `[...]` 单行写法。详见 ARCHITECTURE.md §5.8。
+- 给某个任务接入配置界面：弹窗放 `ui/`，**读写与归一化单独一层且不依赖 Qt**（照 `ui/thirty_settings.py` / `ui/jiejie_settings.py`），否则 `MessageBoxBase` 没有 parent 会崩、逻辑没法测；在 `ui/window.CONFIG_DIALOGS` 登记 key → 弹窗类（不要另写任务列表）；弹窗类给一个 `SAVED_MESSAGE` 类属性，主窗口的保存提示从它取，否则第二个任务接入后仍报上一个任务的文案；写 `Setting.yml` 时**不要直接复用 `Lib.read_config` / `Lib.write_config`**——前者不设 `preserve_quotes`（引号会在读的时候丢），后者不设 `width`（长命令会被折成两行），列表还要**原地切片**才保得住 `[...]` 单行写法。详见 ARCHITECTURE.md §5.8 / §5.9。
 - `MuMuManager.exe` 的路径**不要写死**：从 `Setting.yml.启动项.<账号>.启动命令` 里的 exe 推导目录（同目录 → 上一级 → `shell/`），找不到就降级为发 `WM_CLOSE`；用户可用可选键 `模拟器.MuMuManager` 显式覆盖。
 - 「完整运行完成后的动作」（关模拟器 / 注销 / 睡眠 / 关机）的触发条件严格为 `task_key is None` + `ok` + `not stopped`，**单跑、中断、异常一律不触发**。执行时机必须是 `QThread.finished`（`on_thread_finished`），不能是 `task_finished`——后者发出时 `main._log_stream` 的日志文件还没关，此时睡眠会截断日志。
 - 电源动作是**开关 + 下拉框两个键**：`after_run_sleep`（bool，是否启用）+ `after_run_power`（`logoff` / `sleep` / `shutdown`，启用时用哪个）。**不要合并成一个四值枚举**——分开后老配置升级零迁移，「不执行」由开关表达，下拉框不必塞 `"none"`。开关关闭时下拉框 `setEnabled(False)` 灰化。
