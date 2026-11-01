@@ -495,6 +495,25 @@ def Jiyang_outranked(Best, card_name, priority_cards):
     return False
 
 
+def Jiyang_top_capped(Best, priority_cards):
+    """首选档位是否已经读到封顶值（读到了就整表收工，不必再往下翻）
+
+    首选档位排在所有档位最前面，所以它一旦拿到本类型的封顶值，
+    后面无论扫出什么都不可能比它更优先——「六星太鼓 76」已经是
+    六星太鼓的最高收益，比它更靠后的档位按优先级也赢不了。
+    这时继续往下翻纯属浪费。
+
+    注意只对**首选档位**成立。第二、三、四位读到封顶不能收工：
+    首选档位可能还在后面的屏里没出现。
+
+    :return: True 表示可以收工
+    """
+    if not priority_cards:
+        return False
+    First, _First_pic = priority_cards[0]
+    return Jiyang_at_cap(Best, First)
+
+
 def Jiyang_type_best(Best, card_name):
     """同类型里已经读到的最好成绩，一个都没有则返回 None
 
@@ -607,7 +626,10 @@ def Jiyang_scan_list(Hwnd, priority_cards):
                     n=screen + 1, name=card_name))
                 continue
 
-            if card_name not in Best or Value > Best[card_name]["value"]:
+            # 收益相同时记住后发现的这一张：扫完要往回翻到目标行，
+            # 后发现的离列表底部更近，回滚的步数更少。
+            # 用 >= 而不是 >，就是为了让后来者顶掉同分的前者。
+            if card_name not in Best or Value >= Best[card_name]["value"]:
                 Best[card_name] = {
                     "name": card_name, "value": Value, "scrolls": Scrolls, "row": row, "pic": card_pic,
                 }
@@ -623,8 +645,20 @@ def Jiyang_scan_list(Hwnd, priority_cards):
                     n=screen + 1, name=card_name, v=Value, top=Top["value"]))
 
             if Jiyang_at_cap(Best, card_name):
-                print("        INFO- ----- {name} 已达封顶 {v}，本档剩余行跳过".format(
-                    name=card_name, v=Value))
+                # 首选档位封顶会紧接着报一次「收工」，这里就不重复报了
+                if not Jiyang_top_capped(Best, priority_cards):
+                    print("        INFO- ----- {name} 已达封顶 {v}，本档剩余行跳过".format(
+                        name=card_name, v=Value))
+
+        # 首选档位已经拿到封顶值，整表收工：它排在所有档位最前面，
+        # 后面扫出什么都不可能比它更优先，继续往下翻纯属浪费。
+        # 放在处理完本屏候选之后，这样同一屏里排在它后面的行不会被漏掉
+        # （虽然那些行按优先级也赢不了，但少一次误判的余地）。
+        if Jiyang_top_capped(Best, priority_cards):
+            First = priority_cards[0][0]
+            print("        INFO- ----- {name} 已到封顶 {v}，首选档位拿满，收工".format(
+                name=First, v=Best[First]["value"]))
+            break
 
         # 到底判定：寄养列表末尾.png 命中的是「有头像但没有结界卡图」的空白格子，
         # 与有卡行的得分差一个数量级。必须放在处理完本屏候选之后：

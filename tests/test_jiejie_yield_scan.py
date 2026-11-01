@@ -619,3 +619,98 @@ def test_scan_list_computes_back_steps(fake):
     assert selected["value"] == 67
     assert selected["scrolls"] == 0
     assert selected["back"] == 2, "扫完停在底部，回第一屏要向上滚两次"
+
+
+# ------------------------------------------------------ 首选档位封顶即收工
+
+
+def test_stops_when_first_priority_hits_cap(fake):
+    """首选是六星太鼓，读到 76 就直接收工，不再往下翻"""
+    env = fake(screens=[
+        [_card("六星太鼓", 76)],
+        [_card("六星太鼓", 59)],
+        [_card("六星太鼓", 42)],
+    ])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert found["value"] == 76
+    assert env.screens_visited == [], "第一屏就拿到封顶，一次都不该滚"
+
+
+def test_stops_when_first_priority_douyu_hits_cap(fake):
+    """首选换成六星斗鱼时，读到 151 收工"""
+    priority = (
+        ("六星斗鱼", "./pic/guild/六星斗鱼.png"),
+        ("六星太鼓", "./pic/guild/六星太鼓.png"),
+        ("五星斗鱼", "./pic/guild/五星斗鱼.png"),
+        ("五星太鼓", "./pic/guild/五星太鼓.png"),
+    )
+    env = fake(screens=[
+        [_card("六星斗鱼", 151)],
+        [_card("六星斗鱼", 118)],
+    ])
+
+    found = Task.Jiyang_scan_list(env, priority)
+
+    assert found["name"] == "六星斗鱼"
+    assert found["value"] == 151
+    assert env.screens_visited == []
+
+
+def test_does_not_stop_when_lower_tier_hits_cap(fake):
+    """封顶的是第二优先级，不能收工：首选档位可能还在后面没出现"""
+    env = fake(screens=[
+        [_card("六星斗鱼", 151)],
+        [_card("六星太鼓", 76)],
+    ])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert found["name"] == "六星太鼓", "首选档位排在前面，压过六星斗鱼"
+    assert found["value"] == 76
+    assert env.screens_visited == [1], "第二档封顶不能让整表收工"
+
+
+def test_stops_after_scanning_whole_screen(fake):
+    """同一屏里封顶行后面的行仍要处理完，再收工"""
+    env = fake(screens=[
+        [_card("六星太鼓", 76), _card("六星斗鱼", 118)],
+        [_card("六星斗鱼", 151)],
+    ])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.clicked) == 2, "本屏两行都要点，收工发生在处理完本屏之后"
+    assert env.screens_visited == []
+
+
+# --------------------------------------------------- 同收益记住后发现的
+
+
+def test_equal_value_prefers_later_one(fake):
+    """两个 67 时记住后发现的：它离底部更近，回滚步数更少"""
+    env = fake(screens=[
+        [_card("六星太鼓", 67)],
+        [_card("六星太鼓", 67)],
+        [],
+    ])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert found["value"] == 67
+    assert found["scrolls"] == 1, "应该记住第二屏那张，而不是第一屏那张"
+    assert found["back"] == 1, "回滚两步变一步"
+
+
+def test_higher_value_still_wins_over_later_one(fake):
+    """后来的数字更小，仍然保留前面那个大的"""
+    env = fake(screens=[
+        [_card("六星太鼓", 76)],
+        [_card("六星太鼓", 67)],
+    ])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert found["value"] == 76
+    assert found["scrolls"] == 0
