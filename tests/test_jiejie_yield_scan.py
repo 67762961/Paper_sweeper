@@ -183,7 +183,7 @@ def test_all_tiers_scanned_in_one_pass(fake):
     """四档必须吃同一趟滚动：滚过的屏数应等于列表长度，而不是四倍"""
     env = fake(screens=[
         [_card("六星太鼓", 67), _card("六星斗鱼", 118)],
-        [_card("五星太鼓", 59), _card("五星斗鱼", 151)],
+        [_card("六星太鼓", 59), _card("六星斗鱼", 151)],
     ])
 
     Task.Jiyang_scan_list(env, PRIORITY)
@@ -200,6 +200,89 @@ def test_each_card_clicked_once(fake):
 
     assert len(env.clicked) == 2
     assert len(set(env.clicked)) == 2
+
+
+# ------------------------------------------- 同类型更高档已有数字就不读本档
+
+
+def test_six_star_taiko_skips_five_star_taiko(fake):
+    """读到六星太鼓后，五星太鼓不必再点：同类型内高星必然不更差"""
+    env = fake(screens=[[_card("六星太鼓", 67), _card("五星太鼓", 59)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.clicked) == 1, "五星太鼓被六星太鼓压住，不该再点开"
+    assert env.clicked == [(0, 0)]
+
+
+def test_six_star_douyu_skips_five_star_douyu(fake):
+    """斗鱼同理：六星斗鱼读到数字后，五星斗鱼不必再读"""
+    env = fake(screens=[[_card("六星斗鱼", 118), _card("五星斗鱼", 151)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.clicked) == 1, "五星斗鱼被六星斗鱼压住"
+    assert env.clicked == [(0, 0)]
+
+
+def test_lower_tier_still_read_when_higher_tier_absent(fake):
+    """没有六星时，五星照常要读——压制的前提是「更高档已经读到数字」"""
+    env = fake(screens=[[_card("五星太鼓", 59)]])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.clicked) == 1
+    assert found["name"] == "五星太鼓"
+    assert found["value"] == 59
+
+
+def test_taiko_does_not_suppress_douyu(fake):
+    """跨类型不压制：六星太鼓有数字，不代表六星斗鱼不用读"""
+    env = fake(screens=[[_card("六星太鼓", 67), _card("六星斗鱼", 118)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.clicked) == 2, "太鼓与斗鱼互不压制"
+
+
+def test_suppression_applies_on_later_screens(fake):
+    """六星在后面的屏、五星在前面的屏时，读到六星后也要停下"""
+    env = fake(screens=[
+        [_card("五星太鼓", 59)],
+        [_card("六星太鼓", 67)],
+        [_card("五星太鼓", 42)],
+    ])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    # 第一屏只有五星（此时还没读到六星，必须读）→ 第二屏读到六星
+    # → 第三屏的五星被压住，不该再点
+    assert len(env.clicked) == 2, "读到六星后，后面的五星不再点开"
+
+
+def test_six_star_equal_value_still_suppresses(fake):
+    """67 对 67 这种相接情况也算压制：更高档排在前面，读不读本档结果一样"""
+    env = fake(screens=[[_card("六星太鼓", 67), _card("五星太鼓", 67)]])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.clicked) == 1
+    assert found["name"] == "六星太鼓", "同值时按优先级取靠前的六星"
+
+
+def test_outranked_ignores_tiers_behind(fake):
+    """排在后面的档位压不住前面的：优先级顺序才是裁决者"""
+    # 把五星放最前，六星放最后
+    custom = (
+        ("五星太鼓", "./pic/guild/五星太鼓.png"),
+        ("六星太鼓", "./pic/guild/六星太鼓.png"),
+    )
+    env = fake(screens=[[_card("五星太鼓", 59), _card("六星太鼓", 67)]])
+
+    found = Task.Jiyang_scan_list(env, custom)
+
+    assert found["name"] == "五星太鼓", "五星排第一就选五星，不被后面的六星压住"
+    assert len(env.clicked) == 1
 
 
 # -------------------------------------------------- 滚动前必须把鼠标归位

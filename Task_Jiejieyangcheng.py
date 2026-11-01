@@ -40,6 +40,12 @@ def MainTask_Jiejieyangcheng():
     )
 
 
+# 寄养列表每次滚动的档位（Scroll_print 的单位是「滚轮格」，一屏约 4 行）。
+# 取 5 而不是 3：3 格时相邻两屏有较大重叠，同一行会被反复匹配、重复点开，
+# 既慢又浪费。5 格能保证每行都完整经过一次视窗。
+JIEJIE_SCROLL_STEP = 5
+
+
 def Jiejieyangcheng(current_state, Hwnd, Account=None):
     """
     结界养成主流程
@@ -459,6 +465,35 @@ def Jiyang_at_cap(Best, card_name):
     return Found["value"] >= JIEJIE_YIELD_CAP.get(jiejie_card_type(card_name), 10 ** 6)
 
 
+def Jiyang_outranked(Best, card_name, priority_cards):
+    """本档是否已被同类型的更高档压住（压住了就不必再点本档的行）
+
+    同类型内星级是单调的：六星太鼓 67~76，五星太鼓 59~67，
+    六星斗鱼最低 118，五星斗鱼更低。所以只要同类型的更高档已经读到数字，
+    本档不可能胜出——连 67 对 67 这种相接的情况也算了，因为
+    档间按优先级取第一个有货的，更高档排在前面，读不读本档结果一样。
+
+    跨类型不适用：勾玉与体力单位不同，六星太鼓有货并不影响六星斗鱼。
+
+    :param Best:          已读到的档位 -> 最优记录
+    :param card_name:     当前档位名（六星太鼓 / 五星太鼓 / ...）
+    :param priority_cards: 全部档位，用来判断谁排在谁前面
+    :return:              True 表示本档已被更高档压住
+    """
+    Type = jiejie_card_type(card_name)
+    if not Type:
+        return False
+    for Other, _Other_pic in priority_cards:
+        if Other == card_name:
+            break           # 只往前看：排在后面的档位压不住本档
+        if jiejie_card_type(Other) != Type:
+            continue        # 跨类型不比
+        Found = Best.get(Other)
+        if Found is not None and Found["value"] is not None:
+            return True
+    return False
+
+
 def Jiyang_read_panel(Hwnd):
     """读右侧面板的收益数字，等两帧一致再返回
 
@@ -499,6 +534,8 @@ def Jiyang_scan_list(Hwnd, priority_cards):
         for card_name, card_pic in priority_cards:
             if Jiyang_at_cap(Best, card_name):
                 continue        # 本档已封顶，这一档剩下的行不必再点
+            if Jiyang_outranked(Best, card_name, priority_cards):
+                continue        # 同类型更高档已有数字，本档不可能胜出
             for row in Match_models_in_image_all(Img, card_pic, 0.05, max_matches=8):
                 Rows.append((row[0][1], card_name, card_pic, row))
 
@@ -506,9 +543,9 @@ def Jiyang_scan_list(Hwnd, priority_cards):
         Rows.sort(key=lambda item: item[0])
 
         for _y, card_name, card_pic, row in Rows:
-            # 本档已封顶：这一档剩下的行不必再点。
-            # Rows 是本屏一次性收集的，收集时还没封顶，所以要在点击前再判一次。
-            if Jiyang_at_cap(Best, card_name):
+            # 本档已封顶、或已被同类型更高档压住：这一档剩下的行不必再点。
+            # Rows 是本屏一次性收集的，收集时还没发生，所以要在点击前再判一次。
+            if Jiyang_at_cap(Best, card_name) or Jiyang_outranked(Best, card_name, priority_cards):
                 continue
 
             Fallback.setdefault(
@@ -549,7 +586,7 @@ def Jiyang_scan_list(Hwnd, priority_cards):
         if List_hit:
             Move_to_range(Hwnd, List_hit[0][1])
 
-        Scroll_print(Hwnd, -3)
+        Scroll_print(Hwnd, -JIEJIE_SCROLL_STEP)
         Sleep_quiet(0.8)
         Scrolls += 1
 
@@ -592,7 +629,7 @@ def Jiyang_goto(Hwnd, Target):
                                          [("列表", "./pic/guild/寄养列表.png")], 0.05)
         if List_hit:
             Move_to_range(Hwnd, List_hit[0][1])
-        Scroll_print(Hwnd, 3)
+        Scroll_print(Hwnd, JIEJIE_SCROLL_STEP)
         Sleep_quiet(0.1)
     if Steps:
         Sleep_quiet(1)
