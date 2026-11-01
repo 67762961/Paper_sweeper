@@ -671,6 +671,132 @@ def Find_in_windows_Matchs(Hwnd, Model_path, Threshold, Flag_show):
     return Match_model(Img, Model_path, Threshold, Flag_show, is_window_match=True)
 
 
+# ---- 一帧多用：截一次图，在同一帧上做多次识别 ----
+# 寄养列表扫描里原来的写法是「每识别一次就重新截一次窗口」，
+# 一屏要截 5 次（定位列表 1 次 + 两次 Find_Click_windows 内部各 2 次），
+# 而模板匹配本身只要几十毫秒，截图才是大头。下面三个原语把它拆开。
+
+_TEMPLATE_CACHE = {}  # 路径 -> (mtime_ns, size, 模板图像)
+
+
+def clear_template_cache():
+    """清空模板缓存（测试用；正常运行时不需要手动调用）"""
+    _TEMPLATE_CACHE.clear()
+
+
+def _read_template_cached(Img_model_path):
+    """读取模板图并缓存，避免同一张模板在循环里被反复解码
+
+    缓存键带 mtime 与文件大小：用户替换了模板图会立刻失效，
+    不会出现「改了图但程序还在用旧图」的怪事。
+    """
+    try:
+        stat = os.stat(Img_model_path)
+        stamp = (stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        # 文件不存在时不做缓存，交给 Img_read_ch 统一报错
+        stamp = None
+
+    if stamp is not None:
+        cached = _TEMPLATE_CACHE.get(Img_model_path)
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
+
+    Img_model = Img_read_ch(Img_model_path)
+    if Img_model is None:
+        raise ValueError(f"无法找到文件: {Img_model_path}")
+
+    if stamp is not None:
+        _TEMPLATE_CACHE[Img_model_path] = (stamp, Img_model)
+    return Img_model
+
+
+def Screenshot_window(Hwnd):
+    """截取窗口当前画面，返回 cv2 BGR 图像
+
+    与 Find_in_windows_Matchs 的区别：这里只截图，不做匹配、不点击。
+    调用方可以拿同一帧去做多次识别，避免「识别几次就截几次」。
+    """
+    check_stop()
+    window_rect = win32gui.GetWindowRect(Hwnd)
+    left, top, right, bottom = window_rect
+    Screenshot = pyautogui.screenshot(region=(left, top, right - left, bottom - top))
+    return cv2.cvtColor(np.array(Screenshot), cv2.COLOR_RGB2BGR)
+
+
+def Match_models_in_image(Img, models, Threshold):
+    """在一张已经截好的图上依次试多个模板
+
+    :param Img:       cv2 BGR 图像（调用方自己截，可用 Screenshot_window）
+    :param models:    [(名字, 模板路径), ...]
+    :param Threshold: 匹配阈值，语义与 Match_model 一致
+                      （TM_SQDIFF_NORMED，得分越小越像，超过阈值判失败）
+    :return:          [(名字, [左上, 右下], 得分字符串), ...]，
+                      只含命中项，按得分升序（最像的在前）
+    """
+    check_stop()
+    Img = np.uint8(Img)
+
+    Results = []
+    for name, Model_path in models:
+        Img_model = _read_template_cached(Model_path)
+        Model_height, Model_width = Img_model.shape[0:2]
+
+        # 模板比待匹配图还大时 matchTemplate 会直接抛错，这里当作未命中跳过
+        if Model_height > Img.shape[0] or Model_width > Img.shape[1]:
+            continue
+
+        Result = cv2.matchTemplate(Img, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED)
+        min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Result)
+        if min_val > Threshold:
+            continue
+
+        Left_up = (min_loc[0], min_loc[1])
+        Right_down = (min_loc[0] + Model_width, min_loc[1] + Model_height)
+        Results.append((name, [Left_up, Right_down], f"{min_val:.3f}"))
+
+    Results.sort(key=lambda item: float(item[2]))
+    return Results
+
+
+def Image_fingerprint(Img, size=(32, 18)):
+    """把图像压成一张小尺寸灰度指纹，用于判断「两帧是不是同一画面」
+
+    缩小的作用是把压缩噪声与动画抖动平均掉，所以滚动到底之后
+    相邻两帧的指纹几乎一模一样；而真的滚动了，内容整体位移，指纹差异很大。
+    这替代了原来的 寄养列表末尾.png：那张图配 TM_SQDIFF_NORMED + 0.001
+    等于要求逐像素相等，实拍图永远达不到，末尾判定形同虚设。
+
+    注意：指纹本身是「缩略灰度」，比较时请用 Fingerprint_diff / Fingerprint_same，
+    不要直接比字节串——同一画面带一点噪声时字节未必全等。
+
+    :param Img:  cv2 BGR 图像
+    :param size: 指纹尺寸 (宽, 高)，越小越不敏感
+    :return:     指纹（np.uint8 二维数组，size[1] 行 size[0] 列）
+    """
+    check_stop()
+    Gray = cv2.cvtColor(np.uint8(Img), cv2.COLOR_BGR2GRAY)
+    return cv2.resize(Gray, size, interpolation=cv2.INTER_AREA)
+
+
+def Fingerprint_diff(Fp_a, Fp_b):
+    """两张指纹的平均灰度差（0~255，同一画面通常小于 2）"""
+    a = np.asarray(Fp_a, dtype=np.int16)
+    b = np.asarray(Fp_b, dtype=np.int16)
+    if a.shape != b.shape:
+        raise ValueError(f"指纹尺寸不一致: {a.shape} vs {b.shape}")
+    return float(np.abs(a - b).mean())
+
+
+def Fingerprint_same(Fp_a, Fp_b, Tolerance=3.0):
+    """两张指纹是否算「同一画面」
+
+    :param Tolerance: 平均灰度差上限。实测同一画面带噪声约 1~2，
+                      真实滚动远超 10，取 3 能稳稳分开。
+    """
+    return Fingerprint_diff(Fp_a, Fp_b) <= Tolerance
+
+
 def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):
     """
     在窗口内的指定区域内进行模板匹配

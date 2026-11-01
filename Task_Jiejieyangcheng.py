@@ -27,7 +27,8 @@ def MainTask_Jiejieyangcheng():
     结界养成主任务
     """
     run_accounts_task(
-        "结界养成", ready_after(6),
+        "结界养成",
+        ready_after(6),
         work=lambda Account: Jiejieyangcheng("庭院界面", Find_windows(Account), Account),
     )
 
@@ -48,8 +49,12 @@ def Jiejieyangcheng(current_state, Hwnd, Account=None):
     card_order = jiejie_card_order(settings["card"])
     priority_cards = jiejie_priority_cards(settings["priority"])
     print(
-        "        INFO- ----- 结界卡放置顺序", " → ".join(card_order),
-        "寄养优先级", " → ".join(name for name, _ in priority_cards),
+        "        INFO- ----- 结界卡放置顺序",
+        " → ".join(card_order),
+    )
+    print(
+        "        INFO- ----- 寄养优先级",
+        " → ".join(name for name, _ in priority_cards),
     )
 
     # 重置结束标记
