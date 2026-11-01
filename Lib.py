@@ -797,6 +797,163 @@ def Fingerprint_same(Fp_a, Fp_b, Tolerance=3.0):
     return Fingerprint_diff(Fp_a, Fp_b) <= Tolerance
 
 
+# ---- 收益数字识别（寄养结界右侧面板的「勾玉 +NN」/「体力 +NN」）----
+# 不用 OCR 库：这里的数字是固定字体、固定字号的灰黑字，笔画形状高度一致，
+# 用「连通域切字 + 归一化画布 + 带位移容忍的像素距离」就足够，
+# 而且能明确回答「认不出」（返回 None），不会像 OCR 那样猜一个错的。
+#
+# 实测（四张真实截图，1910x1121 / 1784x932 / 1632x854 / 1618x900）：
+#   同一数字跨图距离 0.000~0.055，不同数字最近 5vs6 = 0.131、1vs4 = 0.148，
+#   所以阈值取 0.10 —— 覆盖实测最差同类（0.055），离最近异类留 30% 缓冲。
+
+JIEJIE_DIGIT_CANVAS = (28, 32)      # 归一化画布 (宽, 高)，按字高等比缩放后居中
+JIEJIE_DIGIT_THRESHOLD = 0.10       # 像素差平方均值上限，超过判「认不出」
+JIEJIE_DIGIT_LUM = 150              # 墨迹判据：亮度上限
+JIEJIE_DIGIT_SAT = 60               # 墨迹判据：最大通道差上限（灰黑字饱和低）
+JIEJIE_YIELD_BOX_X = 0.55           # 数字区粗定位：右半边起点（占窗口宽比例）
+JIEJIE_YIELD_BOX_Y = 0.45           # 数字区粗定位：下半部起点（占窗口高比例）
+JIEJIE_DIGIT_GAP_RATIO = 0.5        # 行内切段的最大字间距（占字高比例）
+
+
+def _digit_ink_mask(Img):
+    """灰度文字的墨迹掩码：足够暗、且三通道差异小
+
+    游戏里的数字是灰黑色，背景是米色面板（R≈200 G≈192 B≈182），
+    按「亮度 < 150 且最大通道差 < 60」就能把文字与背景干净分开，
+    不会把面板上的浅色纹理算进来。
+    """
+    Img = np.asarray(Img, dtype=np.int32)
+    Blue, Green, Red = Img[:, :, 0], Img[:, :, 1], Img[:, :, 2]
+    Lum = 0.299 * Red + 0.587 * Green + 0.114 * Blue
+    Diff = Img.max(axis=2) - Img.min(axis=2)
+    return (Lum < JIEJIE_DIGIT_LUM) & (Diff < JIEJIE_DIGIT_SAT)
+
+
+def _digit_glyphs(Img, Origin_x, Origin_y):
+    """在图像右下区域切出候选字形
+
+    :return: [(x, y, w, h, mask), ...]，坐标是相对整张图的绝对坐标
+    """
+    Sub = Img[Origin_y:, Origin_x:]
+    Mask = _digit_ink_mask(Sub)
+
+    # cv2 的连通域比手写 DFS 快两个数量级，且返回的 stats 直接就是外接框
+    Count, _Labels, Stats, _Centroids = cv2.connectedComponentsWithStats(
+        Mask.astype(np.uint8), connectivity=8
+    )
+
+    Glyphs = []
+    for index in range(1, Count):       # 0 是背景
+        x, y, w, h, _area = Stats[index]
+        # 尺寸过滤：数字高 22~25、宽 8~16（原生分辨率）
+        if h < 14 or h > 44:
+            continue
+        if w < 3 or w > 32:
+            continue
+        # 宽高比过滤：把 `+` 号滤掉（它是 19x21，宽/高≈0.90；数字都 ≤0.68）
+        if w > h * 0.78:
+            continue
+        Glyphs.append(
+            (x + Origin_x, y + Origin_y, w, h, Mask[y:y + h, x:x + w].copy())
+        )
+    return Glyphs
+
+
+def _digit_group_lines(Glyphs):
+    """按垂直重叠把字形聚成行，行内按 x 排序
+
+    :return: [[(x, y, w, h, mask), ...], ...]，按 y 从上到下
+    """
+    Lines = []
+    for Glyph in sorted(Glyphs, key=lambda item: item[1]):
+        Placed = False
+        for Line in Lines:
+            Line_y0 = Line[0][1]
+            Line_y1 = Line[0][1] + Line[0][3]
+            Glyph_y0 = Glyph[1]
+            Glyph_y1 = Glyph[1] + Glyph[3]
+            Overlap = min(Line_y1, Glyph_y1) - max(Line_y0, Glyph_y0)
+            if Overlap > min(Line_y1 - Line_y0, Glyph_y1 - Glyph_y0) * 0.5:
+                Line.append(Glyph)
+                Placed = True
+                break
+        if not Placed:
+            Lines.append([Glyph])
+    return [sorted(Line, key=lambda item: item[0]) for Line in Lines]
+
+
+def _digit_rightmost_run(Line):
+    """行内按间距切段，取最右边那段
+
+    数字是右对齐的，左边混进来的汉字碎片、`+` 号与数字之间有明显空隙；
+    而数字与数字之间只隔 3~10 像素。按「字高的一半」作切分阈值正好分开。
+    """
+    if not Line:
+        return []
+
+    Heights = sorted(Glyph[3] for Glyph in Line)
+    Median = Heights[len(Heights) // 2]
+    Gap_max = max(6, int(round(Median * JIEJIE_DIGIT_GAP_RATIO)))
+
+    Runs = []
+    Current = [Line[0]]
+    for Prev, Glyph in zip(Line, Line[1:]):
+        Gap = Glyph[0] - (Prev[0] + Prev[2])
+        if Gap <= Gap_max:
+            Current.append(Glyph)
+        else:
+            Runs.append(Current)
+            Current = [Glyph]
+    Runs.append(Current)
+
+    # 单字形段不算数字（可能是 `+` 剩下的碎片或标点）
+    Runs = [Run for Run in Runs if len(Run) >= 2]
+    return Runs[-1] if Runs else []
+
+
+def _digit_canvas(Glyph):
+    """把一个字形缩放居中到统一画布，返回 float32 的 0/1 数组
+
+    按高度等比缩放（数字高度一致，宽度才携带信息：1 很窄、0 很宽），
+    所以不能用「拉伸铺满」的方式归一化。
+    """
+    _x, _y, w, h, Mask = Glyph
+    Canvas_w, Canvas_h = JIEJIE_DIGIT_CANVAS
+    Scale = Canvas_h / h
+    New_w = max(1, int(round(w * Scale)))
+    Offset = (Canvas_w - New_w) // 2
+
+    Canvas = np.zeros((Canvas_h, Canvas_w), dtype=np.float32)
+    Source_y = np.clip(
+        ((np.arange(Canvas_h) + 0.5) / Scale).astype(np.int32), 0, h - 1
+    )
+    Source_x = np.clip(
+        ((np.arange(New_w) + 0.5) / Scale).astype(np.int32), 0, w - 1
+    )
+    Canvas[:, Offset:Offset + New_w] = Mask[np.ix_(Source_y, Source_x)].astype(np.float32)
+    return Canvas
+
+
+def _digit_distance(Canvas_a, Canvas_b):
+    """两张画布的像素差平方均值，在 ±2 横移 / ±1 纵移内取最小值
+
+    位移容忍是为了吸收「字形框起点差 1 像素」这种抖动——
+    同一数字重切一次，外接框可能差一格，不放开位移会把它们判成两个数字。
+    """
+    Canvas_h, Canvas_w = Canvas_a.shape
+    Best = float("inf")
+    for dy in (-1, 0, 1):
+        for dx in (-2, -1, 0, 1, 2):
+            Shifted = np.zeros_like(Canvas_b)
+            y0, y1 = max(0, dy), min(Canvas_h, Canvas_h + dy)
+            x0, x1 = max(0, dx), min(Canvas_w, Canvas_w + dx)
+            Shifted[y0:y1, x0:x1] = Canvas_b[y0 - dy:y1 - dy, x0 - dx:x1 - dx]
+            Diff = float(((Canvas_a - Shifted) ** 2).mean())
+            if Diff < Best:
+                Best = Diff
+    return Best
+
+
 def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):
     """
     在窗口内的指定区域内进行模板匹配
