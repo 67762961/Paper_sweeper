@@ -5,12 +5,13 @@
 （截图、模板匹配、读数、滚动、点击），所以可以整段替换成假的，
 在纯逻辑层面验证「选谁」这件事——真机验证留给手动单跑。
 
-重点覆盖五条容易写错的规则：
+重点覆盖六条容易写错的规则：
 1. 一趟扫完，四档吃同一帧截图（不是四趟）；
 2. 档内比数字取最大（59 输给 67）；
 3. 档间按优先级取第一个有货的，**不比数字大小**（六星太鼓 67 胜过六星斗鱼 151）；
 4. 本类型封顶后，本档剩余行不再点，但**其他档照常扫**；
-5. 全部读不出时回退成第一个命中，而不是当作「本档没有卡」。
+5. 全部读不出时回退成第一个命中，而不是当作「本档没有卡」；
+6. 滚动前必须把鼠标放回列表上——滚轮作用在鼠标位置，鼠标不在列表上就滚不动。
 """
 import numpy as np
 import pytest
@@ -28,7 +29,14 @@ class FakeList:
     :param screens: 每屏一个列表，元素是 ``(档位名, 收益值)``；
                     收益为 None 表示这张卡的数字读不出
     :param ended:   每一屏是否已经到底（末尾露出空白格）
+
+    另外模拟一个真机上的关键行为：**滚轮只作用于鼠标位置**。
+    鼠标不在列表上时 scroll 什么也不做——这正是「滚不动」被误判成
+    「列表到头」的成因，所以假环境必须能复现它。
     """
+
+    # 列表模板在画面里的位置（假坐标）
+    LIST_BOX = [[100, 200], [300, 280]]
 
     def __init__(self, screens, ended=None):
         self.screens = screens
@@ -36,20 +44,26 @@ class FakeList:
         self.screen_index = 0
         self.clicked = []           # [(屏号, 行号)]
         self.screens_visited = []
+        self.mouse = (0, 0)         # 鼠标当前所在的假坐标
+        self.scroll_attempts = 0    # 尝试滚动了几次（含滚不动的）
+        self.dead_scrolls = 0       # 其中「鼠标不在列表上」而空转的次数
 
     # ---- 截图与匹配 ----
     def screenshot(self, Hwnd):
-        """按屏号给出不同画面，让指纹能分辨出真的滚动了"""
+        """按屏号给出不同画面"""
         img = np.zeros((10, 10, 3), dtype=np.uint8)
         img[:, :, 0] = (self.screen_index * 23 + 5) % 255
         img[:, :, 1] = (self.screen_index * 41 + 9) % 255
         return img
 
     def match_one(self, Img, models, Threshold):
-        """寄养列表末尾的匹配：按当前屏决定是否到底"""
-        if models[0][0] != "末尾":
-            return []
-        return [("末尾", [[0, 0], [1, 1]], "0.000")] if self.ended[self.screen_index] else []
+        """一次匹配一个位置：末尾空白格 / 寄养列表本身"""
+        name = models[0][0]
+        if name == "末尾":
+            return [("末尾", [[0, 0], [1, 1]], "0.000")] if self.ended[self.screen_index] else []
+        if name == "列表":
+            return [("列表", self.LIST_BOX, "0.000")]
+        return []
 
     def match_all(self, Img, Model_path, Threshold, max_matches=10):
         """只返回属于 Model_path 对应档位的行"""
@@ -61,7 +75,18 @@ class FakeList:
         return rows
 
     # ---- 交互 ----
+    def _in_list(self):
+        """鼠标是否落在列表区域内"""
+        (x0, y0), (x1, y1) = self.LIST_BOX
+        x, y = self.mouse
+        return x0 <= x <= x1 and y0 <= y <= y1
+
     def scroll(self, Hwnd, length):
+        self.scroll_attempts += 1
+        if not self._in_list():
+            # 真机就是这个行为：鼠标不在列表上，滚轮落在别处，列表纹丝不动
+            self.dead_scrolls += 1
+            return
         if length < 0:
             self.screen_index = min(self.screen_index + 1, len(self.screens) - 1)
             self.screens_visited.append(self.screen_index)
@@ -69,7 +94,11 @@ class FakeList:
             self.screen_index = max(self.screen_index - 1, 0)
 
     def move(self, Hwnd, Loc):
-        return 0
+        """把鼠标移到框中心"""
+        cx = (Loc[0][0] + Loc[1][0]) // 2
+        cy = (Loc[0][1] + Loc[1][1]) // 2
+        self.mouse = (cx, cy)
+        return self.mouse
 
     def click(self, Hwnd, Loc, Wait):
         self.clicked.append((self.screen_index, Loc[0][1] // 40))
@@ -173,6 +202,39 @@ def test_each_card_clicked_once(fake):
     assert len(set(env.clicked)) == 2
 
 
+# -------------------------------------------------- 滚动前必须把鼠标归位
+
+
+def test_mouse_returns_to_list_before_scrolling(fake):
+    """一屏没有本档的卡时，滚动前也要把鼠标放回列表，否则滚轮落空
+
+    这是真机上暴露过的 bug：只有「找到卡」时才 Move_to_range，
+    某屏一张卡都没匹配上时鼠标还停在页签上，滚轮滚不动列表，
+    两帧相同就被误判成「列表到头」，扫描提前结束。
+    """
+    env = fake(screens=[
+        [_card("五星斗鱼", 151)],     # 本屏没有六星卡，但列表还没到底
+        [_card("六星太鼓", 67)],
+    ])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert env.dead_scrolls == 0, "不能有「鼠标不在列表上」的空滚"
+    assert found is not None and found["value"] == 67, "必须扫到第二屏"
+
+
+def test_scroll_actually_moves_when_no_card_on_screen(fake):
+    """整屏一张卡都匹配不上时，仍要真的滚动，不能原地打转"""
+    env = fake(screens=[
+        [],
+        [_card("六星太鼓", 67)],
+    ])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert env.screens_visited == [1], "空白屏也必须能滚下去"
+
+
 # ------------------------------------------------------------ 封顶早停
 
 
@@ -252,7 +314,7 @@ def test_returns_none_when_all_empty(fake):
 
 
 def test_falls_back_to_first_hit_when_all_unreadable(fake):
-    """全部读不出时不能当作「本档没有卡」，要回退成第一个命中（R9）"""
+    """全部读不出时不能当作「本档没有卡」，要回退成第一个命中"""
     env = fake(screens=[[_card("六星太鼓", None), _card("六星太鼓", None)]])
 
     found = Task.Jiyang_scan_list(env, PRIORITY)
@@ -279,6 +341,36 @@ def test_fallback_tier_still_selectable(fake):
 
     assert selected is not None
     assert selected["name"] == "六星太鼓"
+
+
+# ---------------------------------------------------- 到底只能由空白格判定
+
+
+def test_stops_when_blank_slot_found(fake):
+    """到底的唯一判据是空白格模板命中，命中即停"""
+    env = fake(screens=[
+        [_card("六星太鼓", 59)],
+        [_card("六星太鼓", 67)],
+    ], ended=[False, True])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert found["value"] == 67, "最后一屏的卡也要参与比较"
+    assert env.screens_visited == [1], "命中空白格后不再往下滚"
+
+
+def test_does_not_stop_on_unchanged_screen(fake):
+    """画面不再变化**不能**当成到底：那是「滚不动」的间接现象，不是语义
+
+    这里让滚动完全无效（屏幕数固定为 1），但空白格永不命中——
+    扫描必须一直跑到轮次上限，而不是提前 break 成「列表到头」。
+    """
+    env = fake(screens=[[_card("六星太鼓", 59)]], ended=[False])
+    env.scroll = lambda Hwnd, length: None      # 滚轮彻底失效
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert found is not None and found["value"] == 59
 
 
 # ------------------------------------------------------------ 回滚复核

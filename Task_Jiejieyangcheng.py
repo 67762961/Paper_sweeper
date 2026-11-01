@@ -17,8 +17,6 @@ from Lib import (
     Screenshot_window,
     Match_models_in_image,
     Match_models_in_image_all,
-    Image_fingerprint,
-    Fingerprint_same,
     jiejie_read_yield,
     run_accounts_task,
     ready_after,
@@ -488,11 +486,12 @@ def Jiyang_scan_list(Hwnd, priority_cards):
              scrolls 是从列表顶部向下滚了几次，row 是该行的匹配框
     """
     Best = {}          # 档位 -> 最优（数字读得出）
-    Fallback = {}      # 档位 -> 第一个命中（数字全都读不出时的兜底，R9）
+    Fallback = {}      # 档位 -> 第一个命中（数字全都读不出时的兜底）
     Scrolls = 0
-    Before = Image_fingerprint(Screenshot_window(Hwnd))
 
-    for screen in range(60):
+    # 100 次是兜底，不是「预计要扫 100 屏」：万一到底判定失效，
+    # 也不会变成死循环。与改动前的轮次上限一致。
+    for screen in range(100):
         Img = Screenshot_window(Hwnd)
 
         # 本屏四档一起找：同一帧上试四张模板，不额外截图
@@ -536,26 +535,23 @@ def Jiyang_scan_list(Hwnd, priority_cards):
                 print("        INFO- ----- {name} 已达封顶 {v}，本档剩余行跳过".format(
                     name=card_name, v=Value))
 
-        # 到底判定沿用原来的 寄养列表末尾.png + 0.001：
-        # 它命中的是「没有卡的空白格子」，与有卡行的得分差一个数量级。
-        # 必须放在处理完本屏候选之后：列表不满一屏时首页就露出空白格，
-        # 若先判到底，第一屏的卡会被直接跳过。
+        # 到底判定：寄养列表末尾.png 命中的是「有头像但没有结界卡图」的空白格子，
+        # 与有卡行的得分差一个数量级。必须放在处理完本屏候选之后：
+        # 列表不满一屏时首页就露出空白格，若先判到底，第一屏的卡会被跳过。
         End_hit = Match_models_in_image(Img, [("末尾", "./pic/guild/寄养列表末尾.png")], 0.001)
         if End_hit:
             print("        INFO-", End_hit[0][2], "已经到寄养列表末尾")
             break
 
+        # 滚动前必须把鼠标放回列表上：pyautogui.scroll 是发给鼠标位置的，
+        # 鼠标若停在页签或别处，滚轮不会作用到列表，画面不动会被误当成「到底」。
+        List_hit = Match_models_in_image(Img, [("列表", "./pic/guild/寄养列表.png")], 0.05)
+        if List_hit:
+            Move_to_range(Hwnd, List_hit[0][1])
+
         Scroll_print(Hwnd, -3)
         Sleep_quiet(0.8)
         Scrolls += 1
-
-        # 滚完画面没变说明已经滚不动了。这与「到底」不是一回事：
-        # 到底由空白格判定，这里只是防止在列表末尾空转 60 次。
-        After = Image_fingerprint(Screenshot_window(Hwnd))
-        if Fingerprint_same(Before, After):
-            print("        INFO- ----- 已滚不动，列表到头")
-            break
-        Before = After
 
     # 档间按优先级取第一个有结果的档位：勾玉与体力单位不同，不互比大小，
     # 所以「六星太鼓 67」胜过「六星斗鱼 151」——因为前者排在前面。
@@ -590,6 +586,12 @@ def Jiyang_goto(Hwnd, Target):
     """
     Steps = Target.get("back", 0)
     for _ in range(Steps):
+        # 与扫描时同理：滚轮作用在鼠标位置，先把它放回列表上，
+        # 否则鼠标停在详情面板上，回滚是滚不动的。
+        List_hit = Match_models_in_image(Screenshot_window(Hwnd),
+                                         [("列表", "./pic/guild/寄养列表.png")], 0.05)
+        if List_hit:
+            Move_to_range(Hwnd, List_hit[0][1])
         Scroll_print(Hwnd, 3)
         Sleep_quiet(0.1)
     if Steps:
