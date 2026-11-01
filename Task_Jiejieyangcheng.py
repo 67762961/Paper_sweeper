@@ -42,9 +42,9 @@ def MainTask_Jiejieyangcheng():
 
 
 # 寄养列表每次滚动的档位（Scroll_print 的单位是「滚轮格」，一屏约 4 行）。
-# 取 5 而不是 3：3 格时相邻两屏有较大重叠，同一行会被反复匹配、重复点开，
-# 既慢又浪费。5 格能保证每行都完整经过一次视窗。
-JIEJIE_SCROLL_STEP = 5
+# 取 6 而不是 3：3 格时相邻两屏有较大重叠，同一行会被反复匹配、重复点开，
+# 既慢又浪费。6 格能保证每行都完整经过一次视窗，重叠又比 5 格少。
+JIEJIE_SCROLL_STEP = 6
 
 
 def Jiejieyangcheng(current_state, Hwnd, Account=None):
@@ -495,6 +495,42 @@ def Jiyang_outranked(Best, card_name, priority_cards):
     return False
 
 
+def Jiyang_type_best(Best, card_name):
+    """同类型里已经读到的最好成绩，一个都没有则返回 None
+
+    为什么不看全部档位：勾玉与体力单位不同，跨类型比大小没有意义。
+    同类型内星级是单调的，所以「同类型目前最高」才是这张卡能不能
+    胜出的真正参照。
+    """
+    Type = jiejie_card_type(card_name)
+    Top = None
+    for Other, Found in Best.items():
+        if Type and jiejie_card_type(Other) != Type:
+            continue
+        if Found["value"] is None:
+            continue
+        if Top is None or Found["value"] > Top["value"]:
+            Top = Found
+    return Top
+
+
+def Jiyang_pick(Best, Fallback, priority_cards):
+    """按优先级裁决：取第一个有结果的档位
+
+    勾玉与体力单位不同，不互比大小，所以「六星太鼓 67」胜过
+    「六星斗鱼 151」——因为前者排在前面。
+
+    :return: (选中记录 或 None, 是否走了兜底)
+    """
+    for card_name, _card_pic in priority_cards:
+        if card_name in Best:
+            return Best[card_name], False
+    for card_name, _card_pic in priority_cards:
+        if card_name in Fallback:
+            return Fallback[card_name], True
+    return None, False
+
+
 def Jiyang_read_panel(Hwnd):
     """读右侧面板的收益数字，等两帧一致再返回
 
@@ -569,13 +605,21 @@ def Jiyang_scan_list(Hwnd, priority_cards):
                     n=screen + 1, name=card_name))
                 continue
 
-            print("        INFO- ----- 第 {n} 屏 {name} 收益 {v}".format(
-                n=screen + 1, name=card_name, v=Value))
-
             if card_name not in Best or Value > Best[card_name]["value"]:
                 Best[card_name] = {
                     "name": card_name, "value": Value, "scrolls": Scrolls, "row": row, "pic": card_pic,
                 }
+
+            # 报一下同类型目前最高，方便对着日志判断这张卡有没有希望胜出。
+            # 只跟同类型比：勾玉与体力单位不同，混在一起看没有意义。
+            Top = Jiyang_type_best(Best, card_name)
+            if Top is None:
+                print("        INFO- ----- 第 {n} 屏 {name} 收益 {v}".format(
+                    n=screen + 1, name=card_name, v=Value))
+            else:
+                print("        INFO- ----- 第 {n} 屏 {name} 收益 {v} 目前最高{top}".format(
+                    n=screen + 1, name=card_name, v=Value, top=Top["value"]))
+
             if Jiyang_at_cap(Best, card_name):
                 print("        INFO- ----- {name} 已达封顶 {v}，本档剩余行跳过".format(
                     name=card_name, v=Value))
@@ -600,19 +644,19 @@ def Jiyang_scan_list(Hwnd, priority_cards):
 
     # 档间按优先级取第一个有结果的档位：勾玉与体力单位不同，不互比大小，
     # 所以「六星太鼓 67」胜过「六星斗鱼 151」——因为前者排在前面。
-    Selected = None
-    for card_name, _card_pic in priority_cards:
-        if card_name in Best:
-            Selected = Best[card_name]
-            break
-    if Selected is None:
-        for card_name, _card_pic in priority_cards:
-            if card_name in Fallback:
-                print("        INFO- ----- {name} 一个数字都没读出，回退成第一个命中".format(name=card_name))
-                Selected = Fallback[card_name]
-                break
+    Selected, Fell_back = Jiyang_pick(Best, Fallback, priority_cards)
     if Selected is None:
         return None
+
+    # 扫完之后紧接着报一次最终选择，紧跟在「已经到寄养列表末尾」下面，
+    # 这样日志一眼就能看到「扫到头了，最后选的是哪张、值多少」。
+    if Selected["value"] is None:
+        print("        INFO- ----- 扫完 当前选中 {name} 收益读不出".format(name=Selected["name"]))
+    else:
+        print("        INFO- ----- 扫完 当前选中 {name} 收益 {v}".format(
+            name=Selected["name"], v=Selected["value"]))
+    if Fell_back:
+        print("        INFO- ----- {name} 一个数字都没读出 回退成第一个命中".format(name=Selected["name"]))
 
     # 扫完停在底部，回滚要向上滚「总次数 - 目标那一屏的次数」次。
     # 这里算好存进去，免得 Jiyang_goto 还要知道扫描总共滚了多少。

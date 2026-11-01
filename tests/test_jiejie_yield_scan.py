@@ -471,6 +471,48 @@ def test_does_not_stop_on_unchanged_screen(fake):
     assert found is not None and found["value"] == 59
 
 
+# ------------------------------------------------------------ 日志可读性
+
+
+def test_logs_current_best_of_same_type(fake, capsys):
+    """每读一个数字都要报「目前最高」，且只跟同类型比
+
+    勾玉与体力单位不同，混在一起报没有意义：斗鱼的 151 不该出现在
+    太鼓那一行里，否则会让人以为 76 落后了。
+    """
+    env = fake(screens=[
+        [_card("六星太鼓", 67)],
+        [_card("六星太鼓", 59)],
+        [_card("六星斗鱼", 118)],
+    ])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+    out = capsys.readouterr().out
+
+    assert "六星太鼓 收益 59 目前最高67" in out, "后读到的低收益要报出同类型最高"
+    assert "六星斗鱼 收益 118 目前最高118" in out, "斗鱼自成一体，不拿太鼓的 67 来比"
+
+
+def test_logs_selected_card_after_reaching_end(fake, capsys):
+    """扫到列表末尾后要紧接着报出最终选中了哪张、收益多少"""
+    env = fake(screens=[[_card("六星太鼓", 67), _card("六星斗鱼", 151)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+    out = capsys.readouterr().out
+
+    assert "扫完 当前选中 六星太鼓 收益 67" in out, "跨类型不互比，取优先级靠前的太鼓"
+
+
+def test_logs_selected_card_when_value_unreadable(fake, capsys):
+    """兜底选中时也要报，且要说清收益读不出，不能显示 None"""
+    env = fake(screens=[[_card("六星太鼓", None)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+    out = capsys.readouterr().out
+
+    assert "扫完 当前选中 六星太鼓 收益读不出" in out
+
+
 # ------------------------------------------------------------ 回滚复核
 
 
