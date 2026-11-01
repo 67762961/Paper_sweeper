@@ -11,14 +11,22 @@ from Lib import (
     Scroll_print,
     Esc_print,
     Sleep_print,
+    Sleep_quiet,
     Move_to_range,
     Click,
+    Screenshot_window,
+    Match_models_in_image,
+    Match_models_in_image_all,
+    Match_models_rows,
+    jiejie_read_yield,
     run_accounts_task,
     ready_after,
     load_jiejie_settings,
     jiejie_card_order,
     jiejie_priority_cards,
     JIEJIE_CARD_LIST_PICS,
+    JIEJIE_YIELD_CAP,
+    jiejie_card_type,
 )
 
 
@@ -31,6 +39,29 @@ def MainTask_Jiejieyangcheng():
         ready_after(6),
         work=lambda Account: Jiejieyangcheng("庭院界面", Find_windows(Account), Account),
     )
+
+
+# 寄养列表每次滚动的档位（Scroll_print 的单位是「滚轮格」，一屏约 4 行）。
+# 取 6 而不是 3：3 格时相邻两屏有较大重叠，同一行会被反复匹配、重复点开，
+# 既慢又浪费。6 格能保证每行都完整经过一次视窗，重叠又比 5 格少。
+JIEJIE_SCROLL_STEP = 6
+
+# 滚完列表后等多久再截图。滚轮翻页之后游戏会重绘整列列表，
+# 同一行的结界卡有可能被刷新成另一种（太鼓 ↔ 斗鱼）。
+#
+# 这里只等「滚轮生效」的时间，不等重绘完成：重绘慢的时候干等太拖时间
+# （整趟下来要白等好几秒）。正确性改由「点开之后、读右侧数字之前
+# 在原地复核一次类型」来保证（见 Jiyang_row_type）——重绘没完就把
+# 这一屏重新识别一遍，比闷头等更准，也更快。
+JIEJIE_SCROLL_WAIT = 0.2
+
+# 点开一行之后、读右侧数字之前，在原地复核卡面类型时的裁切外扩像素。
+# 稍外扩一点，容忍点击时列表的轻微位移。
+JIEJIE_RECHECK_MARGIN = 12
+
+# 同一屏最多重新识别几次。复核不一致说明这一屏还没刷完，
+# 重新识别一遍即可；但要有上限，否则一直不一致就会卡在同一屏。
+JIEJIE_RECHECK_TRIES = 2
 
 
 def Jiejieyangcheng(current_state, Hwnd, Account=None):
@@ -422,13 +453,9 @@ def Yucheng(current_state, Hwnd, priority_cards=None):
             case "寄养任务":
                 Find = Find_Click_windows(Hwnd, "./pic/guild/寄养入口.png", 0.05, "检测到寄养空位", "已经有寄养")
                 if Find:
-                    # 按配置的寄养优先级逐个尝试，顺序由 Lib.jiejie_priority_cards
-                    # 归一化后给出（恒为 4 张卡的一个排列，不会重复）。
-                    Finish = 0
-                    for card_name, card_pic in priority_cards:
-                        Finish = Jiyang("寄养列表", Hwnd, card_pic, card_name)
-                        if Finish:
-                            break
+                    # 四档优先级在 Jiyang 内部一趟扫完再统一裁决，
+                    # 所以这里只调一次，不再按优先级逐个重扫全表。
+                    Finish = Jiyang("寄养列表", Hwnd, priority_cards)
 
                     if Finish:
                         print("        STEP- vvvvv 结束育成")
@@ -448,7 +475,428 @@ def Yucheng(current_state, Hwnd, priority_cards=None):
                     return 1
 
 
-def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
+def Jiyang_at_cap(Best, card_name):
+    """本档是否已经读到该类型的封顶值（读到就不必再点这一档剩下的行）"""
+    Found = Best.get(card_name)
+    if Found is None or Found["value"] is None:
+        return False
+    return Found["value"] >= JIEJIE_YIELD_CAP.get(jiejie_card_type(card_name), 10 ** 6)
+
+
+def Jiyang_outranked(Best, card_name, priority_cards):
+    """本档是否已被同类型的更高档压住（压住了就不必再点本档的行）
+
+    同类型内星级是单调的：六星太鼓 67~76，五星太鼓 59~67，
+    六星斗鱼最低 118，五星斗鱼更低。所以只要同类型的更高档已经读到数字，
+    本档不可能胜出——连 67 对 67 这种相接的情况也算了，因为
+    档间按优先级取第一个有货的，更高档排在前面，读不读本档结果一样。
+
+    跨类型不适用：勾玉与体力单位不同，六星太鼓有货并不影响六星斗鱼。
+
+    :param Best:          已读到的档位 -> 最优记录
+    :param card_name:     当前档位名（六星太鼓 / 五星太鼓 / ...）
+    :param priority_cards: 全部档位，用来判断谁排在谁前面
+    :return:              True 表示本档已被更高档压住
+    """
+    Type = jiejie_card_type(card_name)
+    if not Type:
+        return False
+    for Other, _Other_pic in priority_cards:
+        if Other == card_name:
+            break           # 只往前看：排在后面的档位压不住本档
+        if jiejie_card_type(Other) != Type:
+            continue        # 跨类型不比
+        Found = Best.get(Other)
+        if Found is not None and Found["value"] is not None:
+            return True
+    return False
+
+
+def Jiyang_top_capped(Best, priority_cards):
+    """首选档位是否已经读到封顶值（读到了就整表收工，不必再往下翻）
+
+    首选档位排在所有档位最前面，所以它一旦拿到本类型的封顶值，
+    后面无论扫出什么都不可能比它更优先——「六星太鼓 76」已经是
+    六星太鼓的最高收益，比它更靠后的档位按优先级也赢不了。
+    这时继续往下翻纯属浪费。
+
+    注意只对**首选档位**成立。第二、三、四位读到封顶不能收工：
+    首选档位可能还在后面的屏里没出现。
+
+    :return: True 表示可以收工
+    """
+    if not priority_cards:
+        return False
+    First, _First_pic = priority_cards[0]
+    return Jiyang_at_cap(Best, First)
+
+
+def Jiyang_type_best(Best, card_name):
+    """同类型里已经读到的最好成绩，一个都没有则返回 None
+
+    为什么不看全部档位：勾玉与体力单位不同，跨类型比大小没有意义。
+    同类型内星级是单调的，所以「同类型目前最高」才是这张卡能不能
+    胜出的真正参照。
+    """
+    Type = jiejie_card_type(card_name)
+    Top = None
+    for Other, Found in Best.items():
+        if Type and jiejie_card_type(Other) != Type:
+            continue
+        if Found["value"] is None:
+            continue
+        if Top is None or Found["value"] > Top["value"]:
+            Top = Found
+    return Top
+
+
+def Jiyang_pick(Best, Fallback, priority_cards):
+    """按优先级裁决：取第一个有结果的档位
+
+    勾玉与体力单位不同，不互比大小，所以「六星太鼓 67」胜过
+    「六星斗鱼 151」——因为前者排在前面。
+
+    :return: (选中记录 或 None, 是否走了兜底)
+    """
+    for card_name, _card_pic in priority_cards:
+        if card_name in Best:
+            return Best[card_name], False
+    for card_name, _card_pic in priority_cards:
+        if card_name in Fallback:
+            return Fallback[card_name], True
+    return None, False
+
+
+def Jiyang_read_panel(Hwnd):
+    """读右侧面板的收益数字，等两帧一致再返回
+
+    数字是滚动动画，点开后立刻截图会截到中间帧。所以读两次，
+    两次一致才算数；不一致再等一帧，仍不一致就当作读不出。
+    """
+    First = jiejie_read_yield(Screenshot_window(Hwnd))
+    Sleep_quiet(0.15)
+    Second = jiejie_read_yield(Screenshot_window(Hwnd))
+    if First == Second:
+        return First
+    Sleep_quiet(0.2)
+    Third = jiejie_read_yield(Screenshot_window(Hwnd))
+    return Third if Third == Second else None
+
+
+def Jiyang_after_scroll(Hwnd):
+    """滚完之后等一小会儿再截图，等滚轮生效
+
+    滚轮翻页之后游戏会重绘整列列表，同一行有可能被刷新成另一种卡面
+    （太鼓 ↔ 斗鱼）。这里**不等重绘做完**——重绘慢的时候干等太拖时间
+    （整趟下来白等好几秒）。正确性交给「点开之后、读数字之前
+    在原地复核一次类型」（见 Jiyang_row_type）：重绘没完就把这一屏
+    重新识别一遍，比闷头等更准，也更快。
+
+    :return: 滚动之后的整窗截图（调用方直接用它，不必再截一次）
+    """
+    Sleep_quiet(JIEJIE_SCROLL_WAIT)
+    return Screenshot_window(Hwnd)
+
+
+def Jiyang_row_type(Img, row, priority_cards):
+    """在原来那一行原地重新判一次卡面类型
+
+    只裁这一行附近（外扩 `JIEJIE_RECHECK_MARGIN` 像素），四张模板一起送进
+    `Match_models_rows` 做行内裁决，与扫描时用的是同一把尺子。
+    裁得窄有两个好处：一是快，二是不会把右侧详情面板里那张放大卡面
+    也当成列表里的一行。
+
+    :param row: 扫描时记下的匹配框 [[左上x, 左上y], [右下x, 右下y]]
+    :return:    这一带的卡面类型；那一带已经认不出卡时返回 None
+    """
+    Margin = JIEJIE_RECHECK_MARGIN
+    X0 = max(0, row[0][0] - Margin)
+    Y0 = max(0, row[0][1] - Margin)
+    X1 = min(Img.shape[1], row[1][0] + Margin)
+    Y1 = min(Img.shape[0], row[1][1] + Margin)
+    if X1 - X0 < 8 or Y1 - Y0 < 8:
+        return None
+
+    Models = [(card_name, card_pic) for card_name, card_pic in priority_cards]
+    Found = Match_models_rows(Img[Y0:Y1, X0:X1], Models, 0.05, max_matches=8)
+    if not Found:
+        return None
+
+    # 裁切后的坐标是相对裁切块的，先加回偏移再跟原行比纵向中心。
+    # 取离原行最近的那一条，避免裁切块边缘带进来的邻行冒充。
+    Target = (row[0][1] + row[1][1]) / 2.0
+    Near_name, Near_gap = None, None
+    for name, box, _score in Found:
+        Center = ((box[0][1] + Y0) + (box[1][1] + Y0)) / 2.0
+        Gap = abs(Center - Target)
+        if Near_gap is None or Gap < Near_gap:
+            Near_name, Near_gap = name, Gap
+    # 偏离超过一行高，说明这一行已经不在原处（列表滚了或整屏换了内容）
+    if Near_gap > (row[1][1] - row[0][1]):
+        return None
+    return Near_name
+
+
+def Jiyang_scan_list(Hwnd, priority_cards):
+    """一趟扫完全表：每屏同时试四张模板，点开读数，按档位记录最优
+
+    为什么是一趟而不是四趟：四张模板可以吃同一帧截图，
+    扫四趟等于把同样的滚动与截图做四遍，白白多出三倍时间，
+    而且每多一趟就多一次「扫描期间列表被改动」的机会。
+
+    :return: {"name", "value", "scrolls", "row", "pic"} 或 None
+             scrolls 是从列表顶部向下滚了几次，row 是该行的匹配框
+    """
+    Best = {}          # 档位 -> 最优（数字读得出）
+    Fallback = {}      # 档位 -> 第一个命中（数字全都读不出时的兜底）
+    Scrolls = 0
+    # 滚完之后的那一帧由 Jiyang_after_scroll 交回来，下一屏直接用它，
+    # 省掉一次重复截图。
+    Img = None
+
+    # 100 次是兜底，不是「预计要扫 100 屏」：万一到底判定失效，
+    # 也不会变成死循环。与改动前的轮次上限一致。
+    for screen in range(100):
+        if Img is None:
+            Img = Screenshot_window(Hwnd)
+
+        Clicked_here = False
+        Redone = 0
+        # 复核发现这一屏的卡面在点开时还在变，就把这一屏重新识别一遍。
+        # 正常情况下这里只会跑一轮。
+        while True:
+            # 本屏四档一起找：同一帧上把四张模板一起送进 Match_models_rows，
+            # 由它按行聚类、在行内比分数裁决类型。
+            #
+            # 为什么不能逐张模板各找各的：四张结界卡共用同一个金色托盘与同一排橙色星点，
+            # 一张斗鱼卡在太鼓模板上换个滑窗位置也可能过阈值。逐模板独立搜索时，
+            # 同一行会被两张模板各报一次 → 点两次、记两次账，
+            # 斗鱼的 101 记到「五星太鼓」名下，101 又大于太鼓封顶 76，误触发「已达封顶」。
+            #
+            # 四张模板必须一起参与裁决（哪怕本档已封顶或被压制）：
+            # 少送一张，行内的竞争就不公平，剩下的模板可能把这张卡认成别的类型。
+            # 该不该点这一行，由下面的 at_cap / outranked 判断，与类型识别分开。
+            Models = [(card_name, card_pic) for card_name, card_pic in priority_cards]
+            Pic_of = {card_name: card_pic for card_name, card_pic in Models}
+            Rows = []
+            for card_name, row, _score in Match_models_rows(Img, Models, 0.05, max_matches=8):
+                Rows.append((row[0][1], card_name, Pic_of[card_name], row))
+
+            # 从上到下依次点，与人的阅读顺序一致，也避免上下反复跳
+            Rows.sort(key=lambda item: item[0])
+
+            Redo = False
+            for _y, card_name, card_pic, row in Rows:
+                # 本档已封顶、或已被同类型更高档压住：这一档剩下的行不必再点。
+                # Rows 是本屏一次性收集的，收集时还没发生，所以要在点击前再判一次。
+                if Jiyang_at_cap(Best, card_name) or Jiyang_outranked(Best, card_name, priority_cards):
+                    continue
+
+                Move_to_range(Hwnd, row)
+                Click(Hwnd, row, 1)
+                Clicked_here = True
+
+                # 点开之后、读右侧数字之前，在原地再认一次这一行是什么卡。
+                # 滚轮翻页会让游戏重绘整列列表，同一行的结界卡可能被刷新成
+                # 另一种（太鼓 ↔ 斗鱼）；扫描用的那一帧若是重绘中间态，
+                # 类型就记错了。这里用点开之后的实时画面复核，比干等重绘更快。
+                Now = Jiyang_row_type(Screenshot_window(Hwnd), row, priority_cards)
+                if Now != card_name:
+                    if Redone < JIEJIE_RECHECK_TRIES:
+                        print("        INFO- ----- 第 {n} 屏 {old} 复核成 {new}，这一屏重新识别".format(
+                            n=screen + 1, old=card_name, new=Now or "认不出"))
+                        Redo = True
+                        break
+                    # 复核次数用完还不一致：按复核到的类型继续，
+                    # 总比把这张卡整行丢掉强。认不出卡就跳过这一行。
+                    print("        INFO- ----- 第 {n} 屏 {old} 复核成 {new}，按复核结果记".format(
+                        n=screen + 1, old=card_name, new=Now or "认不出"))
+                    if Now is None:
+                        continue
+                    card_name = Now
+                    card_pic = Pic_of.get(Now, card_pic)
+
+                # 兜底记录放在复核之后：万一这张卡的数字读不出，
+                # 至少还知道「这一档在这个位置有一张」，可以回滚过来点它。
+                Fallback.setdefault(
+                    card_name,
+                    {"name": card_name, "value": None, "scrolls": Scrolls, "row": row, "pic": card_pic},
+                )
+
+                Value = Jiyang_read_panel(Hwnd)
+                if Value is None:
+                    print("        INFO- ----- 第 {n} 屏 {name} 收益读不出，跳过".format(
+                        n=screen + 1, name=card_name))
+                    continue
+
+                # 收益相同时记住后发现的这一张：扫完要往回翻到目标行，
+                # 后发现的离列表底部更近，回滚的步数更少。
+                # 用 >= 而不是 >，就是为了让后来者顶掉同分的前者。
+                if card_name not in Best or Value >= Best[card_name]["value"]:
+                    Best[card_name] = {
+                        "name": card_name, "value": Value, "scrolls": Scrolls, "row": row, "pic": card_pic,
+                    }
+
+                # 报一下同类型目前最高，方便对着日志判断这张卡有没有希望胜出。
+                # 只跟同类型比：勾玉与体力单位不同，混在一起看没有意义。
+                Top = Jiyang_type_best(Best, card_name)
+                if Top is None:
+                    print("        INFO- ----- 第 {n} 屏 {name} 收益 {v}".format(
+                        n=screen + 1, name=card_name, v=Value))
+                else:
+                    print("        INFO- ----- 第 {n} 屏 {name} 收益 {v} 目前最高{top}".format(
+                        n=screen + 1, name=card_name, v=Value, top=Top["value"]))
+
+                if Jiyang_at_cap(Best, card_name):
+                    # 首选档位封顶会紧接着报一次「收工」，这里就不重复报了
+                    if not Jiyang_top_capped(Best, priority_cards):
+                        print("        INFO- ----- {name} 已达封顶 {v}，本档剩余行跳过".format(
+                            name=card_name, v=Value))
+
+            if not Redo:
+                break
+            # 这一屏还在刷，重新截一张再认一遍。重识别期间点过的行会重新匹配，
+            # 但 Best / Fallback 里已经记下的结果不受影响（同分取后发现的）。
+            Redone += 1
+            Img = Screenshot_window(Hwnd)
+
+        # 首选档位已经拿到封顶值，整表收工：它排在所有档位最前面，
+        # 后面扫出什么都不可能比它更优先，继续往下翻纯属浪费。
+        # 放在处理完本屏候选之后，这样同一屏里排在它后面的行不会被漏掉
+        # （虽然那些行按优先级也赢不了，但少一次误判的余地）。
+        if Jiyang_top_capped(Best, priority_cards):
+            First = priority_cards[0][0]
+            print("        INFO- ----- {name} 已到封顶 {v}，首选档位拿满，收工".format(
+                name=First, v=Best[First]["value"]))
+            break
+
+        # 到底判定：寄养列表末尾.png 命中的是「有头像但没有结界卡图」的空白格子，
+        # 与有卡行的得分差一个数量级。必须放在处理完本屏候选之后：
+        # 列表不满一屏时首页就露出空白格，若先判到底，第一屏的卡会被跳过。
+        End_hit = Match_models_in_image(Img, [("末尾", "./pic/guild/寄养列表末尾.png")], 0.001)
+        if End_hit:
+            print("        INFO-", End_hit[0][2], "已经到寄养列表末尾")
+            break
+
+        # 滚动前要保证鼠标落在列表上：pyautogui.scroll 是发给鼠标位置的，
+        # 鼠标若停在页签或详情面板上，滚轮不会作用到列表，画面不动会被误当成「到底」。
+        #
+        # 本屏点过卡的话，鼠标刚刚就落在列表里的某一行上，直接滚就行，
+        # 不必再找一次列表位置。只有整屏一张卡都没点（鼠标还停在上一屏
+        # 的某处，或者停在点过的卡上但那一行已经滚出视窗）时，才把鼠标
+        # 放回列表上。这既省掉一次匹配，也避免了「找不到列表就滚不动」。
+        if not Clicked_here:
+            List_hit = Match_models_in_image(Img, [("列表", "./pic/guild/寄养列表.png")], 0.05)
+            if List_hit:
+                Move_to_range(Hwnd, List_hit[0][1])
+
+        Scroll_print(Hwnd, -JIEJIE_SCROLL_STEP)
+        # 滚完只等一下滚轮生效，不等列表重绘：重绘慢时干等太拖时间。
+        # 重绘途中若把某一行换了卡面，点开之后的原地复核会把它纠回来。
+        # 交回来的那一帧就是下一屏要用的画面，不必再截一次。
+        Img = Jiyang_after_scroll(Hwnd)
+        Scrolls += 1
+
+    # 档间按优先级取第一个有结果的档位：勾玉与体力单位不同，不互比大小，
+    # 所以「六星太鼓 67」胜过「六星斗鱼 151」——因为前者排在前面。
+    Selected, Fell_back = Jiyang_pick(Best, Fallback, priority_cards)
+    if Selected is None:
+        return None
+
+    # 扫完之后紧接着报一次最终选择，紧跟在「已经到寄养列表末尾」下面，
+    # 这样日志一眼就能看到「扫到头了，最后选的是哪张、值多少」。
+    if Selected["value"] is None:
+        print("        INFO- ----- 扫完 当前选中 {name} 收益读不出".format(name=Selected["name"]))
+    else:
+        print("        INFO- ----- 扫完 当前选中 {name} 收益 {v}".format(
+            name=Selected["name"], v=Selected["value"]))
+    if Fell_back:
+        print("        INFO- ----- {name} 一个数字都没读出 回退成第一个命中".format(name=Selected["name"]))
+
+    # 扫完停在底部，回滚要向上滚「总次数 - 目标那一屏的次数」次。
+    # 这里算好存进去，免得 Jiyang_goto 还要知道扫描总共滚了多少。
+    Selected["back"] = max(0, Scrolls - Selected["scrolls"])
+    return Selected
+
+
+def Jiyang_goto(Hwnd, Target, priority_cards=None):
+    """从列表底部向上滚回目标那一屏，复核类型与数字后再确认
+
+    扫描时从顶部一路向下滚，滚到目标那一屏时记下了当时滚了几次（scrolls）。
+    扫完停在底部，所以要向上滚「总次数 - 目标次数」次才能回到目标屏。
+    落点不靠绝对坐标，靠模板重新定位。
+
+    :param priority_cards: 四档模板。复核类型时四张一起参与裁决，
+                           少送几张的话，别的卡可能在目标模板上蒙混过关。
+                           传 None 时退化成只用目标自己那张（仅供测试用）。
+    :return: True 表示已经点中目标行；False 表示回滚后对不上
+    """
+    Steps = Target.get("back", 0)
+    if Steps:
+        # 与扫描时同理：滚轮作用在鼠标位置，先把它放回列表上，
+        # 否则鼠标停在详情面板上，回滚是滚不动的。
+        # 归位只需要做一次——滚动不会移动鼠标，只要第一下落在列表上，
+        # 后面几轮就都还在列表上。
+        List_hit = Match_models_in_image(Screenshot_window(Hwnd),
+                                         [("列表", "./pic/guild/寄养列表.png")], 0.05)
+        if List_hit:
+            Move_to_range(Hwnd, List_hit[0][1])
+    for _ in range(Steps):
+        Scroll_print(Hwnd, JIEJIE_SCROLL_STEP)
+        Sleep_quiet(0.1)
+    if Steps:
+        # 回滚也是滚动，同样会重绘。这里只等滚轮生效，落点对不对
+        # 交给下面点开后的复核——与扫描时同一套判据。
+        Img = Jiyang_after_scroll(Hwnd)
+    else:
+        Img = Screenshot_window(Hwnd)
+
+    Hits = Match_models_in_image_all(Img, Target["pic"], 0.05, 8)
+    if not Hits:
+        Hits = [Target["row"]]
+
+    for row in Hits:
+        Move_to_range(Hwnd, row)
+        Click(Hwnd, row, 1)
+        # 重绘没做完时，定位到的这一行可能已经不是目标卡了。
+        # 点开之后先认一次类型，类型对不上就不必再读数字。
+        Models = list(priority_cards) if priority_cards else [(Target["name"], Target["pic"])]
+        Now = Jiyang_row_type(Screenshot_window(Hwnd), row, Models)
+        if Now != Target["name"]:
+            continue
+        Value = Jiyang_read_panel(Hwnd)
+        if Value is None:
+            continue
+        if Target["value"] is None or Value == Target["value"]:
+            print("        INFO- ----- 回滚复核通过 收益 {v}".format(v=Value))
+            return True
+
+    print("        INFO- ----- 回滚复核未通过")
+    return False
+
+
+def Jiyang_refresh(Hwnd):
+    """点「跨区」→「好友」刷新寄养列表，顺带把列表带回顶部
+
+    只在「回滚复核失败、要重扫」这一条路上用。复核失败说明列表在扫描
+    期间被好友改动过（撤卡 / 新加卡），此时列表停在底部，直接重扫等于
+    从半中间开始。点这两下既刷新内容，也把列表带回顶部。
+
+    正常流程不刷新：整个流程只进一次列表，进来时本来就在顶部，
+    少点两次也就少一次「刷新导致位置对不上」的机会。
+
+    :return: True 表示两步都点到了
+    """
+    if not Find_Click_windows(Hwnd, "./pic/guild/跨区.png", 0.05, "点击跨区", "点击跨区异常"):
+        return False
+    Sleep_quiet(2)
+    if not Find_Click_windows(Hwnd, "./pic/guild/好友.png", 0.05, "点击好友", "点击好友异常"):
+        return False
+    Sleep_quiet(1)
+    return True
+
+
+def Jiyang(current_state, Hwnd, priority_cards):
     print("        STEP- vvvvv 从{First_state}开始寄养任务".format(First_state=current_state))
     for step in range(30):
         Sleep_print(1)
@@ -478,36 +926,40 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     return 1
 
             case "寄养列表":
-                # 刷新好友结界卡列表
-                Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/guild/跨区.png", 0.05, "点击跨区", "点击跨区异常")
-                Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/guild/好友.png", 0.05, "点击好友", "点击好友异常")
-                # 寻找对应结界卡
-                for times in range(100):
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/寄养列表.png", 0.05, 0)
-                    print("        INFO-", Matchs, "移动到寄养列表")
-                    Move_to_range(Hwnd, Range)
-                    Str1 = "点击" + string
-                    Str2 = "无法点击" + string
-                    Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
-                    Str1 = "再次点击" + string
-                    Str2 = "无法点击" + string
-                    Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
-                    if Find:
-                        if Find_Click_windows(Hwnd, "./pic/guild/进入结界.png", 0.05, "点击进入结界", "点击进入结界异常"):
-                            Sleep_print(2)
-                            break
-                    else:
-                        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/寄养列表末尾.png", 0.001, 0)
-                        if Find:
-                            print("        INFO-", Matchs, "已经到寄养列表末尾")
-                            return 0
-                        else:
-                            print("        INFO-", Matchs, "未到寄养列表末尾")
-                            Scroll_print(Hwnd, -3)
+                # 整个流程只进一次列表，进来时列表本来就是从顶部开始的，
+                # 所以不需要再点「跨区」→「好友」刷新一次：那一步只是为了
+                # 让列表回到顶部，而这里没有「回到顶部」的需求。
+                # 少点两次，也就少一次「刷新导致列表内容变化、扫描位置对不上」的机会。
+                Selected = Jiyang_scan_list(Hwnd, priority_cards)
+                if Selected is None:
+                    print("        INFO- ----- 四个优先级都没有可用结界卡")
+                    return 0
 
-                if Find:
+                # 回滚到选中那一行并进入。回滚后必须复核类型与数字，
+                # 因为扫描期间列表可能被好友改动（撤掉结界卡 / 新加入）。
+                if not Jiyang_goto(Hwnd, Selected, priority_cards):
+                    # 复核失败说明列表在扫描期间被改动过，而扫描已经停在底部。
+                    # 直接重扫等于从半中间开始，所以先点「跨区」→「好友」：
+                    # 既刷新内容，也把列表带回顶部，重扫才有意义。
+                    print("        INFO- ----- 回滚复核失败，刷新列表后重扫一次")
+                    if not Jiyang_refresh(Hwnd):
+                        print("        INFO- ----- 刷新列表失败，放弃本次寄养")
+                        return 0
+                    Selected = Jiyang_scan_list(Hwnd, priority_cards)
+                    if Selected is None:
+                        print("        INFO- ----- 重扫后仍没有可用结界卡")
+                        return 0
+                    if not Jiyang_goto(Hwnd, Selected, priority_cards):
+                        print("        INFO- ----- 重扫后仍无法定位，放弃本次寄养")
+                        return 0
+
+                print(
+                    "        INFO- ----- 选中 {name} 收益 {value}".format(
+                        name=Selected["name"], value=Selected["value"]
+                    )
+                )
+                if Find_Click_windows(Hwnd, "./pic/guild/进入结界.png", 0.05, "点击进入结界", "点击进入结界异常"):
+                    Sleep_print(2)
                     print("        STEP- vvvvv 跳转寄养结界")
                     current_state = "寄养结界"
                 else:
@@ -522,7 +974,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     Sleep_print(0.5)
                     Esc_print(Hwnd)
                     Sleep_print(2)
-                    return Jiyang("结界界面", Hwnd, Jiejieka_Model_path, string)
+                    return Jiyang("结界界面", Hwnd, priority_cards)
                 else:
                     # 进入素材列表
                     if Find_Click_windows(Hwnd, "./pic/guild/全部.png", 0.05, "进入全部式神列表", "正处在素材列表中"):
@@ -541,4 +993,4 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                             Sleep_print(2)
                             Esc_print(Hwnd)
                             Sleep_print(2)
-                            return Jiyang("结界界面", Hwnd, Jiejieka_Model_path, string)
+                            return Jiyang("结界界面", Hwnd, priority_cards)

@@ -80,6 +80,15 @@ def Sleep_print(Wait_time):
         Sleep_print_long(Wait_time)
 
 
+def Sleep_quiet(Wait_time):
+    """可中断的静默等待
+
+    扫描循环里每点一次都要等面板刷新，用 Sleep_print 会把真正的信息淹没掉，
+    所以这里只等不打日志。
+    """
+    _sleep_with_stop(Wait_time)
+
+
 def Scroll_print(Hwnd, length):
     check_stop()
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
@@ -759,6 +768,147 @@ def Match_models_in_image(Img, models, Threshold):
     return Results
 
 
+def Match_models_in_image_all(Img, Model_path, Threshold, max_matches=10):
+    """在同一帧上找出**所有**匹配位置（蒙版法重复匹配）
+
+    Match_models_in_image 对每张模板只返回最像的那一个位置，
+    而寄养列表一屏有 4 行，同一档的卡可能同时出现好几个。
+    这里在匹配成功后把该区域涂黑再找下一个，就能在同一帧上拿全。
+
+    与 Find_multiple_in_windows_Matchs 的区别：那个每次循环都重新截一次窗口，
+    这个只在一张已经截好的图上重复匹配，不额外截图。
+
+    :param Img:         cv2 BGR 图像
+    :param Model_path:  模板路径
+    :param Threshold:   匹配阈值，语义与 Match_model 一致
+    :param max_matches: 最多返回几个
+    :return:            [[左上, 右下], ...]，按从上到下排序
+    """
+    check_stop()
+    Img_work = np.uint8(Img).copy()
+
+    Img_model = _read_template_cached(Model_path)
+    Model_height, Model_width = Img_model.shape[0:2]
+    if Model_height > Img_work.shape[0] or Model_width > Img_work.shape[1]:
+        return []
+
+    Positions = []
+    for _ in range(max_matches):
+        Result = cv2.matchTemplate(Img_work, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED)
+        min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Result)
+        if min_val > Threshold:
+            break
+
+        Left_up = (min_loc[0], min_loc[1])
+        Right_down = (min_loc[0] + Model_width, min_loc[1] + Model_height)
+        Positions.append([Left_up, Right_down])
+
+        # 涂黑已匹配区域，避免同一行被重复找到
+        cv2.rectangle(Img_work, Left_up, Right_down, (0, 0, 0), -1)
+
+    Positions.sort(key=lambda box: box[0][1])
+    return Positions
+
+
+def Match_models_rows(Img, Models, Threshold, max_matches=8):
+    """在一帧上找多个不同模板，并按「行」裁决：一行只出一个类型
+
+    与 Match_models_in_image_all 的区别是**行内竞争**。那个原语是
+    每张模板各自独立搜索，涂黑只在同一张模板自己的循环里生效，
+    所以同一张卡可能被两张模板各报一次（四张结界卡共用金色托盘与
+    橙色星点，一张斗鱼卡在太鼓模板上换个滑窗位置也可能过阈值）。
+    同一行被报两次的后果是：点两次、记两次账，斗鱼的收益记到太鼓名下，
+    而太鼓封顶只有 76，于是又误触发「已达封顶」。
+
+    这里的做法是先把所有命中按纵向聚成行，再在行内比分数取最像的那一张。
+    实测三张真实截图 8 行：真实类型分数 0.0095~0.0254，次优 0.0584~0.1144，
+    余量 6~12 倍，比「先到先得」稳得多。
+
+    :param Img:         cv2 BGR 图像
+    :param Models:      [(名字, 模板路径), ...]
+    :param Threshold:   行内胜出者的分数上限，超过则该行不算命中
+    :param max_matches: 每张模板最多取几个峰
+    :return:            [(名字, [左上, 右下], 得分字符串), ...]，按纵向排序
+    """
+    check_stop()
+    Img_work = np.uint8(Img)
+    Img_height, Img_width = Img_work.shape[0:2]
+
+    # 1) 每张模板只跑一次 matchTemplate，得到全图分数图
+    Maps = []
+    for Name, Model_path in Models:
+        Img_model = _read_template_cached(Model_path)
+        Model_height, Model_width = Img_model.shape[0:2]
+        if Model_height > Img_height or Model_width > Img_width:
+            continue
+        Maps.append({
+            "name": Name,
+            "map": cv2.matchTemplate(Img_work, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED),
+            "width": Model_width,
+            "height": Model_height,
+        })
+
+    # 2) 各取若干峰（非极大抑制只压分数图，不重跑匹配）
+    Peaks = []
+    for Item in Maps:
+        Work = Item["map"].copy()
+        for _ in range(max_matches):
+            min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Work)
+            if min_val > Threshold:
+                break
+            Peaks.append({
+                "name": Item["name"],
+                "score": float(min_val),
+                "x": min_loc[0],
+                "y": min_loc[1],
+                "width": Item["width"],
+                "height": Item["height"],
+            })
+            # 压掉这一带，避免同一处反复取到
+            Half_w = Item["width"] // 2
+            Half_h = Item["height"] // 2
+            cv2.rectangle(
+                Work,
+                (max(0, min_loc[0] - Half_w), max(0, min_loc[1] - Half_h)),
+                (min(Work.shape[1], min_loc[0] + Half_w), min(Work.shape[0], min_loc[1] + Half_h)),
+                1.0,
+                -1,
+            )
+
+    if not Peaks:
+        return []
+
+    # 3) 按纵向中心聚成行
+    Peaks.sort(key=lambda item: item["y"] + item["height"] / 2.0)
+    Rows = []
+    for Peak in Peaks:
+        Center = Peak["y"] + Peak["height"] / 2.0
+        for Row in Rows:
+            if abs(Row["center"] - Center) <= max(Row["heights"]) / 2.0:
+                Row["peaks"].append(Peak)
+                Row["center"] = sum(p["y"] + p["height"] / 2.0 for p in Row["peaks"]) / len(Row["peaks"])
+                Row["heights"].append(Peak["height"])
+                break
+        else:
+            Rows.append({"center": Center, "peaks": [Peak], "heights": [Peak["height"]]})
+
+    # 4) 行内比分数，取最像的那一张
+    Results = []
+    for Row in Rows:
+        Winner = min(Row["peaks"], key=lambda item: item["score"])
+        if Winner["score"] > Threshold:
+            continue
+        Results.append((
+            Winner["name"],
+            [[Winner["x"], Winner["y"]],
+             [Winner["x"] + Winner["width"], Winner["y"] + Winner["height"]]],
+            "{0:.3f}".format(Winner["score"]),
+        ))
+
+    Results.sort(key=lambda item: item[1][0][1])
+    return Results
+
+
 def Image_fingerprint(Img, size=(32, 18)):
     """把图像压成一张小尺寸灰度指纹，用于判断「两帧是不是同一画面」
 
@@ -795,6 +945,277 @@ def Fingerprint_same(Fp_a, Fp_b, Tolerance=3.0):
                       真实滚动远超 10，取 3 能稳稳分开。
     """
     return Fingerprint_diff(Fp_a, Fp_b) <= Tolerance
+
+
+# ---- 收益数字识别（寄养结界右侧面板的「勾玉 +NN」/「体力 +NN」）----
+# 不用 OCR 库：这里的数字是固定字体、固定字号的灰黑字，笔画形状高度一致，
+# 用「连通域切字 + 归一化画布 + 带位移容忍的像素距离」就足够，
+# 而且能明确回答「认不出」（返回 None），不会像 OCR 那样猜一个错的。
+#
+# 实测（四张真实截图，1910x1121 / 1784x932 / 1632x854 / 1618x900）：
+#   同一数字跨图距离 0.000~0.055，不同数字最近 5vs6 = 0.131、1vs4 = 0.148，
+#   所以阈值取 0.10 —— 覆盖实测最差同类（0.055），离最近异类留 30% 缓冲。
+
+JIEJIE_DIGIT_CANVAS = (28, 32)      # 归一化画布 (宽, 高)，按字高等比缩放后居中
+JIEJIE_DIGIT_THRESHOLD = 0.10       # 像素差平方均值上限，超过判「认不出」
+JIEJIE_DIGIT_LUM = 150              # 墨迹判据：亮度上限
+JIEJIE_DIGIT_SAT = 60               # 墨迹判据：最大通道差上限（灰黑字饱和低）
+JIEJIE_YIELD_BOX_X = 0.55           # 数字区粗定位：右半边起点（占窗口宽比例）
+JIEJIE_YIELD_BOX_Y = 0.45           # 数字区粗定位：下半部起点（占窗口高比例）
+JIEJIE_DIGIT_GAP_RATIO = 0.5        # 行内切段的最大字间距（占字高比例）
+
+# 数字模板：pic/guild/收益数字0.png ~ 收益数字9.png，下标即数字本身。
+# 这里刻意写成 10 个字面量而不是 f-string 拼接：tools/check_pics.py 会把
+# f-string 目录整体豁免「死图」检查，写成字面量才能让这 10 张图被真正校验。
+JIEJIE_DIGIT_PICS = {
+    0: "./pic/guild/收益数字0.png",
+    1: "./pic/guild/收益数字1.png",
+    2: "./pic/guild/收益数字2.png",
+    3: "./pic/guild/收益数字3.png",
+    4: "./pic/guild/收益数字4.png",
+    5: "./pic/guild/收益数字5.png",
+    6: "./pic/guild/收益数字6.png",
+    7: "./pic/guild/收益数字7.png",
+    8: "./pic/guild/收益数字8.png",
+    9: "./pic/guild/收益数字9.png",
+}
+
+
+def _digit_ink_mask(Img):
+    """灰度文字的墨迹掩码：足够暗、且三通道差异小
+
+    游戏里的数字是灰黑色，背景是米色面板（R≈200 G≈192 B≈182），
+    按「亮度 < 150 且最大通道差 < 60」就能把文字与背景干净分开，
+    不会把面板上的浅色纹理算进来。
+    """
+    Img = np.asarray(Img, dtype=np.int32)
+    Blue, Green, Red = Img[:, :, 0], Img[:, :, 1], Img[:, :, 2]
+    Lum = 0.299 * Red + 0.587 * Green + 0.114 * Blue
+    Diff = Img.max(axis=2) - Img.min(axis=2)
+    return (Lum < JIEJIE_DIGIT_LUM) & (Diff < JIEJIE_DIGIT_SAT)
+
+
+def _digit_glyphs(Img, Origin_x, Origin_y):
+    """在图像右下区域切出候选字形
+
+    :return: [(x, y, w, h, mask), ...]，坐标是相对整张图的绝对坐标
+    """
+    Sub = Img[Origin_y:, Origin_x:]
+    Mask = _digit_ink_mask(Sub)
+
+    # cv2 的连通域比手写 DFS 快两个数量级，且返回的 stats 直接就是外接框
+    Count, _Labels, Stats, _Centroids = cv2.connectedComponentsWithStats(
+        Mask.astype(np.uint8), connectivity=8
+    )
+
+    Glyphs = []
+    for index in range(1, Count):       # 0 是背景
+        x, y, w, h, _area = Stats[index]
+        # 尺寸过滤：数字高 22~25、宽 8~16（原生分辨率）
+        if h < 14 or h > 44:
+            continue
+        if w < 3 or w > 32:
+            continue
+        # 宽高比过滤：把 `+` 号滤掉（它是 19x21，宽/高≈0.90；数字都 ≤0.68）
+        if w > h * 0.78:
+            continue
+        Glyphs.append(
+            (x + Origin_x, y + Origin_y, w, h, Mask[y:y + h, x:x + w].copy())
+        )
+    return Glyphs
+
+
+def _digit_group_lines(Glyphs):
+    """按垂直重叠把字形聚成行，行内按 x 排序
+
+    :return: [[(x, y, w, h, mask), ...], ...]，按 y 从上到下
+    """
+    Lines = []
+    for Glyph in sorted(Glyphs, key=lambda item: item[1]):
+        Placed = False
+        for Line in Lines:
+            Line_y0 = Line[0][1]
+            Line_y1 = Line[0][1] + Line[0][3]
+            Glyph_y0 = Glyph[1]
+            Glyph_y1 = Glyph[1] + Glyph[3]
+            Overlap = min(Line_y1, Glyph_y1) - max(Line_y0, Glyph_y0)
+            if Overlap > min(Line_y1 - Line_y0, Glyph_y1 - Glyph_y0) * 0.5:
+                Line.append(Glyph)
+                Placed = True
+                break
+        if not Placed:
+            Lines.append([Glyph])
+    return [sorted(Line, key=lambda item: item[0]) for Line in Lines]
+
+
+def _digit_rightmost_run(Line):
+    """行内按间距切段，取最右边那段
+
+    数字是右对齐的，左边混进来的汉字碎片、`+` 号与数字之间有明显空隙；
+    而数字与数字之间只隔 3~10 像素。按「字高的一半」作切分阈值正好分开。
+    """
+    if not Line:
+        return []
+
+    Heights = sorted(Glyph[3] for Glyph in Line)
+    Median = Heights[len(Heights) // 2]
+    Gap_max = max(6, int(round(Median * JIEJIE_DIGIT_GAP_RATIO)))
+
+    Runs = []
+    Current = [Line[0]]
+    for Prev, Glyph in zip(Line, Line[1:]):
+        Gap = Glyph[0] - (Prev[0] + Prev[2])
+        if Gap <= Gap_max:
+            Current.append(Glyph)
+        else:
+            Runs.append(Current)
+            Current = [Glyph]
+    Runs.append(Current)
+
+    # 单字形段不算数字（可能是 `+` 剩下的碎片或标点）
+    Runs = [Run for Run in Runs if len(Run) >= 2]
+    return Runs[-1] if Runs else []
+
+
+def _digit_canvas(Glyph):
+    """把一个字形缩放居中到统一画布，返回 float32 的 0/1 数组
+
+    按高度等比缩放（数字高度一致，宽度才携带信息：1 很窄、0 很宽），
+    所以不能用「拉伸铺满」的方式归一化。
+    """
+    _x, _y, w, h, Mask = Glyph
+    Canvas_w, Canvas_h = JIEJIE_DIGIT_CANVAS
+    Scale = Canvas_h / h
+    New_w = max(1, int(round(w * Scale)))
+    Offset = (Canvas_w - New_w) // 2
+
+    Canvas = np.zeros((Canvas_h, Canvas_w), dtype=np.float32)
+    Source_y = np.clip(
+        ((np.arange(Canvas_h) + 0.5) / Scale).astype(np.int32), 0, h - 1
+    )
+    Source_x = np.clip(
+        ((np.arange(New_w) + 0.5) / Scale).astype(np.int32), 0, w - 1
+    )
+    Canvas[:, Offset:Offset + New_w] = Mask[np.ix_(Source_y, Source_x)].astype(np.float32)
+    return Canvas
+
+
+def _digit_distance(Canvas_a, Canvas_b):
+    """两张画布的像素差平方均值，在 ±2 横移 / ±1 纵移内取最小值
+
+    位移容忍是为了吸收「字形框起点差 1 像素」这种抖动——
+    同一数字重切一次，外接框可能差一格，不放开位移会把它们判成两个数字。
+    """
+    Canvas_h, Canvas_w = Canvas_a.shape
+    Best = float("inf")
+    for dy in (-1, 0, 1):
+        for dx in (-2, -1, 0, 1, 2):
+            Shifted = np.zeros_like(Canvas_b)
+            y0, y1 = max(0, dy), min(Canvas_h, Canvas_h + dy)
+            x0, x1 = max(0, dx), min(Canvas_w, Canvas_w + dx)
+            Shifted[y0:y1, x0:x1] = Canvas_b[y0 - dy:y1 - dy, x0 - dx:x1 - dx]
+            Diff = float(((Canvas_a - Shifted) ** 2).mean())
+            if Diff < Best:
+                Best = Diff
+    return Best
+
+
+def _digit_read_run(Run, Prototypes):
+    """把一个数字段读成整数
+
+    :param Run:        [(x, y, w, h, mask), ...]，同一段里的字形
+    :param Prototypes: {数字: 画布}
+    :return:           读到的整数；任何一个字认不出就返回 None（不猜）
+    """
+    Text = ""
+    for Glyph in Run:
+        Canvas = _digit_canvas(Glyph)
+        Best_digit = -1
+        Best_distance = float("inf")
+        for digit, Prototype in Prototypes.items():
+            distance = _digit_distance(Canvas, Prototype)
+            if distance < Best_distance:
+                Best_distance = distance
+                Best_digit = digit
+        if Best_distance > JIEJIE_DIGIT_THRESHOLD:
+            return None
+        Text += str(Best_digit)
+
+    try:
+        return int(Text)
+    except ValueError:      # 理论上不会发生，防御一下
+        return None
+
+
+def jiejie_read_yield(Img, Box=None):
+    """读寄养结界右侧面板的收益数字（勾玉 / 体力后面的那个数）
+
+    面板上有两行数字：上面是「式神经验 +NNNNN」，下面是「勾玉/体力 +NN」。
+    这里只读**下面那一行**，因为寄养优先级只看勾玉 / 体力。
+
+    :param Img: cv2 BGR 图像（通常来自 Screenshot_window）
+    :param Box: 数字区粗定位 (x, y, w, h)；None 表示按窗口右下区域自动取
+    :return:    收益值；认不出返回 None（调用方必须把 None 当作「没有数据」）
+    """
+    check_stop()
+    Img = np.asarray(Img)
+
+    if Box is None:
+        Height, Width = Img.shape[0:2]
+        Origin_x = int(Width * JIEJIE_YIELD_BOX_X)
+        Origin_y = int(Height * JIEJIE_YIELD_BOX_Y)
+        Region = Img[Origin_y:, Origin_x:]
+    else:
+        x, y, w, h = Box
+        Origin_x, Origin_y = x, y
+        Region = Img[y:y + h, x:x + w]
+
+    if Region.size == 0:
+        return None
+
+    Glyphs = _digit_glyphs(Region, 0, 0)
+    Lines = _digit_group_lines(Glyphs)
+    if len(Lines) < 2:
+        return None
+
+    # 只保留「字高接近最大字高」的行：真正的数字行字号统一，
+    # 而界面上的小图标、标点会形成矮行，先剔掉再取最后一行。
+    Heights = [sorted(g[3] for g in Line)[len(Line) // 2] for Line in Lines]
+    Top = max(Heights)
+    Digit_lines = [Line for Line, Med in zip(Lines, Heights) if Med >= Top * 0.85]
+    if len(Digit_lines) < 2:
+        return None
+
+    # 最后一行就是收益行（上一行是「式神经验 +NNNNN」，字号相同但数值不是收益）
+    Run = _digit_rightmost_run(Digit_lines[-1])
+    if not Run:
+        return None
+
+    Prototypes = _digit_prototypes()
+    return _digit_read_run(Run, Prototypes)
+
+
+_DIGIT_PROTOTYPES = {}
+
+
+def clear_digit_cache():
+    """清空数字模板缓存（测试用）"""
+    _DIGIT_PROTOTYPES.clear()
+
+
+def _digit_prototypes():
+    """载入并缓存 10 张数字原型（灰度 0~1）"""
+    if _DIGIT_PROTOTYPES:
+        return _DIGIT_PROTOTYPES
+
+    for digit, path in JIEJIE_DIGIT_PICS.items():
+        Img = _read_template_cached(path)
+        if Img is None:
+            raise ValueError(f"无法找到数字模板: {path}")
+        Gray = cv2.cvtColor(Img, cv2.COLOR_BGR2GRAY)
+        _DIGIT_PROTOTYPES[digit] = Gray.astype(np.float32) / 255.0
+    return _DIGIT_PROTOTYPES
+
 
 
 def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):
@@ -1215,6 +1636,28 @@ JIEJIE_CARD_LIST_PICS = {
     "太鼓": "./pic/guild/太鼓列表.png",
     "斗鱼": "./pic/guild/斗鱼列表.png",
 }
+
+# 各类型的已知封顶收益（6 小时寄养，含 1.4 倍加成）
+# 太鼓六星满时率 9 勾/时 → 76；斗鱼六星满时率 18 体/时 → 151。
+# 扫到封顶值就说明本档不可能更好，可以提前结束这一档的剩余扫描。
+# 键是「类型」（太鼓/斗鱼），不是「档位」（六星太鼓/五星斗鱼），
+# 因为同一类型的封顶与星级无关——六星封顶就是该类型的上限。
+JIEJIE_YIELD_CAP = {
+    "太鼓": 76,
+    "斗鱼": 151,
+}
+
+
+def jiejie_card_type(priority_name):
+    """从档位名取出类型：``六星太鼓`` → ``太鼓``
+
+    :param priority_name: ``寄养优先级`` 的一项（六星太鼓 / 六星斗鱼 / 五星太鼓 / 五星斗鱼）
+    :return:              类型名；无法识别时返回空串（调用方按「没有封顶」处理）
+    """
+    for name in JIEJIE_CARD_OPTIONS:
+        if name in str(priority_name):
+            return name
+    return ""
 
 
 def normalize_jiejie_card(value, warnings=None):
