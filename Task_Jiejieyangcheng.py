@@ -19,6 +19,8 @@ from Lib import (
     Match_models_in_image_all,
     Match_models_rows,
     jiejie_read_yield,
+    Image_fingerprint,
+    Fingerprint_same,
     run_accounts_task,
     ready_after,
     load_jiejie_settings,
@@ -45,6 +47,24 @@ def MainTask_Jiejieyangcheng():
 # 取 6 而不是 3：3 格时相邻两屏有较大重叠，同一行会被反复匹配、重复点开，
 # 既慢又浪费。6 格能保证每行都完整经过一次视窗，重叠又比 5 格少。
 JIEJIE_SCROLL_STEP = 6
+
+# 滚完列表后要等多久才能截图。滚轮翻页之后游戏会重绘整列列表，
+# 同一行的结界卡有可能被刷新成另一种（太鼓 ↔ 斗鱼）；截到重绘中间帧时，
+# 那一行会一半像太鼓一半像斗鱼，行内比分数也可能判错类型。
+#
+# 0.3 秒只是「重绘应该开始了」的下限，什么时候落定不由我们决定，
+# 所以先等这个下限，再连拍两帧比对——一致才算落定（见 Jiyang_wait_settled）。
+JIEJIE_SETTLE_MIN = 0.3
+
+# 两帧之间隔多久再确认一次
+JIEJIE_SETTLE_PROBE = 0.15
+
+# 最多再确认几次：0.3 + 6 × 0.15 ≈ 1.2 秒封顶，等不到一致就先按当前画面走
+JIEJIE_SETTLE_MAX_TRIES = 6
+
+# 只比对画面左侧这个宽度的列表区。右侧详情面板有数字滚动动画，
+# 把它算进来会让「永远不一致」，每屏都白等满上限。
+JIEJIE_LIST_WIDTH_RATIO = 0.55
 
 
 def Jiejieyangcheng(current_state, Hwnd, Account=None):
@@ -566,6 +586,42 @@ def Jiyang_read_panel(Hwnd):
     return Third if Third == Second else None
 
 
+def Jiyang_list_fingerprint(Img):
+    """只取左侧列表区的指纹，用来判断列表是否已经重绘落定
+
+    为什么不取整窗：右侧详情面板有收益数字的滚动动画，把它算进来
+    两帧永远不一致，每屏都要白等满重试上限。
+    """
+    Width = int(Img.shape[1] * JIEJIE_LIST_WIDTH_RATIO)
+    return Image_fingerprint(Img[:, :Width])
+
+
+def Jiyang_wait_settled(Hwnd):
+    """滚完之后等列表重绘落定，返回落定后的截图
+
+    滚轮翻页会让游戏重绘整列列表，同一行有可能被刷新成另一种卡面
+    （太鼓 ↔ 斗鱼）。截到重绘中间帧时，那一行会一半像太鼓一半像斗鱼，
+    行内比分数也可能判错类型——这正是「点开是斗鱼却记成太鼓」的成因之一。
+
+    做法：先等 0.3 秒（重绘应该已经开始的实测下限），然后连拍两帧比对
+    左侧列表区，一致就认为落定；不一致再等 0.15 秒重试，最多 6 次
+    （约 1.2 秒封顶）。等不到一致就先按当前画面走，不能无限等下去。
+
+    :return: 落定后的整窗截图（调用方直接用它，不必再截一次）
+    """
+    Sleep_quiet(JIEJIE_SETTLE_MIN)
+    Img = Screenshot_window(Hwnd)
+    Before = Jiyang_list_fingerprint(Img)
+    for _ in range(JIEJIE_SETTLE_MAX_TRIES):
+        Sleep_quiet(JIEJIE_SETTLE_PROBE)
+        Img = Screenshot_window(Hwnd)
+        After = Jiyang_list_fingerprint(Img)
+        if Fingerprint_same(Before, After):
+            return Img
+        Before = After
+    return Img
+
+
 def Jiyang_scan_list(Hwnd, priority_cards):
     """一趟扫完全表：每屏同时试四张模板，点开读数，按档位记录最优
 
@@ -579,11 +635,15 @@ def Jiyang_scan_list(Hwnd, priority_cards):
     Best = {}          # 档位 -> 最优（数字读得出）
     Fallback = {}      # 档位 -> 第一个命中（数字全都读不出时的兜底）
     Scrolls = 0
+    # 滚完之后的那一帧由 Jiyang_wait_settled 交回来，下一屏直接用它，
+    # 省掉一次重复截图——刚等落定的那一帧就是最新的。
+    Img = None
 
     # 100 次是兜底，不是「预计要扫 100 屏」：万一到底判定失效，
     # 也不会变成死循环。与改动前的轮次上限一致。
     for screen in range(100):
-        Img = Screenshot_window(Hwnd)
+        if Img is None:
+            Img = Screenshot_window(Hwnd)
 
         # 本屏四档一起找：同一帧上把四张模板一起送进 Match_models_rows，
         # 由它按行聚类、在行内比分数裁决类型。
@@ -681,7 +741,10 @@ def Jiyang_scan_list(Hwnd, priority_cards):
                 Move_to_range(Hwnd, List_hit[0][1])
 
         Scroll_print(Hwnd, -JIEJIE_SCROLL_STEP)
-        Sleep_quiet(0.8)
+        # 滚完之后游戏会重绘列表，同一行可能被刷新成另一种卡面（太鼓 ↔ 斗鱼）。
+        # 必须等重绘落定再截图，否则会截到半张图，行内比分数也可能判错类型。
+        # 交回来的那一帧就是下一屏要用的画面，不必再截一次。
+        Img = Jiyang_wait_settled(Hwnd)
         Scrolls += 1
 
     # 档间按优先级取第一个有结果的档位：勾玉与体力单位不同，不互比大小，
@@ -729,9 +792,12 @@ def Jiyang_goto(Hwnd, Target):
         Scroll_print(Hwnd, JIEJIE_SCROLL_STEP)
         Sleep_quiet(0.1)
     if Steps:
-        Sleep_quiet(1)
+        # 回滚也是滚动，同样会让列表重绘。这里用与扫描时同一套「等落定」，
+        # 否则定位到的行可能还是重绘中间帧里的位置，点开对不上。
+        Img = Jiyang_wait_settled(Hwnd)
+    else:
+        Img = Screenshot_window(Hwnd)
 
-    Img = Screenshot_window(Hwnd)
     Hits = Match_models_in_image_all(Img, Target["pic"], 0.05, 8)
     if not Hits:
         Hits = [Target["row"]]
@@ -748,6 +814,27 @@ def Jiyang_goto(Hwnd, Target):
 
     print("        INFO- ----- 回滚复核未通过")
     return False
+
+
+def Jiyang_refresh(Hwnd):
+    """点「跨区」→「好友」刷新寄养列表，顺带把列表带回顶部
+
+    只在「回滚复核失败、要重扫」这一条路上用。复核失败说明列表在扫描
+    期间被好友改动过（撤卡 / 新加卡），此时列表停在底部，直接重扫等于
+    从半中间开始。点这两下既刷新内容，也把列表带回顶部。
+
+    正常流程不刷新：整个流程只进一次列表，进来时本来就在顶部，
+    少点两次也就少一次「刷新导致位置对不上」的机会。
+
+    :return: True 表示两步都点到了
+    """
+    if not Find_Click_windows(Hwnd, "./pic/guild/跨区.png", 0.05, "点击跨区", "点击跨区异常"):
+        return False
+    Sleep_quiet(2)
+    if not Find_Click_windows(Hwnd, "./pic/guild/好友.png", 0.05, "点击好友", "点击好友异常"):
+        return False
+    Sleep_quiet(1)
+    return True
 
 
 def Jiyang(current_state, Hwnd, priority_cards):
@@ -792,7 +879,13 @@ def Jiyang(current_state, Hwnd, priority_cards):
                 # 回滚到选中那一行并进入。回滚后必须复核数字，
                 # 因为扫描期间列表可能被好友改动（撤掉结界卡 / 新加入）。
                 if not Jiyang_goto(Hwnd, Selected):
-                    print("        INFO- ----- 回滚复核失败，重扫一次")
+                    # 复核失败说明列表在扫描期间被改动过，而扫描已经停在底部。
+                    # 直接重扫等于从半中间开始，所以先点「跨区」→「好友」：
+                    # 既刷新内容，也把列表带回顶部，重扫才有意义。
+                    print("        INFO- ----- 回滚复核失败，刷新列表后重扫一次")
+                    if not Jiyang_refresh(Hwnd):
+                        print("        INFO- ----- 刷新列表失败，放弃本次寄养")
+                        return 0
                     Selected = Jiyang_scan_list(Hwnd, priority_cards)
                     if Selected is None:
                         print("        INFO- ----- 重扫后仍没有可用结界卡")

@@ -50,10 +50,13 @@ class FakeList:
         self.scroll_attempts = 0    # 尝试滚动了几次（含滚不动的）
         self.dead_scrolls = 0       # 其中「鼠标不在列表上」而空转的次数
         self.list_looks = 0         # 「找列表位置」的匹配次数
+        self.sleeps = []            # 每次静默等待的秒数
+        self.trace = []             # 动作顺序：('scroll', 屏号) / ('sleep', 秒) / ('shot', 屏号)
 
     # ---- 截图与匹配 ----
     def screenshot(self, Hwnd):
         """按屏号给出不同画面"""
+        self.trace.append(("shot", self.screen_index))
         img = np.zeros((10, 10, 3), dtype=np.uint8)
         img[:, :, 0] = (self.screen_index * 23 + 5) % 255
         img[:, :, 1] = (self.screen_index * 41 + 9) % 255
@@ -101,6 +104,7 @@ class FakeList:
 
     def scroll(self, Hwnd, length):
         self.scroll_attempts += 1
+        self.trace.append(("scroll", self.screen_index))
         if not self._in_list():
             # 真机就是这个行为：鼠标不在列表上，滚轮落在别处，列表纹丝不动
             self.dead_scrolls += 1
@@ -123,7 +127,8 @@ class FakeList:
         return 1
 
     def sleep(self, seconds):
-        pass
+        self.sleeps.append(seconds)
+        self.trace.append(("sleep", seconds))
 
     # ---- 读数 ----
     def read_yield(self, Img):
@@ -714,3 +719,142 @@ def test_higher_value_still_wins_over_later_one(fake):
 
     assert found["value"] == 76
     assert found["scrolls"] == 0
+
+
+# ------------------------------------------------- 滚动后等重绘再截图
+
+
+def test_waits_for_repaint_after_scroll(fake):
+    """滚完列表后游戏会重绘，必须等重绘落定再截图，否则会截到半张卡"""
+    env = fake(screens=[[_card("六星太鼓", 67)], [_card("六星太鼓", 59)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert env.trace[0] == ("shot", 0)
+    for i, event in enumerate(env.trace):
+        if event[0] != "scroll":
+            continue
+        nxt = env.trace[i + 1:i + 3]
+        assert ("sleep", Task.JIEJIE_SETTLE_MIN) in nxt, \
+            "滚动之后必须先等重绘下限，不能直接截图"
+
+
+def test_settle_min_is_at_least_three_tenths():
+    """0.3 秒是重绘应该开始的下限，不能被改小"""
+    assert Task.JIEJIE_SETTLE_MIN >= 0.3
+
+
+def test_settle_keeps_probing_until_two_frames_agree(fake):
+    """两帧不一致就继续等：重绘没落定不能开始判类型"""
+    env = fake(screens=[[_card("六星太鼓", 67)], [_card("六星太鼓", 59)]])
+    real = env.screenshot
+    state = {"n": 0}
+
+    def jitter(Hwnd):
+        # 前两次截图给不同画面，模拟重绘还在进行
+        state["n"] += 1
+        img = real(Hwnd).copy()
+        if state["n"] <= 2:
+            img[:, :, 0] = state["n"] * 60
+        return img
+
+    Task.Screenshot_window = jitter
+    Task.Jiyang_wait_settled(env)
+
+    probes = [e for e in env.trace if e[0] == "sleep" and e[1] == Task.JIEJIE_SETTLE_PROBE]
+    assert len(probes) >= 2, "两帧不一致必须继续探测，不能第一次就收"
+
+
+def test_settle_gives_up_after_max_tries(fake):
+    """一直不一致也不能无限等下去，必须封顶"""
+    env = fake(screens=[[_card("六星太鼓", 67)]])
+    real = env.screenshot
+    state = {"n": 0}
+
+    def forever_changing(Hwnd):
+        # 每帧都拉开足够的灰度差，保证不会被指纹容差吞掉
+        state["n"] += 1
+        img = real(Hwnd).copy()
+        img[:, :, 0] = (state["n"] * 40) % 256
+        return img
+
+    Task.Screenshot_window = forever_changing
+    Task.Jiyang_wait_settled(env)
+
+    probes = [e for e in env.trace if e[0] == "sleep" and e[1] == Task.JIEJIE_SETTLE_PROBE]
+    assert len(probes) == Task.JIEJIE_SETTLE_MAX_TRIES
+
+
+def test_settle_only_looks_at_list_area(fake):
+    """右侧详情面板有数字动画，只比左侧列表区，否则每屏都白等满上限"""
+    env = fake(screens=[[_card("六星太鼓", 67)]])
+    state = {"n": 0}
+
+    def panel_animating(Hwnd):
+        # 整幅画面在变，但只变右侧——左侧列表其实已经落定
+        state["n"] += 1
+        img = np.zeros((100, 200, 3), dtype=np.uint8)
+        img[:, : int(200 * Task.JIEJIE_LIST_WIDTH_RATIO)] = 30
+        img[:, int(200 * Task.JIEJIE_LIST_WIDTH_RATIO):] = state["n"] * 5 % 200
+        return img
+
+    Task.Screenshot_window = panel_animating
+    Task.Jiyang_wait_settled(env)
+
+    probes = [e for e in env.trace if e[0] == "sleep" and e[1] == Task.JIEJIE_SETTLE_PROBE]
+    assert len(probes) == 1, "左侧没变就该立刻收，不该被右侧动画拖着"
+
+
+def test_settled_frame_reused_by_next_screen(fake):
+    """落定的那一帧直接给下一屏用，不要再多截一次"""
+    env = fake(screens=[[], []])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    shots = [e for e in env.trace if e[0] == "shot"]
+    assert len(shots) == 3, "首屏 1 张 + 滚动后落定 2 张，第二屏不再单独截图"
+
+
+# ------------------------------------------------ 复核失败时刷新列表
+
+
+def _stub_find_click(monkeypatch, found):
+    """替掉 Find_Click_windows，记录点了哪些模板"""
+    calls = []
+
+    def fake_click(Hwnd, Model_path, Threshold, message_F, message_C):
+        calls.append(Model_path)
+        return found.get(Model_path, False)
+
+    monkeypatch.setattr(Task, "Find_Click_windows", fake_click)
+    return calls
+
+
+def test_refresh_clicks_cross_area_then_friend(monkeypatch):
+    """刷新 = 先点跨区再点好友，两步都点到了才算成功"""
+    calls = _stub_find_click(monkeypatch, {
+        "./pic/guild/跨区.png": True,
+        "./pic/guild/好友.png": True,
+    })
+
+    assert Task.Jiyang_refresh("Hwnd") is True
+    assert calls == ["./pic/guild/跨区.png", "./pic/guild/好友.png"]
+
+
+def test_refresh_stops_when_cross_area_missing(monkeypatch):
+    """跨区都点不到就不要去点好友了"""
+    calls = _stub_find_click(monkeypatch, {"./pic/guild/跨区.png": False})
+
+    assert Task.Jiyang_refresh("Hwnd") is False
+    assert calls == ["./pic/guild/跨区.png"]
+
+
+def test_refresh_stops_when_friend_missing(monkeypatch):
+    """跨区点到了但好友点不到，同样算刷新失败"""
+    calls = _stub_find_click(monkeypatch, {
+        "./pic/guild/跨区.png": True,
+        "./pic/guild/好友.png": False,
+    })
+
+    assert Task.Jiyang_refresh("Hwnd") is False
+    assert calls == ["./pic/guild/跨区.png", "./pic/guild/好友.png"]
