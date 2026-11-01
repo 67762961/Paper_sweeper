@@ -814,6 +814,22 @@ JIEJIE_YIELD_BOX_X = 0.55           # 数字区粗定位：右半边起点（占
 JIEJIE_YIELD_BOX_Y = 0.45           # 数字区粗定位：下半部起点（占窗口高比例）
 JIEJIE_DIGIT_GAP_RATIO = 0.5        # 行内切段的最大字间距（占字高比例）
 
+# 数字模板：pic/guild/收益数字0.png ~ 收益数字9.png，下标即数字本身。
+# 这里刻意写成 10 个字面量而不是 f-string 拼接：tools/check_pics.py 会把
+# f-string 目录整体豁免「死图」检查，写成字面量才能让这 10 张图被真正校验。
+JIEJIE_DIGIT_PICS = {
+    0: "./pic/guild/收益数字0.png",
+    1: "./pic/guild/收益数字1.png",
+    2: "./pic/guild/收益数字2.png",
+    3: "./pic/guild/收益数字3.png",
+    4: "./pic/guild/收益数字4.png",
+    5: "./pic/guild/收益数字5.png",
+    6: "./pic/guild/收益数字6.png",
+    7: "./pic/guild/收益数字7.png",
+    8: "./pic/guild/收益数字8.png",
+    9: "./pic/guild/收益数字9.png",
+}
+
 
 def _digit_ink_mask(Img):
     """灰度文字的墨迹掩码：足够暗、且三通道差异小
@@ -952,6 +968,104 @@ def _digit_distance(Canvas_a, Canvas_b):
             if Diff < Best:
                 Best = Diff
     return Best
+
+
+def _digit_read_run(Run, Prototypes):
+    """把一个数字段读成整数
+
+    :param Run:        [(x, y, w, h, mask), ...]，同一段里的字形
+    :param Prototypes: {数字: 画布}
+    :return:           读到的整数；任何一个字认不出就返回 None（不猜）
+    """
+    Text = ""
+    for Glyph in Run:
+        Canvas = _digit_canvas(Glyph)
+        Best_digit = -1
+        Best_distance = float("inf")
+        for digit, Prototype in Prototypes.items():
+            distance = _digit_distance(Canvas, Prototype)
+            if distance < Best_distance:
+                Best_distance = distance
+                Best_digit = digit
+        if Best_distance > JIEJIE_DIGIT_THRESHOLD:
+            return None
+        Text += str(Best_digit)
+
+    try:
+        return int(Text)
+    except ValueError:      # 理论上不会发生，防御一下
+        return None
+
+
+def jiejie_read_yield(Img, Box=None):
+    """读寄养结界右侧面板的收益数字（勾玉 / 体力后面的那个数）
+
+    面板上有两行数字：上面是「式神经验 +NNNNN」，下面是「勾玉/体力 +NN」。
+    这里只读**下面那一行**，因为寄养优先级只看勾玉 / 体力。
+
+    :param Img: cv2 BGR 图像（通常来自 Screenshot_window）
+    :param Box: 数字区粗定位 (x, y, w, h)；None 表示按窗口右下区域自动取
+    :return:    收益值；认不出返回 None（调用方必须把 None 当作「没有数据」）
+    """
+    check_stop()
+    Img = np.asarray(Img)
+
+    if Box is None:
+        Height, Width = Img.shape[0:2]
+        Origin_x = int(Width * JIEJIE_YIELD_BOX_X)
+        Origin_y = int(Height * JIEJIE_YIELD_BOX_Y)
+        Region = Img[Origin_y:, Origin_x:]
+    else:
+        x, y, w, h = Box
+        Origin_x, Origin_y = x, y
+        Region = Img[y:y + h, x:x + w]
+
+    if Region.size == 0:
+        return None
+
+    Glyphs = _digit_glyphs(Region, 0, 0)
+    Lines = _digit_group_lines(Glyphs)
+    if len(Lines) < 2:
+        return None
+
+    # 只保留「字高接近最大字高」的行：真正的数字行字号统一，
+    # 而界面上的小图标、标点会形成矮行，先剔掉再取最后一行。
+    Heights = [sorted(g[3] for g in Line)[len(Line) // 2] for Line in Lines]
+    Top = max(Heights)
+    Digit_lines = [Line for Line, Med in zip(Lines, Heights) if Med >= Top * 0.85]
+    if len(Digit_lines) < 2:
+        return None
+
+    # 最后一行就是收益行（上一行是「式神经验 +NNNNN」，字号相同但数值不是收益）
+    Run = _digit_rightmost_run(Digit_lines[-1])
+    if not Run:
+        return None
+
+    Prototypes = _digit_prototypes()
+    return _digit_read_run(Run, Prototypes)
+
+
+_DIGIT_PROTOTYPES = {}
+
+
+def clear_digit_cache():
+    """清空数字模板缓存（测试用）"""
+    _DIGIT_PROTOTYPES.clear()
+
+
+def _digit_prototypes():
+    """载入并缓存 10 张数字原型（灰度 0~1）"""
+    if _DIGIT_PROTOTYPES:
+        return _DIGIT_PROTOTYPES
+
+    for digit, path in JIEJIE_DIGIT_PICS.items():
+        Img = _read_template_cached(path)
+        if Img is None:
+            raise ValueError(f"无法找到数字模板: {path}")
+        Gray = cv2.cvtColor(Img, cv2.COLOR_BGR2GRAY)
+        _DIGIT_PROTOTYPES[digit] = Gray.astype(np.float32) / 255.0
+    return _DIGIT_PROTOTYPES
+
 
 
 def Find_in_windows_Range(Hwnd, Range, Model_path, Threshold, Flag_show):

@@ -10,7 +10,7 @@ pic/
 ├── common/            # 公用元素：跨多个任务使用的通用界面元素（确定、关闭、获得奖励等）（8 张）
 ├── courtyard/         # 庭院：主界面本身与庭院上的功能入口（逢魔、麒麟、宴会等）（15 张）
 ├── signin/            # 登录收菜：邮件、每日一签、福袋、纸人、免费礼包、友情点（24 张）
-├── guild/             # 结界养成：阴阳寮工资、寄养、结界卡、式神育成、食盒酒壶（42 张）
+├── guild/             # 结界养成：阴阳寮工资、寄养、结界卡、式神育成、食盒酒壶（52 张）
 ├── breakthrough/      # 结界突破（9 张）
 ├── digui/             # 地域鬼王（14 张）
 ├── fengmo/            # 逢魔之时（13 张）
@@ -87,22 +87,22 @@ pic/
 | `邮件.png` | 邮件入口 | `Task_SignIn` |
 | `邮箱.png` | 邮箱界面 | `Task_SignIn` |
 
-## `guild/`（42 张）
+## `guild/`（52 张）
 
 结界养成：阴阳寮工资、寄养、结界卡、式神育成、食盒酒壶
 
 | 图片 | 用途 | 引用模块 |
 | ---- | ---- | ---- |
-| `五星太鼓.png` | 太鼓结界卡 | `Task_Jiejieyangcheng` |
-| `五星斗鱼.png` | 斗鱼结界卡 | `Task_Jiejieyangcheng` |
+| `五星太鼓.png` | 太鼓结界卡 | `Lib` |
+| `五星斗鱼.png` | 斗鱼结界卡 | `Lib` |
 | `体力工资.png` | 体力工资 | `Task_Jiejieyangcheng` |
 | `体力食盒.png` | 体力食盒 | `Task_Jiejieyangcheng` |
 | `全部.png` | 全部列表 | `Task_Jiejieyangcheng` |
-| `六星太鼓.png` | 太鼓结界卡 | `Task_Jiejieyangcheng` |
-| `六星斗鱼.png` | 斗鱼结界卡 | `Task_Jiejieyangcheng` |
+| `六星太鼓.png` | 太鼓结界卡 | `Lib` |
+| `六星斗鱼.png` | 斗鱼结界卡 | `Lib` |
 | `关闭弹窗.png` | 关闭按钮（×） | `Task_Jiejieyangcheng` |
 | `取出.png` | 取出按钮 | `Task_Jiejieyangcheng` |
-| `太鼓列表.png` | 太鼓列表 | `Task_Jiejieyangcheng` |
+| `太鼓列表.png` | 太鼓列表 | `Lib` |
 | `奉为达摩.png` | 达摩素材 | `Task_Jiejieyangcheng` |
 | `好友.png` | 好友界面 | `Task_Jiejieyangcheng` |
 | `寄养入口.png` | 庭院功能入口 | `Task_Jiejieyangcheng` |
@@ -111,8 +111,18 @@ pic/
 | `寄养经验.png` | 寄养 | `Task_Jiejieyangcheng` |
 | `式神育成.png` | 式神育成 | `Task_Jiejieyangcheng` |
 | `提取.png` | 提取按钮 | `Task_Jiejieyangcheng` |
+| `收益数字0.png` |  | `Lib` |
+| `收益数字1.png` |  | `Lib` |
+| `收益数字2.png` |  | `Lib` |
+| `收益数字3.png` |  | `Lib` |
+| `收益数字4.png` |  | `Lib` |
+| `收益数字5.png` |  | `Lib` |
+| `收益数字6.png` |  | `Lib` |
+| `收益数字7.png` |  | `Lib` |
+| `收益数字8.png` |  | `Lib` |
+| `收益数字9.png` |  | `Lib` |
 | `放入式神.png` | 放入式神 | `Task_Jiejieyangcheng` |
-| `斗鱼列表.png` | 斗鱼列表 | `Task_Jiejieyangcheng` |
+| `斗鱼列表.png` | 斗鱼列表 | `Lib` |
 | `星级降序.png` | 星级降序 | `Task_Jiejieyangcheng` |
 | `有寄养位.png` | 寄养 | `Task_Jiejieyangcheng` |
 | `满级达摩.png` | 达摩素材 | `Task_Jiejieyangcheng` |
@@ -292,7 +302,7 @@ pic/
 
 ---
 
-**共 201 张模板图，10 个目录。**
+**共 211 张模板图，10 个目录。**
 
 ## 维护说明
 
