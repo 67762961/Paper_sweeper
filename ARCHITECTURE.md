@@ -724,6 +724,28 @@ TaskRow.config_button（ui/widgets.py）
 
 中文路径通过 `Img_read_ch`（`np.frombuffer` + `cv2.imdecode`）读取。
 
+#### 7.1.1 一帧多用（`Screenshot_window` / `Match_models_in_image`）
+
+上面那条流水线是「识别一次就截一次图」。当同一个画面上要找多个东西时（寄养列表要先定位列表、再找卡、再找按钮），重复截图就成了大头——模板匹配本身只要几十毫秒，`pyautogui.screenshot` 才是瓶颈。
+
+三个原语把这件事拆开：
+
+| 函数 | 作用 |
+| ---- | ---- |
+| `Screenshot_window(Hwnd)` | 只截窗口，返回 cv2 BGR 图像，不匹配、不点击 |
+| `Match_models_in_image(Img, models, Threshold)` | 在一张**已截好**的图上依次试多个模板，返回 `[(名字, [左上, 右下], 得分), ...]`，只含命中项、按得分升序 |
+| `_read_template_cached(path)` | 模板解码缓存，键带 `mtime_ns` + 文件大小，换图立刻失效 |
+
+`Match_models_in_image` 的阈值语义与 `Match_model` 完全一致（`TM_SQDIFF_NORMED`，得分越小越像，`> Threshold` 判失败），所以两者可以互换；`tests/test_lib_match_multi.py` 有一条用例专门断言「拆开后的结果与原函数逐字段相同」。模板比待匹配图还大时直接跳过（否则 `cv2.matchTemplate` 会抛错），文件缺失则照旧抛 `ValueError` / `FileNotFoundError`。
+
+#### 7.1.2 画面指纹（`Image_fingerprint` / `Fingerprint_diff` / `Fingerprint_same`）
+
+`Image_fingerprint` 把画面缩到 32×18 的灰度小图；`Fingerprint_diff` 给两张指纹的平均灰度差，`Fingerprint_same` 用容差（默认 3.0）判「是不是同一画面」。缩小的作用是把压缩噪声与动画抖动平均掉：同一画面带噪声的差值约 1~2，真滚动则远超 10，中间有很宽的判别带。
+
+**不要直接比指纹字节串**——同一画面带一点噪声时字节未必全等（早先版本量化后比字节，就栽在这里）。
+
+用途是判断「画面是否稳定」（例如点开右侧面板后等它停止变化），**不要拿它当「列表是否到底」的判据**：列表到底的正确语义是「某一行有头像但没有结界卡图」，而画面不变只是「滚不动了」的间接现象，两者不等价。到底判定仍用 `寄养列表末尾.png`。
+
 ### 7.2 界面状态机
 
 典型模式：
