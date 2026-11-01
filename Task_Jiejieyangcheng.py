@@ -586,6 +586,7 @@ def Jiyang_scan_list(Hwnd, priority_cards):
         # 从上到下依次点，与人的阅读顺序一致，也避免上下反复跳
         Rows.sort(key=lambda item: item[0])
 
+        Clicked_here = False
         for _y, card_name, card_pic, row in Rows:
             # 本档已封顶、或已被同类型更高档压住：这一档剩下的行不必再点。
             # Rows 是本屏一次性收集的，收集时还没发生，所以要在点击前再判一次。
@@ -599,6 +600,7 @@ def Jiyang_scan_list(Hwnd, priority_cards):
 
             Move_to_range(Hwnd, row)
             Click(Hwnd, row, 1)
+            Clicked_here = True
             Value = Jiyang_read_panel(Hwnd)
             if Value is None:
                 print("        INFO- ----- 第 {n} 屏 {name} 收益读不出，跳过".format(
@@ -632,11 +634,17 @@ def Jiyang_scan_list(Hwnd, priority_cards):
             print("        INFO-", End_hit[0][2], "已经到寄养列表末尾")
             break
 
-        # 滚动前必须把鼠标放回列表上：pyautogui.scroll 是发给鼠标位置的，
-        # 鼠标若停在页签或别处，滚轮不会作用到列表，画面不动会被误当成「到底」。
-        List_hit = Match_models_in_image(Img, [("列表", "./pic/guild/寄养列表.png")], 0.05)
-        if List_hit:
-            Move_to_range(Hwnd, List_hit[0][1])
+        # 滚动前要保证鼠标落在列表上：pyautogui.scroll 是发给鼠标位置的，
+        # 鼠标若停在页签或详情面板上，滚轮不会作用到列表，画面不动会被误当成「到底」。
+        #
+        # 本屏点过卡的话，鼠标刚刚就落在列表里的某一行上，直接滚就行，
+        # 不必再找一次列表位置。只有整屏一张卡都没点（鼠标还停在上一屏
+        # 的某处，或者停在点过的卡上但那一行已经滚出视窗）时，才把鼠标
+        # 放回列表上。这既省掉一次匹配，也避免了「找不到列表就滚不动」。
+        if not Clicked_here:
+            List_hit = Match_models_in_image(Img, [("列表", "./pic/guild/寄养列表.png")], 0.05)
+            if List_hit:
+                Move_to_range(Hwnd, List_hit[0][1])
 
         Scroll_print(Hwnd, -JIEJIE_SCROLL_STEP)
         Sleep_quiet(0.8)
@@ -674,13 +682,16 @@ def Jiyang_goto(Hwnd, Target):
     :return: True 表示已经点中目标行；False 表示回滚后对不上
     """
     Steps = Target.get("back", 0)
-    for _ in range(Steps):
+    if Steps:
         # 与扫描时同理：滚轮作用在鼠标位置，先把它放回列表上，
         # 否则鼠标停在详情面板上，回滚是滚不动的。
+        # 归位只需要做一次——滚动不会移动鼠标，只要第一下落在列表上，
+        # 后面几轮就都还在列表上。
         List_hit = Match_models_in_image(Screenshot_window(Hwnd),
                                          [("列表", "./pic/guild/寄养列表.png")], 0.05)
         if List_hit:
             Move_to_range(Hwnd, List_hit[0][1])
+    for _ in range(Steps):
         Scroll_print(Hwnd, JIEJIE_SCROLL_STEP)
         Sleep_quiet(0.1)
     if Steps:
@@ -735,16 +746,10 @@ def Jiyang(current_state, Hwnd, priority_cards):
                     return 1
 
             case "寄养列表":
-                # 刷新好友结界卡列表。点「跨区」再点「好友」除了刷新内容，
-                # 还顺带把列表带回顶部，所以刷新之后不必再手动滚回顶部。
-                # 刷新只做这一次：扫描与回滚之间不再刷新，
-                # 否则扫描时记下的位置会与回滚时的列表对不上。
-                Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/guild/跨区.png", 0.05, "点击跨区", "点击跨区异常")
-                Sleep_print(2)
-                Find_Click_windows(Hwnd, "./pic/guild/好友.png", 0.05, "点击好友", "点击好友异常")
-                Sleep_print(1)
-
+                # 整个流程只进一次列表，进来时列表本来就是从顶部开始的，
+                # 所以不需要再点「跨区」→「好友」刷新一次：那一步只是为了
+                # 让列表回到顶部，而这里没有「回到顶部」的需求。
+                # 少点两次，也就少一次「刷新导致列表内容变化、扫描位置对不上」的机会。
                 Selected = Jiyang_scan_list(Hwnd, priority_cards)
                 if Selected is None:
                     print("        INFO- ----- 四个优先级都没有可用结界卡")

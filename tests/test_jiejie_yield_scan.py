@@ -35,8 +35,9 @@ class FakeList:
     「列表到头」的成因，所以假环境必须能复现它。
     """
 
-    # 列表模板在画面里的位置（假坐标）
-    LIST_BOX = [[100, 200], [300, 280]]
+    # 列表模板在画面里的位置（假坐标）。各行都落在这个区域内：
+    # 点过左边某一行之后，鼠标本来就在列表上，可以直接滚。
+    LIST_BOX = [[0, 0], [300, 200]]
 
     def __init__(self, screens, ended=None):
         self.screens = screens
@@ -44,9 +45,11 @@ class FakeList:
         self.screen_index = 0
         self.clicked = []           # [(屏号, 行号)]
         self.screens_visited = []
-        self.mouse = (0, 0)         # 鼠标当前所在的假坐标
+        # 初始鼠标停在列表外（真机上停「好友」页签就是这么个状态）
+        self.mouse = (500, 500)
         self.scroll_attempts = 0    # 尝试滚动了几次（含滚不动的）
         self.dead_scrolls = 0       # 其中「鼠标不在列表上」而空转的次数
+        self.list_looks = 0         # 「找列表位置」的匹配次数
 
     # ---- 截图与匹配 ----
     def screenshot(self, Hwnd):
@@ -62,6 +65,7 @@ class FakeList:
         if name == "末尾":
             return [("末尾", [[0, 0], [1, 1]], "0.000")] if self.ended[self.screen_index] else []
         if name == "列表":
+            self.list_looks += 1
             return [("列表", self.LIST_BOX, "0.000")]
         return []
 
@@ -300,25 +304,58 @@ def test_outranked_ignores_tiers_behind(fake):
     assert len(env.clicked) == 1
 
 
-# -------------------------------------------------- 滚动前必须把鼠标归位
+# ------------------------------------------- 滚动前只在必要时把鼠标归位
 
 
-def test_mouse_returns_to_list_before_scrolling(fake):
-    """一屏没有本档的卡时，滚动前也要把鼠标放回列表，否则滚轮落空
+def test_no_list_lookup_when_card_was_clicked(fake):
+    """本屏点过卡，鼠标就在列表里，不必再找一次列表位置
+
+    点卡时 Move_to_range 已经把鼠标落在列表的某一行上，
+    再匹配一次「寄养列表」纯属浪费——一屏一次，全表扫下来是可观的开销。
+    """
+    env = fake(screens=[[_card("六星太鼓", 67)], [_card("六星太鼓", 59)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert env.list_looks == 0, "点过卡就不该再找列表位置"
+    assert env.dead_scrolls == 0, "鼠标本来就在列表上，不该有空滚"
+
+
+def test_list_lookup_when_nothing_clicked(fake):
+    """整屏一张卡都没点，鼠标位置不可信，必须先把鼠标放回列表
 
     这是真机上暴露过的 bug：只有「找到卡」时才 Move_to_range，
     某屏一张卡都没匹配上时鼠标还停在页签上，滚轮滚不动列表，
     两帧相同就被误判成「列表到头」，扫描提前结束。
     """
     env = fake(screens=[
-        [_card("五星斗鱼", 151)],     # 本屏没有六星卡，但列表还没到底
+        [],
         [_card("六星太鼓", 67)],
     ])
 
-    found = Task.Jiyang_scan_list(env, PRIORITY)
+    Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert env.dead_scrolls == 0, "不能有「鼠标不在列表上」的空滚"
-    assert found is not None and found["value"] == 67, "必须扫到第二屏"
+    assert env.list_looks >= 1, "没点过卡时必须找一次列表位置"
+    assert env.dead_scrolls == 0, "归位之后滚轮必须真的作用到列表"
+    assert env.screens_visited == [1], "空白屏也必须能滚下去"
+
+
+def test_list_lookup_when_all_rows_skipped(fake):
+    """本屏的行全被压住没点，同样要归位鼠标
+
+    「有行但没点」与「没有行」在鼠标位置上是一回事：
+    上一屏点完卡之后鼠标停在那一行，这一屏的卡可能已经滚出视窗。
+    """
+    env = fake(screens=[
+        [_card("六星太鼓", 67)],
+        [_card("五星太鼓", 59)],        # 被六星太鼓压住，不会点
+        [_card("六星太鼓", 76)],
+    ])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert env.list_looks >= 1, "整屏都没点卡，要归位鼠标"
+    assert env.dead_scrolls == 0
 
 
 def test_scroll_actually_moves_when_no_card_on_screen(fake):
