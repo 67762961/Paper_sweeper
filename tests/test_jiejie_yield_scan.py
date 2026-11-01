@@ -66,12 +66,26 @@ class FakeList:
         return []
 
     def match_all(self, Img, Model_path, Threshold, max_matches=10):
-        """只返回属于 Model_path 对应档位的行"""
+        """只返回属于 Model_path 对应档位的行（回滚定位用）"""
         card_name = Model_path.rsplit("/", 1)[-1].replace(".png", "")
         rows = []
         for i, (name, _value) in enumerate(self.screens[self.screen_index]):
             if name == card_name:
                 rows.append([[0, 40 * i], [100, 40 * i + 30]])
+        return rows
+
+    def match_rows(self, Img, Models, Threshold, max_matches=8):
+        """本屏每一行只报一次，类型由行内比分数决出
+
+        真机上四张模板共用托盘与星点，逐张模板各找各的会把同一行报两次；
+        Match_models_rows 的职责就是聚行后在行内裁决。这里模拟它的结果：
+        每行只出一条，类型是该行的真实类型。
+        """
+        card_names = {name for name, _pic in Models}
+        rows = []
+        for i, (name, _value) in enumerate(self.screens[self.screen_index]):
+            if name in card_names:
+                rows.append((name, [[0, 40 * i], [100, 40 * i + 30]], "0.010"))
         return rows
 
     # ---- 交互 ----
@@ -122,6 +136,7 @@ def fake(monkeypatch):
         monkeypatch.setattr(Task, "Screenshot_window", env.screenshot)
         monkeypatch.setattr(Task, "Match_models_in_image", env.match_one)
         monkeypatch.setattr(Task, "Match_models_in_image_all", env.match_all)
+        monkeypatch.setattr(Task, "Match_models_rows", env.match_rows)
         monkeypatch.setattr(Task, "jiejie_read_yield", env.read_yield)
         monkeypatch.setattr(Task, "Scroll_print", env.scroll)
         monkeypatch.setattr(Task, "Move_to_range", env.move)

@@ -810,6 +810,105 @@ def Match_models_in_image_all(Img, Model_path, Threshold, max_matches=10):
     return Positions
 
 
+def Match_models_rows(Img, Models, Threshold, max_matches=8):
+    """在一帧上找多个不同模板，并按「行」裁决：一行只出一个类型
+
+    与 Match_models_in_image_all 的区别是**行内竞争**。那个原语是
+    每张模板各自独立搜索，涂黑只在同一张模板自己的循环里生效，
+    所以同一张卡可能被两张模板各报一次（四张结界卡共用金色托盘与
+    橙色星点，一张斗鱼卡在太鼓模板上换个滑窗位置也可能过阈值）。
+    同一行被报两次的后果是：点两次、记两次账，斗鱼的收益记到太鼓名下，
+    而太鼓封顶只有 76，于是又误触发「已达封顶」。
+
+    这里的做法是先把所有命中按纵向聚成行，再在行内比分数取最像的那一张。
+    实测三张真实截图 8 行：真实类型分数 0.0095~0.0254，次优 0.0584~0.1144，
+    余量 6~12 倍，比「先到先得」稳得多。
+
+    :param Img:         cv2 BGR 图像
+    :param Models:      [(名字, 模板路径), ...]
+    :param Threshold:   行内胜出者的分数上限，超过则该行不算命中
+    :param max_matches: 每张模板最多取几个峰
+    :return:            [(名字, [左上, 右下], 得分字符串), ...]，按纵向排序
+    """
+    check_stop()
+    Img_work = np.uint8(Img)
+    Img_height, Img_width = Img_work.shape[0:2]
+
+    # 1) 每张模板只跑一次 matchTemplate，得到全图分数图
+    Maps = []
+    for Name, Model_path in Models:
+        Img_model = _read_template_cached(Model_path)
+        Model_height, Model_width = Img_model.shape[0:2]
+        if Model_height > Img_height or Model_width > Img_width:
+            continue
+        Maps.append({
+            "name": Name,
+            "map": cv2.matchTemplate(Img_work, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED),
+            "width": Model_width,
+            "height": Model_height,
+        })
+
+    # 2) 各取若干峰（非极大抑制只压分数图，不重跑匹配）
+    Peaks = []
+    for Item in Maps:
+        Work = Item["map"].copy()
+        for _ in range(max_matches):
+            min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Work)
+            if min_val > Threshold:
+                break
+            Peaks.append({
+                "name": Item["name"],
+                "score": float(min_val),
+                "x": min_loc[0],
+                "y": min_loc[1],
+                "width": Item["width"],
+                "height": Item["height"],
+            })
+            # 压掉这一带，避免同一处反复取到
+            Half_w = Item["width"] // 2
+            Half_h = Item["height"] // 2
+            cv2.rectangle(
+                Work,
+                (max(0, min_loc[0] - Half_w), max(0, min_loc[1] - Half_h)),
+                (min(Work.shape[1], min_loc[0] + Half_w), min(Work.shape[0], min_loc[1] + Half_h)),
+                1.0,
+                -1,
+            )
+
+    if not Peaks:
+        return []
+
+    # 3) 按纵向中心聚成行
+    Peaks.sort(key=lambda item: item["y"] + item["height"] / 2.0)
+    Rows = []
+    for Peak in Peaks:
+        Center = Peak["y"] + Peak["height"] / 2.0
+        for Row in Rows:
+            if abs(Row["center"] - Center) <= max(Row["heights"]) / 2.0:
+                Row["peaks"].append(Peak)
+                Row["center"] = sum(p["y"] + p["height"] / 2.0 for p in Row["peaks"]) / len(Row["peaks"])
+                Row["heights"].append(Peak["height"])
+                break
+        else:
+            Rows.append({"center": Center, "peaks": [Peak], "heights": [Peak["height"]]})
+
+    # 4) 行内比分数，取最像的那一张
+    Results = []
+    for Row in Rows:
+        Winner = min(Row["peaks"], key=lambda item: item["score"])
+        if Winner["score"] > Threshold:
+            continue
+        Results.append((
+            Winner["name"],
+            [[Winner["x"], Winner["y"]],
+             [Winner["x"] + Winner["width"], Winner["y"] + Winner["height"]]],
+            "{0:.3f}".format(Winner["score"]),
+        ))
+
+    Results.sort(key=lambda item: item[1][0][1])
+    return Results
+
+
 def Image_fingerprint(Img, size=(32, 18)):
     """把图像压成一张小尺寸灰度指纹，用于判断「两帧是不是同一画面」
 

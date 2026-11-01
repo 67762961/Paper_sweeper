@@ -17,6 +17,7 @@ from Lib import (
     Screenshot_window,
     Match_models_in_image,
     Match_models_in_image_all,
+    Match_models_rows,
     jiejie_read_yield,
     run_accounts_task,
     ready_after,
@@ -529,15 +530,22 @@ def Jiyang_scan_list(Hwnd, priority_cards):
     for screen in range(100):
         Img = Screenshot_window(Hwnd)
 
-        # 本屏四档一起找：同一帧上试四张模板，不额外截图
+        # 本屏四档一起找：同一帧上把四张模板一起送进 Match_models_rows，
+        # 由它按行聚类、在行内比分数裁决类型。
+        #
+        # 为什么不能逐张模板各找各的：四张结界卡共用同一个金色托盘与同一排橙色星点，
+        # 一张斗鱼卡在太鼓模板上换个滑窗位置也可能过阈值。逐模板独立搜索时，
+        # 同一行会被两张模板各报一次 → 点两次、记两次账，
+        # 斗鱼的 101 记到「五星太鼓」名下，101 又大于太鼓封顶 76，误触发「已达封顶」。
+        #
+        # 四张模板必须一起参与裁决（哪怕本档已封顶或被压制）：
+        # 少送一张，行内的竞争就不公平，剩下的模板可能把这张卡认成别的类型。
+        # 该不该点这一行，由下面的 at_cap / outranked 判断，与类型识别分开。
+        Models = [(card_name, card_pic) for card_name, card_pic in priority_cards]
+        Pic_of = {card_name: card_pic for card_name, card_pic in Models}
         Rows = []
-        for card_name, card_pic in priority_cards:
-            if Jiyang_at_cap(Best, card_name):
-                continue        # 本档已封顶，这一档剩下的行不必再点
-            if Jiyang_outranked(Best, card_name, priority_cards):
-                continue        # 同类型更高档已有数字，本档不可能胜出
-            for row in Match_models_in_image_all(Img, card_pic, 0.05, max_matches=8):
-                Rows.append((row[0][1], card_name, card_pic, row))
+        for card_name, row, _score in Match_models_rows(Img, Models, 0.05, max_matches=8):
+            Rows.append((row[0][1], card_name, Pic_of[card_name], row))
 
         # 从上到下依次点，与人的阅读顺序一致，也避免上下反复跳
         Rows.sort(key=lambda item: item[0])
