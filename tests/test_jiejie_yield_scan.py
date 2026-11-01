@@ -29,6 +29,9 @@ class FakeList:
     :param screens: 每屏一个列表，元素是 ``(档位名, 收益值)``；
                     收益为 None 表示这张卡的数字读不出
     :param ended:   每一屏是否已经到底（末尾露出空白格）
+    :param flip:    模拟「点开之后卡面被刷新成另一种」：键是 ``(屏号, 行号)``，
+                    值是依次要变过去的档位名列表，每点一次前进一格。
+                    列表只有一个元素时就是「一直变回同一种」。
 
     另外模拟一个真机上的关键行为：**滚轮只作用于鼠标位置**。
     鼠标不在列表上时 scroll 什么也不做——这正是「滚不动」被误判成
@@ -39,9 +42,15 @@ class FakeList:
     # 点过左边某一行之后，鼠标本来就在列表上，可以直接滚。
     LIST_BOX = [[0, 0], [300, 200]]
 
-    def __init__(self, screens, ended=None):
+    # 假画面尺寸。必须比最长的一行坐标（40 * 行数 + 30）加复核外扩还大，
+    # 否则 Jiyang_row_type 裁出来的块会小于 8 像素而一律返回 None。
+    SHAPE = (300, 400, 3)
+
+    def __init__(self, screens, ended=None, flip=None):
         self.screens = screens
         self.ended = ended or [False] * (len(screens) - 1) + [True]
+        self.flip = flip or {}
+        self.flip_step = {}         # (屏号, 行号) -> 已经变到第几个
         self.screen_index = 0
         self.clicked = []           # [(屏号, 行号)]
         self.screens_visited = []
@@ -57,7 +66,7 @@ class FakeList:
     def screenshot(self, Hwnd):
         """按屏号给出不同画面"""
         self.trace.append(("shot", self.screen_index))
-        img = np.zeros((10, 10, 3), dtype=np.uint8)
+        img = np.zeros(self.SHAPE, dtype=np.uint8)
         img[:, :, 0] = (self.screen_index * 23 + 5) % 255
         img[:, :, 1] = (self.screen_index * 41 + 9) % 255
         return img
@@ -94,6 +103,21 @@ class FakeList:
             if name in card_names:
                 rows.append((name, [[0, 40 * i], [100, 40 * i + 30]], "0.010"))
         return rows
+
+    def recheck(self, Img, row, priority_cards):
+        """替身版的 Jiyang_row_type：按 flip 表返回点开之后看到的类型
+
+        真机上这一行会在滚轮翻页后被游戏重绘成另一种卡面，这里用
+        ``flip`` 表按「点了几次」逐次推进来复现。
+        """
+        index = row[0][1] // 40
+        key = (self.screen_index, index)
+        if key not in self.flip:
+            return self.screens[self.screen_index][index][0]
+        seq = self.flip[key]
+        step = self.flip_step.get(key, 0)
+        self.flip_step[key] = step + 1
+        return seq[min(step, len(seq) - 1)]
 
     # ---- 交互 ----
     def _in_list(self):
@@ -140,12 +164,13 @@ class FakeList:
 def fake(monkeypatch):
     """返回一个工厂：传入屏数据，得到装好假原语的环境"""
 
-    def build(screens, ended=None):
-        env = FakeList(screens, ended)
+    def build(screens, ended=None, flip=None):
+        env = FakeList(screens, ended, flip)
         monkeypatch.setattr(Task, "Screenshot_window", env.screenshot)
         monkeypatch.setattr(Task, "Match_models_in_image", env.match_one)
         monkeypatch.setattr(Task, "Match_models_in_image_all", env.match_all)
         monkeypatch.setattr(Task, "Match_models_rows", env.match_rows)
+        monkeypatch.setattr(Task, "Jiyang_row_type", env.recheck)
         monkeypatch.setattr(Task, "jiejie_read_yield", env.read_yield)
         monkeypatch.setattr(Task, "Scroll_print", env.scroll)
         monkeypatch.setattr(Task, "Move_to_range", env.move)
@@ -721,11 +746,11 @@ def test_higher_value_still_wins_over_later_one(fake):
     assert found["scrolls"] == 0
 
 
-# ------------------------------------------------- 滚动后等重绘再截图
+# ------------------------------------------------- 滚动后只等滚轮生效
 
 
-def test_waits_for_repaint_after_scroll(fake):
-    """滚完列表后游戏会重绘，必须等重绘落定再截图，否则会截到半张卡"""
+def test_waits_for_scroll_after_scrolling(fake):
+    """滚完只等一下滚轮生效，不再硬等重绘：重绘慢时干等太拖时间"""
     env = fake(screens=[[_card("六星太鼓", 67)], [_card("六星太鼓", 59)]])
 
     Task.Jiyang_scan_list(env, PRIORITY)
@@ -735,84 +760,144 @@ def test_waits_for_repaint_after_scroll(fake):
         if event[0] != "scroll":
             continue
         nxt = env.trace[i + 1:i + 3]
-        assert ("sleep", Task.JIEJIE_SETTLE_MIN) in nxt, \
-            "滚动之后必须先等重绘下限，不能直接截图"
+        assert ("sleep", Task.JIEJIE_SCROLL_WAIT) in nxt, \
+            "滚动之后必须先等一下滚轮生效，不能立刻截图"
 
 
-def test_settle_min_is_at_least_three_tenths():
-    """0.3 秒是重绘应该开始的下限，不能被改小"""
-    assert Task.JIEJIE_SETTLE_MIN >= 0.3
+def test_scroll_wait_is_short():
+    """只等滚轮生效，不等重绘：0.5 秒硬等实测太慢，改回 0.2 秒"""
+    assert Task.JIEJIE_SCROLL_WAIT == 0.2
 
 
-def test_settle_keeps_probing_until_two_frames_agree(fake):
-    """两帧不一致就继续等：重绘没落定不能开始判类型"""
-    env = fake(screens=[[_card("六星太鼓", 67)], [_card("六星太鼓", 59)]])
-    real = env.screenshot
-    state = {"n": 0}
-
-    def jitter(Hwnd):
-        # 前两次截图给不同画面，模拟重绘还在进行
-        state["n"] += 1
-        img = real(Hwnd).copy()
-        if state["n"] <= 2:
-            img[:, :, 0] = state["n"] * 60
-        return img
-
-    Task.Screenshot_window = jitter
-    Task.Jiyang_wait_settled(env)
-
-    probes = [e for e in env.trace if e[0] == "sleep" and e[1] == Task.JIEJIE_SETTLE_PROBE]
-    assert len(probes) >= 2, "两帧不一致必须继续探测，不能第一次就收"
-
-
-def test_settle_gives_up_after_max_tries(fake):
-    """一直不一致也不能无限等下去，必须封顶"""
+def test_after_scroll_waits_once_then_shoots(fake):
+    """滚完的做法是「等一次、截一张」，不连拍比对指纹"""
     env = fake(screens=[[_card("六星太鼓", 67)]])
-    real = env.screenshot
-    state = {"n": 0}
+    before = len(env.trace)
 
-    def forever_changing(Hwnd):
-        # 每帧都拉开足够的灰度差，保证不会被指纹容差吞掉
-        state["n"] += 1
-        img = real(Hwnd).copy()
-        img[:, :, 0] = (state["n"] * 40) % 256
-        return img
+    Task.Jiyang_after_scroll(env)
 
-    Task.Screenshot_window = forever_changing
-    Task.Jiyang_wait_settled(env)
-
-    probes = [e for e in env.trace if e[0] == "sleep" and e[1] == Task.JIEJIE_SETTLE_PROBE]
-    assert len(probes) == Task.JIEJIE_SETTLE_MAX_TRIES
+    after = env.trace[before:]
+    assert after == [("sleep", Task.JIEJIE_SCROLL_WAIT), ("shot", 0)], \
+        "只该等一次再截一张，不该反复探测"
 
 
-def test_settle_only_looks_at_list_area(fake):
-    """右侧详情面板有数字动画，只比左侧列表区，否则每屏都白等满上限"""
-    env = fake(screens=[[_card("六星太鼓", 67)]])
-    state = {"n": 0}
-
-    def panel_animating(Hwnd):
-        # 整幅画面在变，但只变右侧——左侧列表其实已经落定
-        state["n"] += 1
-        img = np.zeros((100, 200, 3), dtype=np.uint8)
-        img[:, : int(200 * Task.JIEJIE_LIST_WIDTH_RATIO)] = 30
-        img[:, int(200 * Task.JIEJIE_LIST_WIDTH_RATIO):] = state["n"] * 5 % 200
-        return img
-
-    Task.Screenshot_window = panel_animating
-    Task.Jiyang_wait_settled(env)
-
-    probes = [e for e in env.trace if e[0] == "sleep" and e[1] == Task.JIEJIE_SETTLE_PROBE]
-    assert len(probes) == 1, "左侧没变就该立刻收，不该被右侧动画拖着"
-
-
-def test_settled_frame_reused_by_next_screen(fake):
-    """落定的那一帧直接给下一屏用，不要再多截一次"""
+def test_after_scroll_frame_reused_by_next_screen(fake):
+    """滚完那一帧直接给下一屏用，不要再多截一次"""
     env = fake(screens=[[], []])
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
     shots = [e for e in env.trace if e[0] == "shot"]
-    assert len(shots) == 3, "首屏 1 张 + 滚动后落定 2 张，第二屏不再单独截图"
+    assert len(shots) == 2, "首屏 1 张 + 滚动后 1 张，第二屏不再单独截图"
+
+
+# ------------------------------------------------ 点开后原地复核类型
+
+
+def test_recheck_mismatch_redoes_screen(fake):
+    """点开后类型变了：这一屏重新识别，最后按复核到的类型记账
+
+    滚轮翻页会让游戏重绘整列列表，扫描用的那一帧若是重绘中间态，
+    类型就会记错。复核到不一致时必须把这一屏重来，而不是照着错的记。
+    """
+    env = fake(
+        screens=[[_card("六星太鼓", 67)]],
+        flip={(0, 0): ["六星斗鱼"]},      # 一直变不回来
+    )
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert found["name"] == "六星斗鱼", "复核一直说是斗鱼，就按斗鱼记"
+    assert found["value"] == 67
+    assert len(env.clicked) == 3, "两次重识别 + 第三次按复核结果记账"
+
+
+def test_recheck_settles_then_records_original(fake):
+    """重识别之后卡面恢复原样，就照原类型正常记账"""
+    env = fake(
+        screens=[[_card("六星太鼓", 67)]],
+        flip={(0, 0): ["六星斗鱼", "六星太鼓"]},   # 第一次复核是中间态，之后稳定
+    )
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert found["name"] == "六星太鼓"
+    assert found["value"] == 67
+    assert len(env.clicked) == 2, "重识别一次就够了"
+
+
+def test_recheck_consistent_clicks_once(fake):
+    """复核一致时不能白重来：每张卡只点一次"""
+    env = fake(screens=[[_card("六星太鼓", 67), _card("六星斗鱼", 151)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.clicked) == 2, "两张卡各点一次，复核没发现异常就不重来"
+
+
+def test_recheck_logs_redo(fake, capsys):
+    """重识别要在日志里留一行，方便对不上时回看"""
+    env = fake(
+        screens=[[_card("六星太鼓", 67)]],
+        flip={(0, 0): ["六星斗鱼", "六星太鼓"]},
+    )
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+    out = capsys.readouterr().out
+
+    assert "六星太鼓 复核成 六星斗鱼，这一屏重新识别" in out
+
+
+def test_recheck_gives_up_after_limit(fake, capsys):
+    """复核次数用完后不能再无限重来，要按复核结果往下走"""
+    env = fake(
+        screens=[[_card("六星太鼓", 67)]],
+        flip={(0, 0): ["六星斗鱼"]},
+    )
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+    out = capsys.readouterr().out
+
+    assert "按复核结果记" in out
+    assert len(env.clicked) == Task.JIEJIE_RECHECK_TRIES + 1, \
+        "重识别次数 + 最后按复核结果记的那一次"
+
+
+def test_row_type_crops_around_row(monkeypatch):
+    """复核只裁这一行附近，并且把裁切偏移加回去再比纵向中心"""
+    seen = {}
+
+    def fake_rows(Img, Models, Threshold, max_matches=8):
+        seen["shape"] = Img.shape
+        # 裁切块里的坐标是相对的：这一行在裁切块里 y 约 12（原图 40，裁切从 28 开始）
+        return [("六星太鼓", [[0, 12], [100, 42]], "0.010")]
+
+    monkeypatch.setattr(Task, "Match_models_rows", fake_rows)
+    img = np.zeros((300, 400, 3), dtype=np.uint8)
+    row = [[10, 40], [110, 70]]
+
+    got = Task.Jiyang_row_type(img, row, PRIORITY)
+
+    assert got == "六星太鼓"
+    assert seen["shape"][0] == (70 - 40) + 2 * Task.JIEJIE_RECHECK_MARGIN, "纵向按外扩裁切"
+
+
+def test_row_type_returns_none_when_no_match(monkeypatch):
+    """那一带已经认不出卡时返回 None，调用方据此跳过这一行"""
+    monkeypatch.setattr(Task, "Match_models_rows", lambda *a, **k: [])
+    img = np.zeros((300, 400, 3), dtype=np.uint8)
+
+    assert Task.Jiyang_row_type(img, [[10, 40], [110, 70]], PRIORITY) is None
+
+
+def test_row_type_rejects_far_row(monkeypatch):
+    """裁切块边缘带进来的邻行不能冒充原行：偏离超过一行高就当认不出"""
+    monkeypatch.setattr(Task, "Match_models_rows",
+                        lambda *a, **k: [("六星太鼓", [[0, 60], [100, 90]], "0.010")])
+    img = np.zeros((300, 400, 3), dtype=np.uint8)
+    row = [[10, 40], [110, 70]]      # 原行中心 y=55，裁切后邻行中心 28+75=103
+
+    assert Task.Jiyang_row_type(img, row, PRIORITY) is None
 
 
 # ------------------------------------------------ 复核失败时刷新列表
