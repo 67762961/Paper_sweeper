@@ -201,6 +201,81 @@ def test_clear_template_cache_forces_reread(tmp_path, scene, monkeypatch):
     assert calls == [path]
 
 
+# ------------------------------------------------- Match_models_in_image_all
+
+
+def _make_list_scene(rows):
+    """造一张「列表」图：在固定的几个纵向位置各贴一份同样的卡面"""
+    rng = np.random.default_rng(11)
+    scene = rng.integers(0, 50, size=(400, 320, 3), dtype=np.uint8)
+    patch = np.zeros((60, 80, 3), dtype=np.uint8)
+    cv2.rectangle(patch, (5, 5), (75, 55), (190, 170, 130), -1)
+    cv2.circle(patch, (40, 30), 18, (60, 120, 200), -1)
+    for y in rows:
+        scene[y:y + 60, 100:180] = patch
+    return scene, patch
+
+
+def test_multi_all_finds_every_row(tmp_path):
+    """一屏四行同款卡面时，必须四行全都找出来（Match_models_in_image 只给一行）"""
+    scene, patch = _make_list_scene([20, 120, 220, 320])
+    path = _write_template(tmp_path, "card.png", patch)
+
+    boxes = Lib.Match_models_in_image_all(scene, path, 0.05, max_matches=8)
+
+    assert len(boxes) == 4
+    assert [b[0][1] for b in boxes] == [20, 120, 220, 320], "按从上到下排序"
+
+
+def test_multi_all_respects_max_matches(tmp_path):
+    """上限到了就停，不能无限找下去"""
+    scene, patch = _make_list_scene([20, 120, 220, 320])
+    path = _write_template(tmp_path, "card.png", patch)
+
+    boxes = Lib.Match_models_in_image_all(scene, path, 0.05, max_matches=2)
+
+    assert len(boxes) == 2
+
+
+def test_multi_all_does_not_repeat_same_row(tmp_path):
+    """涂黑之后不能把同一行再报一次，否则会重复点击同一张卡"""
+    scene, patch = _make_list_scene([20, 120])
+    path = _write_template(tmp_path, "card.png", patch)
+
+    boxes = Lib.Match_models_in_image_all(scene, path, 0.05, max_matches=8)
+
+    assert len(boxes) == 2
+    assert len({tuple(b[0]) for b in boxes}) == 2
+
+
+def test_multi_all_returns_empty_when_absent(tmp_path):
+    """画面里没有这张卡时返回空列表，而不是抛异常"""
+    scene, _patch = _make_list_scene([])
+    other = np.full((60, 80, 3), 255, dtype=np.uint8)
+    path = _write_template(tmp_path, "other.png", other)
+
+    assert Lib.Match_models_in_image_all(scene, path, 0.05) == []
+
+
+def test_multi_all_skips_template_larger_than_image(tmp_path):
+    """模板比图还大时返回空，不能让 cv2 抛错"""
+    big = np.zeros((80, 80, 3), dtype=np.uint8)
+    path = _write_template(tmp_path, "big.png", big)
+
+    assert Lib.Match_models_in_image_all(np.zeros((40, 40, 3), dtype=np.uint8), path, 0.05) == []
+
+
+def test_multi_all_does_not_modify_input(tmp_path):
+    """内部会涂黑工作副本，但不能改到调用方传进来的那一帧"""
+    scene, patch = _make_list_scene([20, 120])
+    path = _write_template(tmp_path, "card.png", patch)
+    before = scene.copy()
+
+    Lib.Match_models_in_image_all(scene, path, 0.05)
+
+    assert np.array_equal(scene, before), "调用方的图必须原样"
+
+
 # ------------------------------------------------------- 画面指纹
 
 

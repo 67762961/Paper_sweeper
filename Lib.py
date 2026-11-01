@@ -80,6 +80,15 @@ def Sleep_print(Wait_time):
         Sleep_print_long(Wait_time)
 
 
+def Sleep_quiet(Wait_time):
+    """可中断的静默等待
+
+    扫描循环里每点一次都要等面板刷新，用 Sleep_print 会把真正的信息淹没掉，
+    所以这里只等不打日志。
+    """
+    _sleep_with_stop(Wait_time)
+
+
 def Scroll_print(Hwnd, length):
     check_stop()
     ctypes.windll.user32.SetForegroundWindow(Hwnd)
@@ -757,6 +766,48 @@ def Match_models_in_image(Img, models, Threshold):
 
     Results.sort(key=lambda item: float(item[2]))
     return Results
+
+
+def Match_models_in_image_all(Img, Model_path, Threshold, max_matches=10):
+    """在同一帧上找出**所有**匹配位置（蒙版法重复匹配）
+
+    Match_models_in_image 对每张模板只返回最像的那一个位置，
+    而寄养列表一屏有 4 行，同一档的卡可能同时出现好几个。
+    这里在匹配成功后把该区域涂黑再找下一个，就能在同一帧上拿全。
+
+    与 Find_multiple_in_windows_Matchs 的区别：那个每次循环都重新截一次窗口，
+    这个只在一张已经截好的图上重复匹配，不额外截图。
+
+    :param Img:         cv2 BGR 图像
+    :param Model_path:  模板路径
+    :param Threshold:   匹配阈值，语义与 Match_model 一致
+    :param max_matches: 最多返回几个
+    :return:            [[左上, 右下], ...]，按从上到下排序
+    """
+    check_stop()
+    Img_work = np.uint8(Img).copy()
+
+    Img_model = _read_template_cached(Model_path)
+    Model_height, Model_width = Img_model.shape[0:2]
+    if Model_height > Img_work.shape[0] or Model_width > Img_work.shape[1]:
+        return []
+
+    Positions = []
+    for _ in range(max_matches):
+        Result = cv2.matchTemplate(Img_work, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED)
+        min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Result)
+        if min_val > Threshold:
+            break
+
+        Left_up = (min_loc[0], min_loc[1])
+        Right_down = (min_loc[0] + Model_width, min_loc[1] + Model_height)
+        Positions.append([Left_up, Right_down])
+
+        # 涂黑已匹配区域，避免同一行被重复找到
+        cv2.rectangle(Img_work, Left_up, Right_down, (0, 0, 0), -1)
+
+    Positions.sort(key=lambda box: box[0][1])
+    return Positions
 
 
 def Image_fingerprint(Img, size=(32, 18)):
@@ -1486,6 +1537,28 @@ JIEJIE_CARD_LIST_PICS = {
     "太鼓": "./pic/guild/太鼓列表.png",
     "斗鱼": "./pic/guild/斗鱼列表.png",
 }
+
+# 各类型的已知封顶收益（6 小时寄养，含 1.4 倍加成）
+# 太鼓六星满时率 9 勾/时 → 76；斗鱼六星满时率 18 体/时 → 151。
+# 扫到封顶值就说明本档不可能更好，可以提前结束这一档的剩余扫描。
+# 键是「类型」（太鼓/斗鱼），不是「档位」（六星太鼓/五星斗鱼），
+# 因为同一类型的封顶与星级无关——六星封顶就是该类型的上限。
+JIEJIE_YIELD_CAP = {
+    "太鼓": 76,
+    "斗鱼": 151,
+}
+
+
+def jiejie_card_type(priority_name):
+    """从档位名取出类型：``六星太鼓`` → ``太鼓``
+
+    :param priority_name: ``寄养优先级`` 的一项（六星太鼓 / 六星斗鱼 / 五星太鼓 / 五星斗鱼）
+    :return:              类型名；无法识别时返回空串（调用方按「没有封顶」处理）
+    """
+    for name in JIEJIE_CARD_OPTIONS:
+        if name in str(priority_name):
+            return name
+    return ""
 
 
 def normalize_jiejie_card(value, warnings=None):
