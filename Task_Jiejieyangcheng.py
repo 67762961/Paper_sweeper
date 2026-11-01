@@ -11,14 +11,23 @@ from Lib import (
     Scroll_print,
     Esc_print,
     Sleep_print,
+    Sleep_quiet,
     Move_to_range,
     Click,
+    Screenshot_window,
+    Match_models_in_image,
+    Match_models_in_image_all,
+    Image_fingerprint,
+    Fingerprint_same,
+    jiejie_read_yield,
     run_accounts_task,
     ready_after,
     load_jiejie_settings,
     jiejie_card_order,
     jiejie_priority_cards,
     JIEJIE_CARD_LIST_PICS,
+    JIEJIE_YIELD_CAP,
+    jiejie_card_type,
 )
 
 
@@ -422,13 +431,9 @@ def Yucheng(current_state, Hwnd, priority_cards=None):
             case "寄养任务":
                 Find = Find_Click_windows(Hwnd, "./pic/guild/寄养入口.png", 0.05, "检测到寄养空位", "已经有寄养")
                 if Find:
-                    # 按配置的寄养优先级逐个尝试，顺序由 Lib.jiejie_priority_cards
-                    # 归一化后给出（恒为 4 张卡的一个排列，不会重复）。
-                    Finish = 0
-                    for card_name, card_pic in priority_cards:
-                        Finish = Jiyang("寄养列表", Hwnd, card_pic, card_name)
-                        if Finish:
-                            break
+                    # 四档优先级在 Jiyang 内部一趟扫完再统一裁决，
+                    # 所以这里只调一次，不再按优先级逐个重扫全表。
+                    Finish = Jiyang("寄养列表", Hwnd, priority_cards)
 
                     if Finish:
                         print("        STEP- vvvvv 结束育成")
@@ -448,7 +453,168 @@ def Yucheng(current_state, Hwnd, priority_cards=None):
                     return 1
 
 
-def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
+def Jiyang_at_cap(Best, card_name):
+    """本档是否已经读到该类型的封顶值（读到就不必再点这一档剩下的行）"""
+    Found = Best.get(card_name)
+    if Found is None or Found["value"] is None:
+        return False
+    return Found["value"] >= JIEJIE_YIELD_CAP.get(jiejie_card_type(card_name), 10 ** 6)
+
+
+def Jiyang_read_panel(Hwnd):
+    """读右侧面板的收益数字，等两帧一致再返回
+
+    数字是滚动动画，点开后立刻截图会截到中间帧。所以读两次，
+    两次一致才算数；不一致再等一帧，仍不一致就当作读不出。
+    """
+    First = jiejie_read_yield(Screenshot_window(Hwnd))
+    Sleep_quiet(0.15)
+    Second = jiejie_read_yield(Screenshot_window(Hwnd))
+    if First == Second:
+        return First
+    Sleep_quiet(0.2)
+    Third = jiejie_read_yield(Screenshot_window(Hwnd))
+    return Third if Third == Second else None
+
+
+def Jiyang_scan_list(Hwnd, priority_cards):
+    """一趟扫完全表：每屏同时试四张模板，点开读数，按档位记录最优
+
+    为什么是一趟而不是四趟：四张模板可以吃同一帧截图，
+    扫四趟等于把同样的滚动与截图做四遍，白白多出三倍时间，
+    而且每多一趟就多一次「扫描期间列表被改动」的机会。
+
+    :return: {"name", "value", "scrolls", "row", "pic"} 或 None
+             scrolls 是从列表顶部向下滚了几次，row 是该行的匹配框
+    """
+    Best = {}          # 档位 -> 最优（数字读得出）
+    Fallback = {}      # 档位 -> 第一个命中（数字全都读不出时的兜底，R9）
+    Scrolls = 0
+    Before = Image_fingerprint(Screenshot_window(Hwnd))
+
+    for screen in range(60):
+        Img = Screenshot_window(Hwnd)
+
+        # 本屏四档一起找：同一帧上试四张模板，不额外截图
+        Rows = []
+        for card_name, card_pic in priority_cards:
+            if Jiyang_at_cap(Best, card_name):
+                continue        # 本档已封顶，这一档剩下的行不必再点
+            for row in Match_models_in_image_all(Img, card_pic, 0.05, max_matches=8):
+                Rows.append((row[0][1], card_name, card_pic, row))
+
+        # 从上到下依次点，与人的阅读顺序一致，也避免上下反复跳
+        Rows.sort(key=lambda item: item[0])
+
+        for _y, card_name, card_pic, row in Rows:
+            # 本档已封顶：这一档剩下的行不必再点。
+            # Rows 是本屏一次性收集的，收集时还没封顶，所以要在点击前再判一次。
+            if Jiyang_at_cap(Best, card_name):
+                continue
+
+            Fallback.setdefault(
+                card_name,
+                {"name": card_name, "value": None, "scrolls": Scrolls, "row": row, "pic": card_pic},
+            )
+
+            Move_to_range(Hwnd, row)
+            Click(Hwnd, row, 1)
+            Value = Jiyang_read_panel(Hwnd)
+            if Value is None:
+                print("        INFO- ----- 第 {n} 屏 {name} 收益读不出，跳过".format(
+                    n=screen + 1, name=card_name))
+                continue
+
+            print("        INFO- ----- 第 {n} 屏 {name} 收益 {v}".format(
+                n=screen + 1, name=card_name, v=Value))
+
+            if card_name not in Best or Value > Best[card_name]["value"]:
+                Best[card_name] = {
+                    "name": card_name, "value": Value, "scrolls": Scrolls, "row": row, "pic": card_pic,
+                }
+            if Jiyang_at_cap(Best, card_name):
+                print("        INFO- ----- {name} 已达封顶 {v}，本档剩余行跳过".format(
+                    name=card_name, v=Value))
+
+        # 到底判定沿用原来的 寄养列表末尾.png + 0.001：
+        # 它命中的是「没有卡的空白格子」，与有卡行的得分差一个数量级。
+        # 必须放在处理完本屏候选之后：列表不满一屏时首页就露出空白格，
+        # 若先判到底，第一屏的卡会被直接跳过。
+        End_hit = Match_models_in_image(Img, [("末尾", "./pic/guild/寄养列表末尾.png")], 0.001)
+        if End_hit:
+            print("        INFO-", End_hit[0][2], "已经到寄养列表末尾")
+            break
+
+        Scroll_print(Hwnd, -3)
+        Sleep_quiet(0.8)
+        Scrolls += 1
+
+        # 滚完画面没变说明已经滚不动了。这与「到底」不是一回事：
+        # 到底由空白格判定，这里只是防止在列表末尾空转 60 次。
+        After = Image_fingerprint(Screenshot_window(Hwnd))
+        if Fingerprint_same(Before, After):
+            print("        INFO- ----- 已滚不动，列表到头")
+            break
+        Before = After
+
+    # 档间按优先级取第一个有结果的档位：勾玉与体力单位不同，不互比大小，
+    # 所以「六星太鼓 67」胜过「六星斗鱼 151」——因为前者排在前面。
+    Selected = None
+    for card_name, _card_pic in priority_cards:
+        if card_name in Best:
+            Selected = Best[card_name]
+            break
+    if Selected is None:
+        for card_name, _card_pic in priority_cards:
+            if card_name in Fallback:
+                print("        INFO- ----- {name} 一个数字都没读出，回退成第一个命中".format(name=card_name))
+                Selected = Fallback[card_name]
+                break
+    if Selected is None:
+        return None
+
+    # 扫完停在底部，回滚要向上滚「总次数 - 目标那一屏的次数」次。
+    # 这里算好存进去，免得 Jiyang_goto 还要知道扫描总共滚了多少。
+    Selected["back"] = max(0, Scrolls - Selected["scrolls"])
+    return Selected
+
+
+def Jiyang_goto(Hwnd, Target):
+    """从列表底部向上滚回目标那一屏，复核数字后再确认
+
+    扫描时从顶部一路向下滚，滚到目标那一屏时记下了当时滚了几次（scrolls）。
+    扫完停在底部，所以要向上滚「总次数 - 目标次数」次才能回到目标屏。
+    落点不靠绝对坐标，靠模板重新定位。
+
+    :return: True 表示已经点中目标行；False 表示回滚后对不上
+    """
+    Steps = Target.get("back", 0)
+    for _ in range(Steps):
+        Scroll_print(Hwnd, 3)
+        Sleep_quiet(0.1)
+    if Steps:
+        Sleep_quiet(1)
+
+    Img = Screenshot_window(Hwnd)
+    Hits = Match_models_in_image_all(Img, Target["pic"], 0.05, 8)
+    if not Hits:
+        Hits = [Target["row"]]
+
+    for row in Hits:
+        Move_to_range(Hwnd, row)
+        Click(Hwnd, row, 1)
+        Value = Jiyang_read_panel(Hwnd)
+        if Value is None:
+            continue
+        if Target["value"] is None or Value == Target["value"]:
+            print("        INFO- ----- 回滚复核通过 收益 {v}".format(v=Value))
+            return True
+
+    print("        INFO- ----- 回滚复核未通过")
+    return False
+
+
+def Jiyang(current_state, Hwnd, priority_cards):
     print("        STEP- vvvvv 从{First_state}开始寄养任务".format(First_state=current_state))
     for step in range(30):
         Sleep_print(1)
@@ -478,36 +644,40 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     return 1
 
             case "寄养列表":
-                # 刷新好友结界卡列表
+                # 刷新好友结界卡列表。点「跨区」再点「好友」除了刷新内容，
+                # 还顺带把列表带回顶部，所以刷新之后不必再手动滚回顶部。
+                # 刷新只做这一次：扫描与回滚之间不再刷新，
+                # 否则扫描时记下的位置会与回滚时的列表对不上。
                 Sleep_print(2)
                 Find_Click_windows(Hwnd, "./pic/guild/跨区.png", 0.05, "点击跨区", "点击跨区异常")
                 Sleep_print(2)
                 Find_Click_windows(Hwnd, "./pic/guild/好友.png", 0.05, "点击好友", "点击好友异常")
-                # 寻找对应结界卡
-                for times in range(100):
-                    Range, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/寄养列表.png", 0.05, 0)
-                    print("        INFO-", Matchs, "移动到寄养列表")
-                    Move_to_range(Hwnd, Range)
-                    Str1 = "点击" + string
-                    Str2 = "无法点击" + string
-                    Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
-                    Str1 = "再次点击" + string
-                    Str2 = "无法点击" + string
-                    Find = Find_Click_windows(Hwnd, Jiejieka_Model_path, 0.05, Str1, Str2)
-                    if Find:
-                        if Find_Click_windows(Hwnd, "./pic/guild/进入结界.png", 0.05, "点击进入结界", "点击进入结界异常"):
-                            Sleep_print(2)
-                            break
-                    else:
-                        Find, Matchs = Find_in_windows_Matchs(Hwnd, "./pic/guild/寄养列表末尾.png", 0.001, 0)
-                        if Find:
-                            print("        INFO-", Matchs, "已经到寄养列表末尾")
-                            return 0
-                        else:
-                            print("        INFO-", Matchs, "未到寄养列表末尾")
-                            Scroll_print(Hwnd, -3)
+                Sleep_print(1)
 
-                if Find:
+                Selected = Jiyang_scan_list(Hwnd, priority_cards)
+                if Selected is None:
+                    print("        INFO- ----- 四个优先级都没有可用结界卡")
+                    return 0
+
+                # 回滚到选中那一行并进入。回滚后必须复核数字，
+                # 因为扫描期间列表可能被好友改动（撤掉结界卡 / 新加入）。
+                if not Jiyang_goto(Hwnd, Selected):
+                    print("        INFO- ----- 回滚复核失败，重扫一次")
+                    Selected = Jiyang_scan_list(Hwnd, priority_cards)
+                    if Selected is None:
+                        print("        INFO- ----- 重扫后仍没有可用结界卡")
+                        return 0
+                    if not Jiyang_goto(Hwnd, Selected):
+                        print("        INFO- ----- 重扫后仍无法定位，放弃本次寄养")
+                        return 0
+
+                print(
+                    "        INFO- ----- 选中 {name} 收益 {value}".format(
+                        name=Selected["name"], value=Selected["value"]
+                    )
+                )
+                if Find_Click_windows(Hwnd, "./pic/guild/进入结界.png", 0.05, "点击进入结界", "点击进入结界异常"):
+                    Sleep_print(2)
                     print("        STEP- vvvvv 跳转寄养结界")
                     current_state = "寄养结界"
                 else:
@@ -522,7 +692,7 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                     Sleep_print(0.5)
                     Esc_print(Hwnd)
                     Sleep_print(2)
-                    return Jiyang("结界界面", Hwnd, Jiejieka_Model_path, string)
+                    return Jiyang("结界界面", Hwnd, priority_cards)
                 else:
                     # 进入素材列表
                     if Find_Click_windows(Hwnd, "./pic/guild/全部.png", 0.05, "进入全部式神列表", "正处在素材列表中"):
@@ -541,4 +711,4 @@ def Jiyang(current_state, Hwnd, Jiejieka_Model_path, string):
                             Sleep_print(2)
                             Esc_print(Hwnd)
                             Sleep_print(2)
-                            return Jiyang("结界界面", Hwnd, Jiejieka_Model_path, string)
+                            return Jiyang("结界界面", Hwnd, priority_cards)
