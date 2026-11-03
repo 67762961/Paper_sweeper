@@ -25,7 +25,7 @@ from Lib import (
     jiejie_card_order,
     jiejie_priority_cards,
     JIEJIE_CARD_LIST_PICS,
-    JIEJIE_YIELD_CAP,
+    jiejie_yield_cap,
     jiejie_card_type,
 )
 
@@ -62,6 +62,19 @@ JIEJIE_RECHECK_MARGIN = 12
 # 同一屏最多重新识别几次。复核不一致说明这一屏还没刷完，
 # 重新识别一遍即可；但要有上限，否则一直不一致就会卡在同一屏。
 JIEJIE_RECHECK_TRIES = 2
+
+# 点开列表里的一行要连点几次。
+#
+# 滚轮翻页后游戏会重绘整列列表，重绘那一瞬点下去会被吞掉，而落空不会报错：
+# 左侧列表没选中任何行、右侧详情面板还停在上张卡上，于是收益被记到这一行名下。
+# 复核类型只能兜住「类型变了」，兜不住「压根没点中」——这行刷新后若仍是
+# 同一类型，复核也会判「一致」。第二次点击时重绘已经结束，一定点得中，
+# 这就是改动前连点两次的原因。
+JIEJIE_CLICK_TIMES = 2
+
+# 两次点击之间的间隔（秒）。改动前的 1 秒偏长，而重绘基本在 0.3~0.5 秒内
+# 结束，留 0.5 秒既够第二次点中，也不至于白等。
+JIEJIE_CLICK_WAIT = 0.5
 
 
 def Jiejieyangcheng(current_state, Hwnd, Account=None):
@@ -476,20 +489,27 @@ def Yucheng(current_state, Hwnd, priority_cards=None):
 
 
 def Jiyang_at_cap(Best, card_name):
-    """本档是否已经读到该类型的封顶值（读到就不必再点这一档剩下的行）"""
+    """本档是否已经读到该档的上限（读到就不必再点这一档剩下的行）
+
+    上限按**档位**取，不是按类型：六星斗鱼能到 151，五星斗鱼最高只到 134。
+    按类型记的话，五星斗鱼读到 134 也够不到斗鱼的 151，这一档的剩余行
+    会被白点一遍。
+    """
+    Cap = jiejie_yield_cap(card_name)
     Found = Best.get(card_name)
-    if Found is None or Found["value"] is None:
+    if Cap is None or Found is None or Found["value"] is None:
         return False
-    return Found["value"] >= JIEJIE_YIELD_CAP.get(jiejie_card_type(card_name), 10 ** 6)
+    return Found["value"] >= Cap
 
 
 def Jiyang_outranked(Best, card_name, priority_cards):
     """本档是否已被同类型的更高档压住（压住了就不必再点本档的行）
 
-    同类型内星级是单调的：六星太鼓 67~76，五星太鼓 59~67，
-    六星斗鱼最低 118，五星斗鱼更低。所以只要同类型的更高档已经读到数字，
-    本档不可能胜出——连 67 对 67 这种相接的情况也算了，因为
-    档间按优先级取第一个有货的，更高档排在前面，读不读本档结果一样。
+    判据是「更高档的数值 >= 本档上限」，不是「更高档有没有数字」：
+    六星斗鱼最低 118，而五星斗鱼最高能到 134，所以 118 压不住五星，
+    要 134 才压得住。太鼓那边六星最低 67 = 五星上限 67，相接也算压住
+    （同值按优先级取靠前的六星），于是「有六星太鼓就不点五星太鼓」
+    天然成立。
 
     跨类型不适用：勾玉与体力单位不同，六星太鼓有货并不影响六星斗鱼。
 
@@ -499,7 +519,8 @@ def Jiyang_outranked(Best, card_name, priority_cards):
     :return:              True 表示本档已被更高档压住
     """
     Type = jiejie_card_type(card_name)
-    if not Type:
+    Cap = jiejie_yield_cap(card_name)
+    if not Type or Cap is None:
         return False
     for Other, _Other_pic in priority_cards:
         if Other == card_name:
@@ -507,7 +528,7 @@ def Jiyang_outranked(Best, card_name, priority_cards):
         if jiejie_card_type(Other) != Type:
             continue        # 跨类型不比
         Found = Best.get(Other)
-        if Found is not None and Found["value"] is not None:
+        if Found is not None and Found["value"] is not None and Found["value"] >= Cap:
             return True
     return False
 
@@ -637,6 +658,24 @@ def Jiyang_row_type(Img, row, priority_cards):
     return Near_name
 
 
+def Jiyang_click_row(Hwnd, row):
+    """点开列表里的一行：连点 `JIEJIE_CLICK_TIMES` 次，间隔 `JIEJIE_CLICK_WAIT`
+
+    为什么要点两次：滚轮翻页后游戏会重绘整列列表，重绘那一瞬点下去会被
+    吞掉，而落空**不会报错**——左侧没选中任何行、右侧详情面板还停在
+    上一张卡上，于是 `Jiyang_read_panel` 读到的是上一张卡的收益。
+    第二次点击时重绘已经结束，一定点得中。
+
+    `Click` 内部自己会 `Move_to_range`，这里不必再移一次鼠标。
+
+    扫描与回滚（`Jiyang_goto`）共用这一个原语：两条路径都会落空，
+    而回滚落空的后果更重——它返回 True 之后紧接着就是点「进入结界」，
+    把上一张卡的数字误认成目标行就等于寄养错卡。
+    """
+    for _ in range(JIEJIE_CLICK_TIMES):
+        Click(Hwnd, row, JIEJIE_CLICK_WAIT)
+
+
 def Jiyang_scan_list(Hwnd, priority_cards):
     """一趟扫完全表：每屏同时试四张模板，点开读数，按档位记录最优
 
@@ -692,8 +731,9 @@ def Jiyang_scan_list(Hwnd, priority_cards):
                 if Jiyang_at_cap(Best, card_name) or Jiyang_outranked(Best, card_name, priority_cards):
                     continue
 
-                Move_to_range(Hwnd, row)
-                Click(Hwnd, row, 1)
+                # 连点两次：重绘那一瞬的点击会被吞掉，而且落空不报错
+                # （右侧面板还停在上张卡上），第二次点击时重绘已结束。
+                Jiyang_click_row(Hwnd, row)
                 Clicked_here = True
 
                 # 点开之后、读右侧数字之前，在原地再认一次这一行是什么卡。
@@ -856,10 +896,13 @@ def Jiyang_goto(Hwnd, Target, priority_cards=None):
         Hits = [Target["row"]]
 
     for row in Hits:
-        Move_to_range(Hwnd, row)
-        Click(Hwnd, row, 1)
+        # 与扫描同一条点击路径，同样会落空，所以同样连点两次。
+        # 这里比扫描更不能容忍落空：下面一旦返回 True，紧接着就是点
+        # 「进入结界」——把上一张卡的数字误认成目标行就等于寄养错卡。
+        Jiyang_click_row(Hwnd, row)
         # 重绘没做完时，定位到的这一行可能已经不是目标卡了。
-        # 点开之后先认一次类型，类型对不上就不必再读数字。
+        # 点开之后先认一次类型，类型对不上就不必再读数字，
+        # 继续试下一个候选行（不直接放弃：候选可能不止一行）。
         Models = list(priority_cards) if priority_cards else [(Target["name"], Target["pic"])]
         Now = Jiyang_row_type(Screenshot_window(Hwnd), row, Models)
         if Now != Target["name"]:
