@@ -52,7 +52,10 @@ class FakeList:
         self.flip = flip or {}
         self.flip_step = {}         # (屏号, 行号) -> 已经变到第几个
         self.screen_index = 0
-        self.clicked = []           # [(屏号, 行号)]
+        self.clicked = []           # 原始点击：[(屏号, 行号)]，连点两次就两条
+        self.opened = []            # 「打开了一行」：同一次打开内的连点只记一条
+        self.open_clicks = 0        # 本次打开已经点了几下（复核/滚动时归零）
+        self.click_waits = []       # 每次点击后等待的秒数
         self.screens_visited = []
         # 初始鼠标停在列表外（真机上停「好友」页签就是这么个状态）
         self.mouse = (500, 500)
@@ -109,7 +112,11 @@ class FakeList:
 
         真机上这一行会在滚轮翻页后被游戏重绘成另一种卡面，这里用
         ``flip`` 表按「点了几次」逐次推进来复现。
+
+        复核发生在连点两次之后，所以这里顺手把「本次打开点了几下」归零，
+        下一次点击就算新开一行。
         """
+        self.open_clicks = 0
         index = row[0][1] // 40
         key = (self.screen_index, index)
         if key not in self.flip:
@@ -147,7 +154,16 @@ class FakeList:
         return self.mouse
 
     def click(self, Hwnd, Loc, Wait):
-        self.clicked.append((self.screen_index, Loc[0][1] // 40))
+        # 真机的 Lib.Click 内部会先 Move_to_range 再点，所以点过一行之后
+        # 鼠标一定落在列表上——这里必须照做，否则滚轮永远滚不动。
+        self.move(Hwnd, Loc)
+        spot = (self.screen_index, Loc[0][1] // 40)
+        self.clicked.append(spot)
+        self.click_waits.append(Wait)
+        # 「打开了一行」按第一次点击记：连点两次是同一次打开，不该算两行。
+        if self.open_clicks == 0:
+            self.opened.append(spot)
+        self.open_clicks += 1
         return 1
 
     def sleep(self, seconds):
@@ -238,7 +254,7 @@ def test_all_tiers_scanned_in_one_pass(fake):
     Task.Jiyang_scan_list(env, PRIORITY)
 
     assert env.screens_visited == [1], "只有一屏可翻，只能滚一次"
-    assert len(env.clicked) == 4, "四张卡各点一次，不多不少"
+    assert len(env.opened) == 4, "四张卡各点一次，不多不少"
 
 
 def test_each_card_clicked_once(fake):
@@ -247,8 +263,8 @@ def test_each_card_clicked_once(fake):
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 2
-    assert len(set(env.clicked)) == 2
+    assert len(env.opened) == 2
+    assert len(set(env.opened)) == 2
 
 
 # ------------------------------------------- 同类型更高档已有数字就不读本档
@@ -260,8 +276,8 @@ def test_six_star_taiko_skips_five_star_taiko(fake):
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 1, "五星太鼓被六星太鼓压住，不该再点开"
-    assert env.clicked == [(0, 0)]
+    assert len(env.opened) == 1, "五星太鼓被六星太鼓压住，不该再点开"
+    assert env.opened == [(0, 0)]
 
 
 def test_six_star_douyu_118_does_not_suppress_five_star(fake):
@@ -274,7 +290,7 @@ def test_six_star_douyu_118_does_not_suppress_five_star(fake):
 
     found = Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 2, "118 < 134，五星斗鱼必须点开"
+    assert len(env.opened) == 2, "118 < 134，五星斗鱼必须点开"
     assert found["name"] == "六星斗鱼", "同值按优先级；这里六星 118 仍然胜出"
     assert found["value"] == 118
 
@@ -285,8 +301,8 @@ def test_six_star_douyu_134_suppresses_five_star(fake):
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 1, "134 已达五星上限，五星不必再点"
-    assert env.clicked == [(0, 0)]
+    assert len(env.opened) == 1, "134 已达五星上限，五星不必再点"
+    assert env.opened == [(0, 0)]
 
 
 def test_lower_tier_still_read_when_higher_tier_absent(fake):
@@ -295,7 +311,7 @@ def test_lower_tier_still_read_when_higher_tier_absent(fake):
 
     found = Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 1
+    assert len(env.opened) == 1
     assert found["name"] == "五星太鼓"
     assert found["value"] == 59
 
@@ -306,7 +322,7 @@ def test_taiko_does_not_suppress_douyu(fake):
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 2, "太鼓与斗鱼互不压制"
+    assert len(env.opened) == 2, "太鼓与斗鱼互不压制"
 
 
 def test_suppression_applies_on_later_screens(fake):
@@ -321,7 +337,7 @@ def test_suppression_applies_on_later_screens(fake):
 
     # 第一屏只有五星（此时还没读到六星，必须读）→ 第二屏读到六星
     # → 第三屏的五星被压住，不该再点
-    assert len(env.clicked) == 2, "读到六星后，后面的五星不再点开"
+    assert len(env.opened) == 2, "读到六星后，后面的五星不再点开"
 
 
 def test_six_star_equal_value_still_suppresses(fake):
@@ -330,7 +346,7 @@ def test_six_star_equal_value_still_suppresses(fake):
 
     found = Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 1
+    assert len(env.opened) == 1
     assert found["name"] == "六星太鼓", "同值时按优先级取靠前的六星"
 
 
@@ -351,7 +367,7 @@ def test_outranked_ignores_tiers_behind(fake):
     found = Task.Jiyang_scan_list(env, custom)
 
     assert found["name"] == "五星太鼓", "五星排第一就选五星，不被后面的六星压住"
-    assert env.clicked[0] == (0, 0), "五星那一行先读"
+    assert env.opened[0] == (0, 0), "五星那一行先读"
 
 
 # ------------------------------------------- 滚动前只在必要时把鼠标归位
@@ -429,7 +445,7 @@ def test_cap_skips_rest_of_that_tier(fake):
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 1, "封顶后不应再点同一档的其他行"
+    assert len(env.opened) == 1, "封顶后不应再点同一档的其他行"
 
 
 def test_cap_does_not_stop_other_tiers(fake):
@@ -438,7 +454,7 @@ def test_cap_does_not_stop_other_tiers(fake):
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 2, "斗鱼那一行仍要点开"
+    assert len(env.opened) == 2, "斗鱼那一行仍要点开"
 
 
 def test_cap_differs_per_card_type(fake):
@@ -671,6 +687,59 @@ def test_goto_rolls_back_from_bottom(fake):
     assert env.screen_index == 0, "向上滚两次应该回到第一屏"
 
 
+def test_goto_clicks_twice(fake):
+    """回滚点开候选行也要连点两次：与扫描走同一个原语
+
+    回滚落空的后果比扫描更重——它返回 True 之后紧接着就是点「进入结界」，
+    把上一张卡的数字误认成目标行就等于寄养错卡。
+    """
+    env = fake(screens=[[_card("六星太鼓", 67)]])
+    target = {"name": "六星太鼓", "value": 67, "scrolls": 0, "back": 0,
+              "row": [[0, 0], [100, 30]], "pic": "./pic/guild/六星太鼓.png"}
+
+    assert Task.Jiyang_goto(env, target) is True
+
+    assert len(env.clicked) == Task.JIEJIE_CLICK_TIMES, "回滚也要连点两次"
+    assert env.click_waits == [Task.JIEJIE_CLICK_WAIT] * Task.JIEJIE_CLICK_TIMES
+
+
+def test_goto_mismatch_tries_next_row(fake):
+    """第一个候选行类型不符时继续试下一个，而不是直接放弃
+
+    直接放弃会白触发一次「刷新 + 重扫」的大动作，而候选本来可能不止一行。
+    """
+    env = fake(
+        screens=[[_card("六星太鼓", 67), _card("六星太鼓", 67)]],
+        flip={(0, 0): ["六星斗鱼"]},        # 第一个候选行复核成斗鱼
+    )
+    target = {"name": "六星太鼓", "value": 67, "scrolls": 0, "back": 0,
+              "row": [[0, 0], [100, 30]], "pic": "./pic/guild/六星太鼓.png"}
+
+    assert Task.Jiyang_goto(env, target) is True, "第二个候选行应当命中"
+    assert len(env.opened) == 2, "两个候选行都试过"
+
+
+def test_clicks_each_row_twice(fake):
+    """每打开一行都要连点两次，间隔 JIEJIE_CLICK_WAIT
+
+    重绘那一瞬的点击会被吞掉，而且落空不报错（右侧面板还停在上张卡上），
+    第二次点击时重绘已结束，一定点得中。
+    """
+    env = fake(screens=[[_card("六星太鼓", 67), _card("六星斗鱼", 151)]])
+
+    Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.opened) == 2, "打开了两行"
+    assert len(env.clicked) == 2 * Task.JIEJIE_CLICK_TIMES, "每行点了两次"
+    assert env.click_waits == [Task.JIEJIE_CLICK_WAIT] * len(env.clicked)
+
+
+def test_click_params_match_plan(fake):
+    """双击参数按计划取值：两次、间隔 0.5 秒"""
+    assert Task.JIEJIE_CLICK_TIMES == 2
+    assert Task.JIEJIE_CLICK_WAIT == 0.5
+
+
 def test_scan_list_computes_back_steps(fake):
     """回滚次数 = 扫描总次数 - 目标那一屏的次数，由扫描自己算好"""
     env = fake(screens=[
@@ -746,7 +815,7 @@ def test_stops_after_scanning_whole_screen(fake):
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 2, "本屏两行都要点，收工发生在处理完本屏之后"
+    assert len(env.opened) == 2, "本屏两行都要点，收工发生在处理完本屏之后"
     assert env.screens_visited == []
 
 
@@ -844,7 +913,7 @@ def test_recheck_mismatch_redoes_screen(fake):
 
     assert found["name"] == "六星斗鱼", "复核一直说是斗鱼，就按斗鱼记"
     assert found["value"] == 67
-    assert len(env.clicked) == 3, "两次重识别 + 第三次按复核结果记账"
+    assert len(env.opened) == 3, "两次重识别 + 第三次按复核结果记账"
 
 
 def test_recheck_settles_then_records_original(fake):
@@ -858,16 +927,16 @@ def test_recheck_settles_then_records_original(fake):
 
     assert found["name"] == "六星太鼓"
     assert found["value"] == 67
-    assert len(env.clicked) == 2, "重识别一次就够了"
+    assert len(env.opened) == 2, "重识别一次就够了"
 
 
 def test_recheck_consistent_clicks_once(fake):
-    """复核一致时不能白重来：每张卡只点一次"""
+    """复核一致时不能白重来：每张卡只打开一次（连点两次算一次打开）"""
     env = fake(screens=[[_card("六星太鼓", 67), _card("六星斗鱼", 151)]])
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 2, "两张卡各点一次，复核没发现异常就不重来"
+    assert len(env.opened) == 2, "两张卡各打开一次，复核没发现异常就不重来"
 
 
 def test_recheck_logs_redo(fake, capsys):
@@ -894,7 +963,7 @@ def test_recheck_gives_up_after_limit(fake, capsys):
     out = capsys.readouterr().out
 
     assert "按复核结果记" in out
-    assert len(env.clicked) == Task.JIEJIE_RECHECK_TRIES + 1, \
+    assert len(env.opened) == Task.JIEJIE_RECHECK_TRIES + 1, \
         "重识别次数 + 最后按复核结果记的那一次"
 
 
