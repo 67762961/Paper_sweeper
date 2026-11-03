@@ -25,7 +25,7 @@ from Lib import (
     jiejie_card_order,
     jiejie_priority_cards,
     JIEJIE_CARD_LIST_PICS,
-    JIEJIE_YIELD_CAP,
+    jiejie_yield_cap,
     jiejie_card_type,
 )
 
@@ -476,20 +476,27 @@ def Yucheng(current_state, Hwnd, priority_cards=None):
 
 
 def Jiyang_at_cap(Best, card_name):
-    """本档是否已经读到该类型的封顶值（读到就不必再点这一档剩下的行）"""
+    """本档是否已经读到该档的上限（读到就不必再点这一档剩下的行）
+
+    上限按**档位**取，不是按类型：六星斗鱼能到 151，五星斗鱼最高只到 134。
+    按类型记的话，五星斗鱼读到 134 也够不到斗鱼的 151，这一档的剩余行
+    会被白点一遍。
+    """
+    Cap = jiejie_yield_cap(card_name)
     Found = Best.get(card_name)
-    if Found is None or Found["value"] is None:
+    if Cap is None or Found is None or Found["value"] is None:
         return False
-    return Found["value"] >= JIEJIE_YIELD_CAP.get(jiejie_card_type(card_name), 10 ** 6)
+    return Found["value"] >= Cap
 
 
 def Jiyang_outranked(Best, card_name, priority_cards):
     """本档是否已被同类型的更高档压住（压住了就不必再点本档的行）
 
-    同类型内星级是单调的：六星太鼓 67~76，五星太鼓 59~67，
-    六星斗鱼最低 118，五星斗鱼更低。所以只要同类型的更高档已经读到数字，
-    本档不可能胜出——连 67 对 67 这种相接的情况也算了，因为
-    档间按优先级取第一个有货的，更高档排在前面，读不读本档结果一样。
+    判据是「更高档的数值 >= 本档上限」，不是「更高档有没有数字」：
+    六星斗鱼最低 118，而五星斗鱼最高能到 134，所以 118 压不住五星，
+    要 134 才压得住。太鼓那边六星最低 67 = 五星上限 67，相接也算压住
+    （同值按优先级取靠前的六星），于是「有六星太鼓就不点五星太鼓」
+    天然成立。
 
     跨类型不适用：勾玉与体力单位不同，六星太鼓有货并不影响六星斗鱼。
 
@@ -499,7 +506,8 @@ def Jiyang_outranked(Best, card_name, priority_cards):
     :return:              True 表示本档已被更高档压住
     """
     Type = jiejie_card_type(card_name)
-    if not Type:
+    Cap = jiejie_yield_cap(card_name)
+    if not Type or Cap is None:
         return False
     for Other, _Other_pic in priority_cards:
         if Other == card_name:
@@ -507,7 +515,7 @@ def Jiyang_outranked(Best, card_name, priority_cards):
         if jiejie_card_type(Other) != Type:
             continue        # 跨类型不比
         Found = Best.get(Other)
-        if Found is not None and Found["value"] is not None:
+        if Found is not None and Found["value"] is not None and Found["value"] >= Cap:
             return True
     return False
 

@@ -255,7 +255,7 @@ def test_each_card_clicked_once(fake):
 
 
 def test_six_star_taiko_skips_five_star_taiko(fake):
-    """读到六星太鼓后，五星太鼓不必再点：同类型内高星必然不更差"""
+    """读到六星太鼓后，五星太鼓不必再点：67 已达五星档上限 67"""
     env = fake(screens=[[_card("六星太鼓", 67), _card("五星太鼓", 59)]])
 
     Task.Jiyang_scan_list(env, PRIORITY)
@@ -264,13 +264,28 @@ def test_six_star_taiko_skips_five_star_taiko(fake):
     assert env.clicked == [(0, 0)]
 
 
-def test_six_star_douyu_skips_five_star_douyu(fake):
-    """斗鱼同理：六星斗鱼读到数字后，五星斗鱼不必再读"""
-    env = fake(screens=[[_card("六星斗鱼", 118), _card("五星斗鱼", 151)]])
+def test_six_star_douyu_118_does_not_suppress_five_star(fake):
+    """六星斗鱼读到 118 压不住五星斗鱼：五星上限 134，还可能更好
+
+    这是「按类型记封顶」时期的老 bug——当时只要更高档读到数字就压住，
+    六星斗鱼最低那档 118 会把可能存在的 134 五星斗鱼整片跳过。
+    """
+    env = fake(screens=[[_card("六星斗鱼", 118), _card("五星斗鱼", 134)]])
+
+    found = Task.Jiyang_scan_list(env, PRIORITY)
+
+    assert len(env.clicked) == 2, "118 < 134，五星斗鱼必须点开"
+    assert found["name"] == "六星斗鱼", "同值按优先级；这里六星 118 仍然胜出"
+    assert found["value"] == 118
+
+
+def test_six_star_douyu_134_suppresses_five_star(fake):
+    """六星斗鱼读到 134 才压得住五星斗鱼：134 >= 五星上限 134"""
+    env = fake(screens=[[_card("六星斗鱼", 134), _card("五星斗鱼", 134)]])
 
     Task.Jiyang_scan_list(env, PRIORITY)
 
-    assert len(env.clicked) == 1, "五星斗鱼被六星斗鱼压住"
+    assert len(env.clicked) == 1, "134 已达五星上限，五星不必再点"
     assert env.clicked == [(0, 0)]
 
 
@@ -320,7 +335,12 @@ def test_six_star_equal_value_still_suppresses(fake):
 
 
 def test_outranked_ignores_tiers_behind(fake):
-    """排在后面的档位压不住前面的：优先级顺序才是裁决者"""
+    """排在后面的档位压不住前面的：优先级顺序才是裁决者
+
+    这里五星排第一、六星排最后。六星太鼓的上限是 76，而排在前面的
+    五星只读到 59（< 76），所以六星仍会被读一次——但最终裁决仍按
+    优先级取五星，后置的档位不可能把前置的挤掉。
+    """
     # 把五星放最前，六星放最后
     custom = (
         ("五星太鼓", "./pic/guild/五星太鼓.png"),
@@ -331,7 +351,7 @@ def test_outranked_ignores_tiers_behind(fake):
     found = Task.Jiyang_scan_list(env, custom)
 
     assert found["name"] == "五星太鼓", "五星排第一就选五星，不被后面的六星压住"
-    assert len(env.clicked) == 1
+    assert env.clicked[0] == (0, 0), "五星那一行先读"
 
 
 # ------------------------------------------- 滚动前只在必要时把鼠标归位
@@ -431,13 +451,28 @@ def test_cap_differs_per_card_type(fake):
 
 
 def test_cap_table_matches_known_yields():
-    """封顶值必须与收益表一致，否则早停会漏掉更好的卡"""
-    assert Lib.JIEJIE_YIELD_CAP["太鼓"] == 76
-    assert Lib.JIEJIE_YIELD_CAP["斗鱼"] == 151
+    """封顶值必须与收益表一致，否则早停会漏掉更好的卡
+
+    表按**档位**记，不是按类型：六星斗鱼能到 151，五星斗鱼最高只到 134；
+    太鼓六星 76、五星 67。按类型记的话「五星斗鱼读到 134」永远够不到
+    斗鱼的 151，这一档的剩余行会被白点一遍。
+    """
+    assert Lib.JIEJIE_YIELD_CAP["六星太鼓"] == 76
+    assert Lib.JIEJIE_YIELD_CAP["五星太鼓"] == 67
+    assert Lib.JIEJIE_YIELD_CAP["六星斗鱼"] == 151
+    assert Lib.JIEJIE_YIELD_CAP["五星斗鱼"] == 134
+
+
+def test_yield_cap_lookup():
+    """按档位取上限；未知档位返回 None，调用方按「没有上限」处理"""
+    assert Lib.jiejie_yield_cap("六星太鼓") == 76
+    assert Lib.jiejie_yield_cap("五星斗鱼") == 134
+    assert Lib.jiejie_yield_cap("未知档位") is None
+    assert Lib.jiejie_yield_cap(None) is None
 
 
 def test_card_type_extracted_from_priority_name():
-    """封顶表按类型索引，而档位名带星级，必须先取出类型"""
+    """压制判据要判「是不是同类型」，档位名带星级，必须先取出类型"""
     assert Lib.jiejie_card_type("六星太鼓") == "太鼓"
     assert Lib.jiejie_card_type("五星太鼓") == "太鼓"
     assert Lib.jiejie_card_type("六星斗鱼") == "斗鱼"
