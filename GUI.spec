@@ -18,6 +18,10 @@ a = Analysis(
         'qfluentwidgets.window',
         'qframelesswindow',
         'darkdetect',
+        # 调试截图的图文对照渲染器：end_shots() 收尾时 import 它生成 index.md。
+        # tools/ 没有 __init__.py（隐式命名空间包），打包版必须在这里登记，
+        # 否则 exe 里 import 不到，收尾只会打一行「生成失败」。
+        'tools.render_shots',
     ],
     hookspath=[],
     runtime_hooks=[],

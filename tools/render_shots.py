@@ -17,14 +17,19 @@
 
 图与日志怎么对上：日志行本身不带时间戳，但每条匹配结果几乎都会把得分打进
 `INFO- 0.312 未找到太鼓` 这样的行里，而 index.tsv 的「得分」列是同一份三位小数。
-于是按 index.tsv 的顺序往后扫日志，找到第一处出现该得分的行，就把「这一帧的判定之后、
-下一帧的判定之前」的日志行归给这一帧。找不到得分的帧（调用方压根没打印）记为未对齐，
-不编造上下文。
+于是把「帧序号有序」与「日志行号有序」同时满足的配对整体求最长公共子序列
+（LCS，用 Hunt-Szymanski + 二分 LIS），把「这一帧的判定之后、下一帧的判定之前」的
+日志行归给这一帧。找不到得分的帧（调用方压根没打印）记为未对齐，不编造上下文。
+
+为什么不用「往后找第一处同分行」的贪心：同一次运行里同一个得分会反复出现
+（实测一次 379 帧的运行里 `0.011` 出现 19 次、`0.012` 出现 15 次），贪心会先把
+后面才对得上的行消耗掉，越走越偏——同一份数据贪心只对上 18 帧，LCS 能对上 192 帧。
 
 只用标准库：markdown 内嵌图片不需要读图片尺寸，也不需要解码。
 """
 
 import argparse
+import bisect
 import datetime
 import glob
 import os
@@ -39,12 +44,11 @@ SHOT_PREFIX = "shots_"
 INDEX_NAME = "index.tsv"
 OUTPUT_NAME = "index.md"
 
-# index.tsv 的得分列形如 0.312；日志里也按三位小数的原样打印
-SCORE_PATTERN = re.compile(r"^0\.\d{3}$")
-
-# 往后找得分时最多扫多少行。日志平均每 4~5 行产出一帧，
-# 200 行足够跨过任何一段等待，又不至于把后面不相干的结果误认。
-MAX_ALIGN_LINES = 200
+# 日志里出现的得分 token：index.tsv 的得分列就是同一份三位小数（Lib 里 f"{min_val:.3f}"）
+# 前后不能再接数字或小数点，避免把 0.0115 这类更长的小数误认成 0.011。
+# 不认 1.000：那是未命中时调用方写的兜底值，日志里没有对应行，
+# 认了会把 NULL 配给不相干的日志。
+SCORE_TOKEN_PATTERN = re.compile(r"(?<![\d.])0\.\d{3}(?!\d)")
 
 # 连续这么多次「同模板 + 同结果」就折叠（轮询场景动辄上百张几乎一样的画面）
 FOLD_MIN = 4
@@ -136,21 +140,54 @@ def iter_shot_dirs(root=LOGS_DIR):
 def align_rows(rows, lines):
     """给每一行找它在日志里的位置，返回与 rows 等长的位置列表（找不到为 None）。
 
-    只往后扫、不回头：帧的顺序与日志顺序天然一致，回头找会把同一段日志重复配给多帧。
+    求的是「帧序与行号同时递增」的最长公共子序列（LCS）：帧的顺序与日志顺序天然一致，
+    但同一得分在一次运行里会反复出现（实测 379 帧的运行里 `0.011` 出现 19 次），
+    「往后找第一处同分行」的贪心会先把后面才对得上的行消耗掉，越走越偏——
+    同一份数据贪心只对上 18 帧，LCS 能对上 192 帧。
+
+    实现用 Hunt-Szymanski：按帧顺序展开候选 (行号, 帧号)，同一帧内的候选按行号倒序
+    （保证一帧最多贡献一个配对），再用二分对行号序列求严格递增的最长上升子序列。
+    规模上 379 帧 × 192 条得分行不到 0.1 秒，几千帧也没问题。
     """
-    positions = []
-    cursor = 0
-    for row in rows:
-        score = row["得分"]
-        found = None
-        if SCORE_PATTERN.match(score or ""):
-            limit = min(len(lines), cursor + MAX_ALIGN_LINES)
-            for index in range(cursor, limit):
-                if score in lines[index]:
-                    found = index
-                    cursor = index + 1
-                    break
-        positions.append(found)
+    positions = [None] * len(rows)
+
+    # 得分 -> 出现它的日志行号（一次扫描建索引，避免逐帧重扫日志）
+    line_numbers = {}
+    for index, line in enumerate(lines):
+        for match in SCORE_TOKEN_PATTERN.finditer(line):
+            line_numbers.setdefault(match.group(0), []).append(index)
+
+    tails = []        # tails[k]：长度为 k+1 的上升子序列的末尾行号
+    nodes = []        # 只追加：nodes[i] = (帧号, 行号, 父节点下标)
+    slot_node = []    # slot_node[k]：tails[k] 对应的节点下标
+
+    for frame, row in enumerate(rows):
+        score = (row["得分"] or "").strip()
+        candidates = line_numbers.get(score)
+        if not candidates:
+            continue
+        for line_no in reversed(candidates):
+            slot = bisect.bisect_left(tails, line_no)
+            if slot < len(tails) and tails[slot] == line_no:
+                # 这一行已经被更早的帧用掉了，换成当前帧不会让子序列更长
+                continue
+            parent = slot_node[slot - 1] if slot > 0 else -1
+            nodes.append((frame, line_no, parent))
+            index = len(nodes) - 1
+            if slot == len(tails):
+                tails.append(line_no)
+                slot_node.append(index)
+            else:
+                tails[slot] = line_no
+                slot_node[slot] = index
+
+    # 从最优末尾回溯出所有配对
+    if slot_node:
+        current = slot_node[-1]
+        while current >= 0:
+            frame, line_no, parent = nodes[current]
+            positions[frame] = line_no
+            current = parent
     return positions
 
 

@@ -387,6 +387,68 @@ def test_end_shots可重复调用(tmp_path):
     assert Lib._SHOT_INDEX is None
 
 
+# ------------------------------------------------ 收尾自动生成图文对照
+
+
+def test_收尾自动生成index_md(tmp_path):
+    """开了截图又存到了图，收尾就把 index.md 摆好，不用再手敲命令"""
+    frame = _frame()
+    _start(tmp_path, "all")
+    for _ in range(2):
+        Lib._record_shot(frame, "match_model", "./pic/common/确定.png", 0.300, 0.05, True,
+                         Left_up=(10, 10), Right_down=(50, 50))
+    Lib.end_shots()
+
+    index_md = os.path.join(Lib._SHOT_DIR, "index.md")
+    assert os.path.isfile(index_md), "收尾应自动生成 index.md"
+    content = open(index_md, encoding="utf-8").read()
+    assert "![](" in content, "要有图片引用"
+    assert "## #0001" in content and "## #0002" in content
+
+
+def test_一张图都没存时不生成index_md(tmp_path, capsys):
+    """开了档位却一张没存（比如任务直接跳过），不该留下空文档"""
+    _start(tmp_path, "all")
+    Lib.end_shots()
+    assert not os.path.exists(os.path.join(Lib._SHOT_DIR, "index.md"))
+    out = capsys.readouterr().out
+    assert "图文对照已生成" not in out
+
+
+def test_收尾打一行图文对照提示(tmp_path, capsys):
+    """控制台只多一行 INFO- 指路，明细全在文档里"""
+    _start(tmp_path, "all")
+    Lib._record_shot(_frame(), "match_model", "./pic/common/确定.png", 0.300, 0.05, True,
+                     Left_up=(10, 10), Right_down=(50, 50))
+    Lib.end_shots()
+
+    out = capsys.readouterr().out
+    # 注意别用「图文对照」当过滤词：tmp_path 目录名本身就含这几个字
+    hint_lines = [line for line in out.splitlines() if "INFO- ----- 图文对照" in line]
+    assert len(hint_lines) == 1, f"只该有一行提示，实际 {hint_lines}"
+    assert "index.md" in hint_lines[0]
+
+
+def test_渲染失败不影响收尾(tmp_path, capsys, monkeypatch):
+    """排查工具坏了也不能把任务收尾搞崩，汇总行照打"""
+    _start(tmp_path, "all")
+    Lib._record_shot(_frame(), "match_model", "./pic/common/确定.png", 0.300, 0.05, True,
+                     Left_up=(10, 10), Right_down=(50, 50))
+
+    import tools.render_shots as render_shots
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("渲染器炸了")
+
+    monkeypatch.setattr(render_shots, "render_run", boom)
+    Lib.end_shots()  # 不该抛
+
+    out = capsys.readouterr().out
+    assert "本次共保存 1 张" in out, "汇总行必须照打"
+    assert "图文对照生成失败" in out, "失败要如实提示，且不改变档位状态"
+    assert Lib._SHOT_MODE == "off"
+
+
 def test_目录建不出来时自关(tmp_path, monkeypatch):
     """建目录失败不能让整场运行挂掉，只需关掉截图继续跑"""
     monkeypatch.setattr(Lib.os, "makedirs", lambda *a, **k: (_ for _ in ()).throw(OSError("没权限")))

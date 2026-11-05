@@ -641,8 +641,32 @@ def begin_shots(log_file_path, mode=None):
         _SHOT_MODE = "off"
 
 
+def _render_shot_index():
+    """把本次截图目录渲染成 index.md（图片与它对应的日志区间逐帧对照）。
+
+    只在开了截图档位、且确实存到图时调用。渲染器是 tools/render_shots.py，
+    走 Python 3 的隐式命名空间包导入（tools/ 没有 __init__.py 也能 import）；
+    打包版要能生效，GUI.spec 的 hiddenimports 里必须登记 tools.render_shots。
+
+    任何异常都只提示、不外抛：排查工具失败不能反过来把任务收尾搞崩。
+    """
+    try:
+        import tools.render_shots as render_shots
+        text_lines = render_shots.render_run(_SHOT_DIR)
+        path = render_shots.write_index(_SHOT_DIR, text_lines)
+    except Exception as error:
+        print("        INFO- ----- 图文对照生成失败（不影响本次运行）:", error)
+        return None
+    print(f"        INFO- ----- 图文对照已生成: {path}")
+    return path
+
+
 def end_shots():
-    """收尾：打一行汇总并关 index.tsv（G3：控制台只出现这一行截图信息）"""
+    """收尾：打一行汇总、关 index.tsv、自动生成 index.md
+
+    控制台的截图信息固定两行：一行 `SHOT-` 汇总（G3），一行 `INFO-` 指向
+    刚生成的图文对照。逐张明细一律只进 index.tsv / index.md，不刷控制台。
+    """
     global _SHOT_MODE, _SHOT_INDEX
     if _SHOT_INDEX is not None:
         try:
@@ -655,6 +679,10 @@ def end_shots():
         # 不额外扫目录（扫几千个文件要几百毫秒，收尾时没必要再付一次）
         print(f"        SHOT- ----- 本次共保存 {_SHOT_SAVED} 张 / 约 {_SHOT_BYTES / 1048576:.0f} MB"
               f" -> {_SHOT_DIR}")
+        # 开截图本来就是为了排查，跑完直接把图文对照摆好，省得再手敲命令。
+        # 一张都没存下来就不生成，免得留下一份「没有可渲染的记录」的空文档。
+        if _SHOT_SAVED:
+            _render_shot_index()
     _SHOT_MODE = "off"
 
 

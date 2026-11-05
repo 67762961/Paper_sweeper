@@ -153,7 +153,32 @@ def test_align得分非三位小数不对齐(tmp_path):
     assert render_shots.align_rows(rows, render_shots.read_log(log_path)) == [None]
 
 
+def test_同分密集时不错位(tmp_path):
+    """回归：同一得分反复出现时，贪心会越走越偏，LCS 要对上全部得分行。
+
+    真实样本（379 帧 / 645 行日志）里 `0.011` 出现 19 次、`0.012` 15 次——
+    「往后找第一处同分行」会先把后面才对得上的行消耗掉，实测只对上 18 帧。
+    这里按同样模式造数据，断言每一帧都落到它自己那一行、且顺序严格递增。
+    """
+    same_scores = ["0.011"] * 19 + ["0.012"] * 15 + ["0.038"] * 14
+    log_lines = []
+    expected = []
+    for index, score in enumerate(same_scores):
+        log_lines.append("        INFO- %s 第 %d 次判定" % (score, index))
+        log_lines.append("        填充行 A")
+        expected.append(len(log_lines) - 2)
+    rows = [row(index + 1, "hit", "主界面", score) for index, score in enumerate(same_scores)]
+
+    shot_dir = write_shot_dir(tmp_path, rows, log_lines=log_lines)
+    lines = render_shots.read_log(render_shots.find_log(shot_dir))
+    positions = render_shots.align_rows(render_shots.parse_index(shot_dir), lines)
+
+    assert positions == expected, "每帧都要对上自己那一行，不能错位"
+    assert len({pos for pos in positions if pos is not None}) == len(positions), "不许共用同一行"
+
+
 def test_区间到下一帧之前(tmp_path):
+
     rows = render_shots.parse_index(write_shot_dir(
         tmp_path,
         [row(1, "hit", "主界面", "0.012"), row(2, "miss", "太鼓", "0.312")],
