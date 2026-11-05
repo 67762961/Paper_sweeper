@@ -564,6 +564,99 @@ def Img_read_ch(file_path):
     return img
 
 
+# ---- 调试截图（默认全关，热路径第一行 early return）----
+_SHOT_MODE = "off"          # off / miss / all
+_SHOT_DIR = None            # logs/<月>/<日>/shots_<stamp>
+_SHOT_SEQ = 0               # 产出序号，等于「第几次匹配判定」
+_SHOT_SAVED = 0
+_SHOT_BYTES = 0             # 累计写盘字节，供 end_shots() 打汇总
+_SHOT_FAILS = 0             # 连续写盘失败计数，达 3 熔断
+_SHOT_INDEX = None          # index.tsv 文件句柄
+_SHOT_LIMIT = 8000          # 单次运行张数上限（轮询场景会顶到数千）
+# 排除机制保留但默认置空：不给「必然 miss 的探测」开后门，真出现某模板刷爆再往里加名字
+_SHOT_SKIP_TEMPLATES = ()
+_SHOT_SKIP_ALL = False      # 由 begin_shots() 按环境变量刷新，不写成模块级常量
+
+
+def Img_write_ch(file_path, Img, quality=80):
+    """中文路径写图：cv2.imwrite 遇中文路径静默返回 False，必须走 imencode + tofile"""
+    try:
+        Ok, Buffer = cv2.imencode(".jpg", Img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        if not Ok:
+            return False
+        Buffer.tofile(file_path)
+        return True
+    except Exception as error:
+        print("        WAIT- ----- 截图写盘失败:", file_path, error)
+        return False
+
+
+def _read_shot_pref():
+    """读 state/gui.json 的 debug_shots。直接用 json 读，不 import ui.prefs——
+    Lib 是底层，不能反向依赖界面层（ui/__init__.py 写明了单向依赖）"""
+    try:
+        with open(paths.PREFS, "r", encoding="utf-8") as Handle:
+            return json.load(Handle).get("debug_shots")
+    except Exception:
+        return None
+
+
+_SHOT_BAD_CHARS = re.compile(r'[\\/:*?"<>|]')
+
+
+def _shot_name(Origin, Model_path, Score, Hit):
+    """000123_miss_确定_0.312.jpg。模板名走中文，必须先把 Windows 非法字符换掉"""
+    name = os.path.splitext(os.path.basename(Model_path or ""))[0] or Origin
+    name = _SHOT_BAD_CHARS.sub("_", name)[:40]
+    try:
+        score = "{0:.3f}".format(float(Score))
+    except (TypeError, ValueError):
+        score = str(Score)
+    return f"{_SHOT_SEQ:06d}_{'hit' if Hit else 'miss'}_{name}_{score}.jpg"
+
+
+def begin_shots(log_file_path, mode=None):
+    """在 _log_stream 里调用：按当前档位准备截图目录与 index.tsv"""
+    global _SHOT_MODE, _SHOT_DIR, _SHOT_SEQ, _SHOT_SAVED, _SHOT_BYTES, _SHOT_FAILS, _SHOT_INDEX
+    global _SHOT_SKIP_ALL
+
+    _SHOT_MODE = (mode or os.environ.get("PAPER_SHOTS") or _read_shot_pref() or "off").lower()
+    _SHOT_SKIP_ALL = bool(os.environ.get("PAPER_SHOTS_ALL"))
+    _SHOT_SEQ = _SHOT_SAVED = _SHOT_BYTES = _SHOT_FAILS = 0
+    if _SHOT_MODE not in ("miss", "all"):
+        _SHOT_MODE = "off"
+        return
+    # 目录名沿用 log 的 timestamp，保证一一对应
+    # log 名形如 console_output_2026-11-04_22-15-03.log，末 19 位就是 %Y-%m-%d_%H-%M-%S
+    stem = os.path.splitext(os.path.basename(log_file_path))[0]
+    stamp = stem[-19:] if len(stem) >= 19 else stem
+    _SHOT_DIR = os.path.join(os.path.dirname(log_file_path), "shots_" + stamp)
+    try:
+        os.makedirs(_SHOT_DIR, exist_ok=True)
+        _SHOT_INDEX = open(os.path.join(_SHOT_DIR, "index.tsv"), "w", encoding="utf-8")
+        _SHOT_INDEX.write("序号\t时间\t结果\t来源\t模板\t得分\t阈值\t尺寸\t裁剪偏移\t文件\n")
+    except OSError as error:
+        print("        WAIT- ----- 无法创建截图目录，已关闭截图:", error)
+        _SHOT_MODE = "off"
+
+
+def end_shots():
+    """收尾：打一行汇总并关 index.tsv（G3：控制台只出现这一行截图信息）"""
+    global _SHOT_MODE, _SHOT_INDEX
+    if _SHOT_INDEX is not None:
+        try:
+            _SHOT_INDEX.close()
+        except Exception:
+            pass
+        _SHOT_INDEX = None
+    if _SHOT_MODE != "off":
+        # 汇总一行：张数 + 体积 + 路径。体积靠累加每张写盘后的 os.path.getsize，
+        # 不额外扫目录（扫几千个文件要几百毫秒，收尾时没必要再付一次）
+        print(f"        SHOT- ----- 本次共保存 {_SHOT_SAVED} 张 / 约 {_SHOT_BYTES / 1048576:.0f} MB"
+              f" -> {_SHOT_DIR}")
+    _SHOT_MODE = "off"
+
+
 def _draw_boxes(Img, Left_up, Right_down, search_range=None, is_window_match=False):
     """
     在图像副本上画出匹配框（调试显示与截图保存共用）
