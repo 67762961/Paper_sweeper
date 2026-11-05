@@ -261,7 +261,7 @@ python -m pytest
 python tools/check_pics.py
 ```
 
-`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 634 个用例：
+`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 639 个用例：
 
 | 文件 | 用例数 | 覆盖内容 |
 |---|---|---|
@@ -288,7 +288,7 @@ python tools/check_pics.py
 | `tests/test_jiejie_yield.py` | 24 | 寄养收益计算：各星级/时长组合、非法输入、边界值 |
 | `tests/test_jiejie_yield_scan.py` | 65 | 寄养列表扫描：纵向聚类成行、`Match_models_rows` 的裁剪偏移、行内取最像、复核轮 |
 | `tests/test_lib_match_multi.py` | 30 | 多目标/多命中匹配原语：`Match_models_in_image` 取最像、`Match_models_in_image_all` 黑块迭代、`Match_models_rows` 聚行 |
-| `tests/test_shots.py` | 36 | **调试截图**：三档开关、命名与序号、`index.tsv` 十列、中文路径写盘、熔断、**四个匹配原语每次判定都留一张图**、未命中记最像的分数、`models_all` 存的是没涂黑的原始帧、裁剪偏移列 |
+| `tests/test_shots.py` | 41 | **调试截图**：三档开关与「参数 > 环境变量 > `gui.json` > off」优先级、命名与序号、`index.tsv` 十列、中文路径写盘、熔断、**四个匹配原语每次判定都留一张图**、未命中记最像的分数、`models_all` 存的是没涂黑的原始帧、裁剪偏移列 |
 | `tests/test_prefs_shots.py` | 26 | **截图档位的读写与回落**：默认 `off`、三档往返、13 种非法值回落、不改动其它键、老配置缺键也能读 |
 | `tests/test_settings_dialog_shots.py` | 14 | **设置弹窗的截图下拉框**（真实控件）：三项顺序与 `VALID_SHOT_MODES` 一致、打开时回显已保存档位、`values()` 键集合、能真的写进 `state/gui.json`、带容量与语义提示 |
 | `tests/test_open_settings_save.py` | 8 | **设置保存路径**：成功时落盘并应用、**写盘失败弹提示且不应用改动**、取消时一次都不写、合并而非覆盖 |

@@ -20,12 +20,25 @@ import pytest
 
 import Lib
 
+# 真正的偏好读取函数：autouse 夹具会把它换成「永远没有配置」的替身，
+# 需要验真实读盘逻辑的用例从这里取回原件（模块导入时抓一次，之后不受 setattr 影响）。
+_REAL_READ_SHOT_PREF = Lib._read_shot_pref
+
 
 @pytest.fixture(autouse=True)
 def _reset_shot_state(monkeypatch):
-    """每个用例前后都把截图状态清干净，避免用例之间互相影响"""
+    """每个用例前后都把截图状态清干净，避免用例之间互相影响。
+
+    除了模块全局量和环境变量，还必须**掐掉 state/gui.json 这一档偏好**：
+    `begin_shots()` 的优先级是 参数 > PAPER_SHOTS > gui.json > off，
+    只要这个仓库当前的 gui.json 里 debug_shots 是 all（用户在设置弹窗里点过），
+    所有「默认应为 off」的用例就会假失败。用例不能依赖「跑测试时工作目录里
+    碰巧没有 gui.json」这种外部条件。
+    """
     monkeypatch.delenv("PAPER_SHOTS", raising=False)
     monkeypatch.delenv("PAPER_SHOTS_ALL", raising=False)
+    # 把偏好读取固定成「没有配置」，与真实读盘解耦
+    monkeypatch.setattr(Lib, "_read_shot_pref", lambda: None)
     Lib._SHOT_MODE = "off"
     Lib._SHOT_DIR = None
     Lib._SHOT_SEQ = 0
@@ -97,6 +110,62 @@ def test_显式参数优先于环境变量(tmp_path, monkeypatch):
     monkeypatch.setenv("PAPER_SHOTS", "all")
     Lib.begin_shots(_log_path(tmp_path), mode="off")
     assert Lib._SHOT_MODE == "off"
+
+
+def test_环境变量优先于gui_json(tmp_path, monkeypatch):
+    """PAPER_SHOTS 要压过 state/gui.json 里的档位"""
+    monkeypatch.setattr(Lib, "_read_shot_pref", lambda: "miss")
+    monkeypatch.setenv("PAPER_SHOTS", "all")
+    Lib.begin_shots(_log_path(tmp_path))
+    assert Lib._SHOT_MODE == "all"
+
+
+def test_gui_json可以开档(tmp_path, monkeypatch):
+    """没有环境变量、没有显式参数时，读 state/gui.json 的 debug_shots"""
+    monkeypatch.setattr(Lib, "_read_shot_pref", lambda: "all")
+    Lib.begin_shots(_log_path(tmp_path))
+    assert Lib._SHOT_MODE == "all"
+    assert os.path.isdir(Lib._SHOT_DIR)
+
+
+def test_gui_json的非法档位回落off(tmp_path, monkeypatch):
+    """写坏了也不该开截图——gui.json 是用户能手改的"""
+    monkeypatch.setattr(Lib, "_read_shot_pref", lambda: "随便写的值")
+    Lib.begin_shots(_log_path(tmp_path))
+    assert Lib._SHOT_MODE == "off"
+    assert Lib._SHOT_DIR is None
+
+
+def test_gui_json坏掉时静默回落off(tmp_path, monkeypatch):
+    """gui.json 是用户能手改的，写坏了不能让 begin_shots 崩，也不能误开截图。
+
+    这里用真实的 `_read_shot_pref`（不是替身），验的是它自己的 try/except。
+    """
+    monkeypatch.setattr(Lib, "_read_shot_pref", _REAL_READ_SHOT_PREF)
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("state", exist_ok=True)
+    with open(os.path.join("state", "gui.json"), "w", encoding="utf-8") as handle:
+        handle.write('{"debug_shots": ')
+
+    Lib.begin_shots(_log_path(tmp_path))
+    assert Lib._SHOT_MODE == "off"
+    assert Lib._SHOT_DIR is None
+
+
+def test_真实gui_json能把档位带进来(tmp_path, monkeypatch):
+    """走真实的 _read_shot_pref：临时目录里写一份 gui.json，确认能读到。
+
+    这条与上面几条不同——它不替换 _read_shot_pref，直接验路径拼接与 JSON 解析。
+    """
+    monkeypatch.setattr(Lib, "_read_shot_pref", _REAL_READ_SHOT_PREF)
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("state", exist_ok=True)
+    with open(os.path.join("state", "gui.json"), "w", encoding="utf-8") as handle:
+        handle.write('{"debug_shots": "all"}')
+
+    Lib.begin_shots(_log_path(tmp_path))
+    assert Lib._SHOT_MODE == "all"
+    assert os.path.isdir(Lib._SHOT_DIR)
 
 
 # ----------------------------------------------------------- miss / all 语义
