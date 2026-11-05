@@ -261,7 +261,7 @@ python -m pytest
 python tools/check_pics.py
 ```
 
-`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 637 个用例：
+`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 676 个用例：
 
 | 文件 | 用例数 | 覆盖内容 |
 |---|---|---|
@@ -288,9 +288,10 @@ python tools/check_pics.py
 | `tests/test_jiejie_yield.py` | 24 | 寄养收益计算：各星级/时长组合、非法输入、边界值 |
 | `tests/test_jiejie_yield_scan.py` | 65 | 寄养列表扫描：纵向聚类成行、`Match_models_rows` 的裁剪偏移、行内取最像、复核轮 |
 | `tests/test_lib_match_multi.py` | 30 | 多目标/多命中匹配原语：`Match_models_in_image` 取最像、`Match_models_in_image_all` 黑块迭代、`Match_models_rows` 聚行 |
-| `tests/test_shots.py` | 39 | **调试截图**：三档开关与「参数 > `gui.json` > off」优先级（环境变量 `PAPER_SHOTS` 已废弃，有用例守着它不再生效）、命名与序号、`index.tsv` 十列、中文路径写盘、熔断、**四个匹配原语每次判定都留一张图**、未命中记最像的分数、`models_all` 存的是没涂黑的原始帧、裁剪偏移列 |
+| `tests/test_shots.py` | 43 | **调试截图**：三档开关与「参数 > `gui.json` > off」优先级（环境变量 `PAPER_SHOTS` 已废弃，有用例守着它不再生效）、命名与序号、`index.tsv` 十列、中文路径写盘、熔断、**四个匹配原语每次判定都留一张图**、未命中记最像的分数、`models_all` 存的是没涂黑的原始帧、裁剪偏移列、**收尾自动生成 `index.md`**（一张没存则不生成、渲染失败不影响收尾） |
 | `tests/test_prefs_shots.py` | 26 | **截图档位的读写与回落**：默认 `off`、三档往返、13 种非法值回落、不改动其它键、老配置缺键也能读 |
 | `tests/test_settings_dialog_shots.py` | 14 | **设置弹窗的截图下拉框**（真实控件）：三项顺序与 `VALID_SHOT_MODES` 一致、打开时回显已保存档位、`values()` 键集合、能真的写进 `state/gui.json`、带容量与语义提示 |
+| `tests/test_render_shots.py` | 35 | **截图渲染器**：读 `index.tsv` 十列、按 stamp 反推 `.log`、**LCS 对齐**（同分密集出现时不错位、不共用同一行）、区间切分（连续未对齐不劈开）、图文对照输出、连拍折叠只合并同模板、未对齐如实标注不编造上下文、`--miss-only` / `--by-template` / `--no-fold`、`iter_shot_dirs` 与 `resolve_targets` |
 | `tests/test_open_settings_save.py` | 8 | **设置保存路径**：成功时落盘并应用、**写盘失败弹提示且不应用改动**、取消时一次都不写、合并而非覆盖 |
 | `tests/test_示例_教学用.py` | 10 | 教学示例（不计入上表的覆盖统计，但会被 `pytest` 一起跑） |
 
@@ -543,9 +544,22 @@ python -m pytest --lf                         # 只重跑上次失败的
    - 单任务运行日志：`logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log`
    - GUI 崩溃：`logs/app_crash.log`
    - 控制台匹配得分（`INFO- 0.0xx ...`）可辅助判断阈值是否过严/过松。
-   - 调试截图：在设置弹窗里把「调试截图」选成**全部保存**跑一次，每次匹配判定都会存一张图到日志同目录的
-     `shots_<stamp>/` 下，明细在同目录 `index.tsv`（图与日志的对齐表）；默认关闭，详见 `ARCHITECTURE.md` §8.1。
+   - 调试截图：在设置弹窗里把「调试截图」选成**全部保存**跑一次，每次匹配判定都会存一张图；
+     开了截图时**这次的 `.log` 也放进 `shots_<stamp>/`**，一次排查的日志、图片、索引全在一个文件夹里
+     （日期目录下不再散着一堆 `.log`）。默认关闭，详见 `ARCHITECTURE.md` §8.1。
      完整跑一次约 2000～6000 张、几百 MB，排查完记得删。
+   - 看图：跑完自动就在截图目录里生成 `index.md`——每张图配上它判定区间内的日志行，能直接看出
+     「这句 log 对应哪张图」。控制台收尾只打两行（顶格与 `TASK-` 同级，路径另起一行缩进）：
+
+     ```
+     SHOT- ----- 本次共保存 8 张 / 约 3 MB
+             -> logs\2026-11\2026-11-05\shots_2026-11-05_21-38-53
+     SHOT- ----- 图文对照已生成
+             -> logs\2026-11\2026-11-05\shots_2026-11-05_21-38-53\index.md
+     ```
+
+     事后想补渲染旧目录或筛选，用 `python tools/render_shots.py`（`--miss-only` 只看未命中，
+     `--by-template` 按模板归堆）；详见 `ARCHITECTURE.md` §8.2。
    - 清理旧日志：`python tools/clean_logs.py`（默认只预览，`--apply` 才删除，默认保留 6 个月）。
 
 ---
@@ -572,7 +586,8 @@ Paper_sweeper/
 ├── tools/                 # 开发辅助脚本（不参与打包）
 │   ├── check_pics.py      # 模板图引用检查
 │   ├── clean_logs.py      # 旧日志清理（按年月分层，默认预览）
-│   └── gen_pic_readme.py  # 生成 pic/README.md 索引
+│   ├── gen_pic_readme.py  # 生成 pic/README.md 索引
+│   └── render_shots.py    # 调试截图渲染成图文对照的 index.md
 ├── tests/                 # pytest 用例（纯逻辑，不依赖游戏窗口）
 ├── dev/                   # 本地调试脚本（不入库，详见 dev/README.md）
 ├── config/                # Setting.yml（静态配置，用户手改）

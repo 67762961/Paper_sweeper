@@ -89,10 +89,12 @@ class SettingsDialog(MessageBoxBase):
         shot_row.addWidget(self.shot_combo)
         self.viewLayout.addLayout(shot_row)
 
-        # 提示：开启后处置细写在 ARCHITECTURE.md §8.1，这里只留最必要的两句
+        # 提示：只按档位各说一句「会怎么样」，细节在 ARCHITECTURE.md §8.1
         self.shot_hint = CaptionLabel(
-            "开启后每次匹配判定都存一张图到日志同目录的 shots_* 下"
-            "（完整跑一次约几百 MB）；「只存未命中」不适合反向探测较多的流程。",
+            "关闭：平常状态，不存图、不占空间。\n"
+            "只存未命中：只存没认出来的那几次，文件少；"
+            "但「点完看它还在不在」这类反向探测本来就会未命中，也会被存下来。\n"
+            "全部保存：每次匹配判定都存一张，最全；完整跑一次约几千张、几百 MB。",
             self,
         )
         self.shot_hint.setWordWrap(True)
