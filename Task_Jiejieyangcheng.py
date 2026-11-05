@@ -639,7 +639,9 @@ def Jiyang_row_type(Img, row, priority_cards):
         return None
 
     Models = [(card_name, card_pic) for card_name, card_pic in priority_cards]
-    Found = Match_models_rows(Img[Y0:Y1, X0:X1], Models, 0.05, max_matches=8)
+    # 传 (X0, Y0)：这一帧是裁过的，调试截图要靠这个偏移知道它在整屏的哪里
+    Found = Match_models_rows(Img[Y0:Y1, X0:X1], Models, 0.05, max_matches=8,
+                              origin_offset=(X0, Y0))
     if not Found:
         return None
 

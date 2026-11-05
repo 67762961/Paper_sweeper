@@ -486,6 +486,32 @@ def test_钩子_models_all_存的是没涂黑的原始帧(tmp_path, scene_and_te
     assert shot[170, 65].max() > 100, "第二个命中区域同样不该被涂黑"
 
 
+def test_钩子_models_rows_记下裁剪偏移(tmp_path, scene_and_template):
+    """models_rows 收到的常是裁切块，index.tsv 要能看出它在整屏的哪里"""
+    scene, hit, _miss = scene_and_template
+    _start(tmp_path, "all")
+
+    Lib.Match_models_rows(scene[40:140, 30:150], [("确定", hit)], 0.05,
+                          origin_offset=(30, 40))
+
+    cols = open(os.path.join(Lib._SHOT_DIR, "index.tsv"), encoding="utf-8").read().splitlines()[1].split("\t")
+    assert cols[8] == "30,40", "裁剪偏移要落进 index.tsv 第 9 列"
+
+    jpg = [n for n in os.listdir(Lib._SHOT_DIR) if n.endswith(".jpg")][0]
+    shot = Lib.Img_read_ch(os.path.join(Lib._SHOT_DIR, jpg))
+    assert shot.shape[0:2] == (100, 120), "存下来的应是这一帧（裁切块），坐标才配得上偏移列"
+
+
+def test_钩子_models_rows_不传偏移时记横线(tmp_path, scene_and_template):
+    scene, hit, _miss = scene_and_template
+    _start(tmp_path, "all")
+
+    Lib.Match_models_rows(scene, [("确定", hit)], 0.05)
+
+    cols = open(os.path.join(Lib._SHOT_DIR, "index.tsv"), encoding="utf-8").read().splitlines()[1].split("\t")
+    assert cols[8] == "-"
+
+
 def test_钩子_关闭时一次都不写(tmp_path, scene_and_template):
     scene, hit, _miss = scene_and_template
     before = sorted(os.listdir(tmp_path))

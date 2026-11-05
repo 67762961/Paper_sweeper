@@ -1028,7 +1028,7 @@ def Match_models_in_image_all(Img, Model_path, Threshold, max_matches=10):
     return Positions
 
 
-def Match_models_rows(Img, Models, Threshold, max_matches=8):
+def Match_models_rows(Img, Models, Threshold, max_matches=8, origin_offset=None):
     """在一帧上找多个不同模板，并按「行」裁决：一行只出一个类型
 
     与 Match_models_in_image_all 的区别是**行内竞争**。那个原语是
@@ -1046,6 +1046,8 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
     :param Models:      [(名字, 模板路径), ...]
     :param Threshold:   行内胜出者的分数上限，超过则该行不算命中
     :param max_matches: 每张模板最多取几个峰
+    :param origin_offset: 这张 Img 来自整屏的哪个位置 (x, y)，只用于调试截图
+                        记下裁剪偏移；不传表示 Img 就是整屏
     :return:            [(名字, [左上, 右下], 得分字符串), ...]，按纵向排序
     """
     check_stop()
@@ -1100,10 +1102,11 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
         # 全部模板都没过阈值：这是一次判定为未命中的匹配，照 G1 留一张图。
         # 记最像那张的分数，否则「为什么没认出来」只能靠猜
         if Best is not None:
-            _record_shot(Img, "models_rows", Best[1], f"{Best[0]:.3f}", Threshold, False)
+            _record_shot(Img, "models_rows", Best[1], f"{Best[0]:.3f}", Threshold, False,
+                         Offset=origin_offset)
         else:
             _record_shot(Img, "models_rows", Models[0][1] if Models else None, "-",
-                         Threshold, False)
+                         Threshold, False, Offset=origin_offset)
         return []
 
     # 3) 按纵向中心聚成行
@@ -1145,7 +1148,7 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
         _record_shot(Img_shot, "models_rows",
                      Results[0][0] if Results else (Models[0][0] if Models else None),
                      Results[0][2] if Results else "1.000",
-                     Threshold, bool(Results), Left_up=None)
+                     Threshold, bool(Results), Left_up=None, Offset=origin_offset)
 
     return Results
 
