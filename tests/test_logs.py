@@ -99,12 +99,23 @@ def test_log_stream_restores_stdout_on_error(tmp_path, monkeypatch):
 # ------------------------------------------------------- 截图与日志同进退
 
 
+def _write_shot_pref(mode):
+    """在当前工作目录写一份只含 debug_shots 的 state/gui.json。
+
+    截图档位只认这个文件和 begin_shots(mode=) 参数（PAPER_SHOTS 环境变量已废弃），
+    所以用例要先 monkeypatch.chdir 到临时目录，再落这份配置。
+    """
+    os.makedirs("state", exist_ok=True)
+    with open(os.path.join("state", "gui.json"), "w", encoding="utf-8") as handle:
+        handle.write('{"debug_shots": "%s"}' % mode)
+
+
 def test_log_stream_创建截图目录(tmp_path, monkeypatch):
     """开了截图档位时，截图目录与 .log 同 stamp 同目录；没开就一个目录都不建"""
     import Lib
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("PAPER_SHOTS", "all")
+    _write_shot_pref("all")
     Lib._SHOT_MODE = "off"
 
     with main._log_stream(None, "console_output") as log_path:
@@ -121,7 +132,7 @@ def test_log_stream_收尾只多一行汇总(tmp_path, monkeypatch):
     import Lib
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("PAPER_SHOTS", "all")
+    _write_shot_pref("all")
     Lib._SHOT_MODE = "off"
 
     with main._log_stream(None, "console_output") as log_path:
@@ -141,7 +152,7 @@ def test_log_stream_关闭时不建截图目录(tmp_path, monkeypatch):
     import Lib
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("PAPER_SHOTS", "off")
+    _write_shot_pref("off")
     Lib._SHOT_MODE = "off"
 
     with main._log_stream(None, "single_digui") as log_path:

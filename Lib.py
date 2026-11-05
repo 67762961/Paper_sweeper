@@ -573,9 +573,6 @@ _SHOT_BYTES = 0             # 累计写盘字节，供 end_shots() 打汇总
 _SHOT_FAILS = 0             # 连续写盘失败计数，达 3 熔断
 _SHOT_INDEX = None          # index.tsv 文件句柄
 _SHOT_LIMIT = 8000          # 单次运行张数上限（轮询场景会顶到数千）
-# 排除机制保留但默认置空：不给「必然 miss 的探测」开后门，真出现某模板刷爆再往里加名字
-_SHOT_SKIP_TEMPLATES = ()
-_SHOT_SKIP_ALL = False      # 由 begin_shots() 按环境变量刷新，不写成模块级常量
 
 
 def Img_write_ch(file_path, Img, quality=80):
@@ -616,12 +613,16 @@ def _shot_name(Origin, Model_path, Score, Hit):
 
 
 def begin_shots(log_file_path, mode=None):
-    """在 _log_stream 里调用：按当前档位准备截图目录与 index.tsv"""
-    global _SHOT_MODE, _SHOT_DIR, _SHOT_SEQ, _SHOT_SAVED, _SHOT_BYTES, _SHOT_FAILS, _SHOT_INDEX
-    global _SHOT_SKIP_ALL
+    """在 _log_stream 里调用：按当前档位准备截图目录与 index.tsv
 
-    _SHOT_MODE = (mode or os.environ.get("PAPER_SHOTS") or _read_shot_pref() or "off").lower()
-    _SHOT_SKIP_ALL = bool(os.environ.get("PAPER_SHOTS_ALL"))
+    优先级：显式 mode 参数 > state/gui.json 的 debug_shots > off。
+    设置弹窗写的就是 gui.json，所以界面上显示什么，这里就执行什么。
+    不再读 PAPER_SHOTS 环境变量——它曾让「设置里关着、实际却在存图」，
+    用户无从察觉那个变量还在进程环境里。
+    """
+    global _SHOT_MODE, _SHOT_DIR, _SHOT_SEQ, _SHOT_SAVED, _SHOT_BYTES, _SHOT_FAILS, _SHOT_INDEX
+
+    _SHOT_MODE = (mode or _read_shot_pref() or "off").lower()
     _SHOT_SEQ = _SHOT_SAVED = _SHOT_BYTES = _SHOT_FAILS = 0
     if _SHOT_MODE not in ("miss", "all"):
         _SHOT_MODE = "off"
@@ -673,9 +674,6 @@ def _record_shot(Img, Origin, Model_path, Score, Threshold, Hit,
     if _SHOT_MODE == "miss" and Hit:
         return
     if _SHOT_SAVED >= _SHOT_LIMIT:
-        return
-    # 排除名单：默认空（无例外）；机制保留，真被刷爆时再往里加模板名
-    if not _SHOT_SKIP_ALL and os.path.basename(Model_path or "") in _SHOT_SKIP_TEMPLATES:
         return
     try:
         # ① 画框：与 Flag_show 的调试窗口完全一致

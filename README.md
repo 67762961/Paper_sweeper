@@ -154,7 +154,7 @@ python GUI.py
 8. 右侧控制台会实时打印识别与任务日志；同一份日志也会写入 `logs/<年-月>/<日期>/`
    （完整运行为 `console_output_*.log`，单任务为 `single_<key>_*.log`）。
 
-9. 右侧日志区顶部可一键**清空日志**、切换**自动滚动**；点击齿轮打开**设置**（主题、日志字号、打开日志目录）。
+9. 右侧日志区顶部可一键**清空日志**、切换**自动滚动**；点击齿轮打开**设置**（主题、日志字号、打开日志目录、调试截图档位）。
    顶栏标题旁的亮度按钮可快速切换**浅色 / 深色**主题。
 
 打包版可使用同目录下的 `GUI.exe`（若存在），行为与 `python GUI.py` 一致。
@@ -261,7 +261,7 @@ python -m pytest
 python tools/check_pics.py
 ```
 
-`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 329 个用例：
+`pytest` 只覆盖**不依赖真实游戏窗口**的纯逻辑，当前有 637 个用例：
 
 | 文件 | 用例数 | 覆盖内容 |
 |---|---|---|
@@ -271,7 +271,7 @@ python tools/check_pics.py
 | `tests/test_config_backup.py` | 10 | **损坏配置先备份再重置**：重置前生成 `.corrupt-*.bak`，历史记录不被静默清空 |
 | `tests/test_paths.py` | 16 | **`config/` 与 `state/` 分层**：路径常量位置、旧布局迁移（不覆盖、不复制）、迁移后四个读取入口都能读到旧数据 |
 | `tests/test_runtime.py` | 9 | **`runtime.py` 命名约定**：`stop_thread` 可被消费、`config/` 里不能有 `__init__.py`、全项目禁止 `import config` |
-| `tests/test_logs.py` | 13 | 日志按年月分层、`clean_logs.py` 的按月/按天清理计划（只碰 `YYYY-MM` 目录） |
+| `tests/test_logs.py` | 16 | 日志按年月分层、`clean_logs.py` 的按月/按天清理计划（只碰 `YYYY-MM` 目录）、**日志与截图同 stamp 同目录**、收尾只多一行汇总、关闭时不建目录 |
 | `tests/test_check_pics.py` | 15 | `tools/check_pics.py` 自身的判定逻辑（失效引用、大小写不一致、死图、动态拼接豁免） |
 | `tests/test_emulator_close.py` | 46 | **关闭模拟器**：受控账号只来自 `启动项`、实例号解析、**MuMuManager 路径推导**（不写死安装路径）、两种子命令顺序的降级、找不到管理器时降级为关窗口、**关闭流程绝不调用会启动游戏的 `Find_windows`**；末尾还有**电源动作**：三种动作各走对 API、睡眠参数不是休眠、关机用 `EWX_POWEROFF`、不加强制标志位、未知动作/特权失败/返回 0/异常 |
 | `tests/test_prefs_after_run.py` | 34 | **完成动作偏好的读写与回落**：两个开关默认关闭、电源动作默认睡眠、三种动作可读回、7 种非法值回落、字符串 `"false"` / 数字 / `null` 都回落默认（不做校验会误触发睡眠）、开关与动作互不影响、保存不丢已有键 |
@@ -284,6 +284,14 @@ python tools/check_pics.py
 | `tests/test_thirty_dialog.py` | 18 | **「寮三十设置」弹窗**（真实控件）：7 列下拉、选项只有代码支持的那几个、**主副账号单向约束**（主账号全放开、副账号自动让开、**两个账号能互换**、三个账号时取第一个不同的、单账号时退化）、角色提示语、`values()` 次数是整数、`validate()` 成功写盘/失败返回 False 不关窗、配置损坏时仍能打开 |
 | `tests/test_jiejie_settings.py` | 50 | **结界养成配置**（纯逻辑 + 界面读写层）：默认值等于改动前写死的行为、放置顺序可调换、优先级补齐/截断/重复让位/穷举脏输入恒为合法排列、按账号读取、段缺失或损坏回落、只改 `结界养成` 段、**YAML 保真**（flow 单行、引号、注释、长命令不折行、新建段前留空行且重复保存不累积空行）、非法取值与损坏配置拒绝写入 |
 | `tests/test_jiejie_dialog.py` | 30 | **「结界养成设置」弹窗**（真实控件）：每账号一张卡片、放置下拉只有太鼓/斗鱼、四个优先级下拉**横排一行且标签在下拉框上方**（布局结构契约）、下拉与标签的**高度被钉死**（父窗口再矮也不被压扁）、纵向留白比库默认值收紧、**单向互斥**（第 N 级灰掉前 N-1 级的当前值、第 4 级天然锁定）、撞车时自动改派、`validate()` 成功写盘/失败返回 False 不关窗、齿轮已登记且提示语按任务区分、每个已登记弹窗都有自己的 `SAVED_MESSAGE`（不串台） |
+| `tests/test_jiejie_digit_primitives.py` | 19 | 结界养成的数字识别原语：模板切分、逐位匹配、脏输入回落 |
+| `tests/test_jiejie_yield.py` | 24 | 寄养收益计算：各星级/时长组合、非法输入、边界值 |
+| `tests/test_jiejie_yield_scan.py` | 65 | 寄养列表扫描：纵向聚类成行、`Match_models_rows` 的裁剪偏移、行内取最像、复核轮 |
+| `tests/test_lib_match_multi.py` | 30 | 多目标/多命中匹配原语：`Match_models_in_image` 取最像、`Match_models_in_image_all` 黑块迭代、`Match_models_rows` 聚行 |
+| `tests/test_shots.py` | 39 | **调试截图**：三档开关与「参数 > `gui.json` > off」优先级（环境变量 `PAPER_SHOTS` 已废弃，有用例守着它不再生效）、命名与序号、`index.tsv` 十列、中文路径写盘、熔断、**四个匹配原语每次判定都留一张图**、未命中记最像的分数、`models_all` 存的是没涂黑的原始帧、裁剪偏移列 |
+| `tests/test_prefs_shots.py` | 26 | **截图档位的读写与回落**：默认 `off`、三档往返、13 种非法值回落、不改动其它键、老配置缺键也能读 |
+| `tests/test_settings_dialog_shots.py` | 14 | **设置弹窗的截图下拉框**（真实控件）：三项顺序与 `VALID_SHOT_MODES` 一致、打开时回显已保存档位、`values()` 键集合、能真的写进 `state/gui.json`、带容量与语义提示 |
+| `tests/test_open_settings_save.py` | 8 | **设置保存路径**：成功时落盘并应用、**写盘失败弹提示且不应用改动**、取消时一次都不写、合并而非覆盖 |
 | `tests/test_示例_教学用.py` | 10 | 教学示例（不计入上表的覆盖统计，但会被 `pytest` 一起跑） |
 
 > 新增任务时，先跑 `python -m pytest tests/test_task_registry.py` —— 忘记登记注册表或状态键写错会立刻失败。
@@ -535,8 +543,9 @@ python -m pytest --lf                         # 只重跑上次失败的
    - 单任务运行日志：`logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log`
    - GUI 崩溃：`logs/app_crash.log`
    - 控制台匹配得分（`INFO- 0.0xx ...`）可辅助判断阈值是否过严/过松。
-   - 调试截图：设环境变量 `PAPER_SHOTS=all` 跑一次，每次匹配判定都会存一张图到日志同目录的
+   - 调试截图：在设置弹窗里把「调试截图」选成**全部保存**跑一次，每次匹配判定都会存一张图到日志同目录的
      `shots_<stamp>/` 下，明细在同目录 `index.tsv`（图与日志的对齐表）；默认关闭，详见 `ARCHITECTURE.md` §8.1。
+     完整跑一次约 2000～6000 张、几百 MB，排查完记得删。
    - 清理旧日志：`python tools/clean_logs.py`（默认只预览，`--apply` 才删除，默认保留 6 个月）。
 
 ---

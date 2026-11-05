@@ -61,7 +61,7 @@ flowchart LR
 │   ├── theme.py                   设计 token：颜色/间距/圆角/字号
 │   ├── theme_manager.py           Fluent 主题初始化与深浅色切换
 │   ├── prefs.py                   界面偏好读写（state/gui.json）
-│   ├── settings_dialog.py         设置弹窗（主题 / 日志偏好 / 日志目录）
+│   ├── settings_dialog.py         设置弹窗（主题 / 日志偏好 / 日志目录 / 调试截图）
 │   ├── after_run_dialog.py        完整运行设置弹窗（关闭模拟器 / 电源动作）
 │   ├── thirty_settings.py         寮三十配置读写层（纯逻辑，不依赖 Qt）
 │   ├── thirty_dialog.py           寮三十设置弹窗（副本 / 次数 / 主副账号）
@@ -166,8 +166,8 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`）、`CountdownDialog`（可取消的倒计时确认框） |
 | `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 「关闭模拟器 / 中断运行 / 完整运行 / 设置齿轮」按钮组） |
 | `ui/theme_manager.py` | Fluent 主题初始化与深浅色切换（主题偏好存 `state/gui.json`） |
-| `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号 / 两个完成动作开关） |
-| `ui/settings_dialog.py` | 日志设置弹窗：主题、日志偏好与「打开日志目录」（日志区齿轮进入） |
+| `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号 / 调试截图档位 / 两个完成动作开关） |
+| `ui/settings_dialog.py` | 日志设置弹窗：主题、日志偏好、「打开日志目录」与调试截图档位下拉（日志区齿轮进入） |
 | `ui/after_run_dialog.py` | 完整运行设置弹窗：只有「关闭模拟器」「让电脑睡眠」两个开关（按钮区齿轮进入） |
 | `ui/thirty_settings.py` | 寮三十配置的**纯逻辑**读写：常量、7 项归一化、非法值回落、账号校验、YAML 保真写回。不依赖 Qt，可被 pytest 直接测 |
 | `ui/thirty_dialog.py` | 「寮三十设置」弹窗：主副账号（单向约束，副账号自动跟随）+ 一周七天横排的副本/次数下拉（`thirty` 行齿轮进入） |
@@ -188,7 +188,8 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 - 点「关闭模拟器」→ `Lib.close_emulators()` 关闭受控模拟器窗口（详见 §5.6），控制台输出 `closed/missing/stuck` 摘要并用 `InfoBar` 提示；
 - 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果；
 - 顶栏右侧提供深浅色主题快捷切换按钮，右侧日志区提供「清空 / 自动滚动 / 设置」工具条；
-- 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号，并提供「打开日志目录」入口；
+- 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号、调试截图档位，并提供「打开日志目录」入口；
+  写盘失败时弹「保存失败」提示并**不**应用改动（不切主题、不同步日志区），避免界面与磁盘状态对不上；
 - 界面偏好写入 `state/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `config/Setting.yml` / `state/Gui_state.yml`；
 - 深浅色主题各有独立配色：文字类控件用 Fluent 标签（浅色 / 深色两套文字色由库自动切换），
   自绘状态图标、日志行着色与轮廓按钮在切换后按当前主题重新取色；主强调色是比原 `#007BFF`
@@ -944,7 +945,7 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | 脚本 | 调用 `main.Full_operation()` | 无 GUI，输出到控制台与日志 |
 | 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log` |
 | 调试 | `dev/test.py` / `dev/test_main.py` | 单点验证模板/任务，已 gitignore（见 `dev/README.md`） |
-| 调试 | 设置弹窗选「调试截图」档位，或 `PAPER_SHOTS=all python GUI.py` | 见下方「调试截图」（也可以在 `dev/` 脚本里设同名环境变量） |
+| 调试 | 设置弹窗选「调试截图」档位 | 见下方「调试截图」（`dev/` 脚本可显式传 `Lib.begin_shots(path, mode="all")`） |
 | 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.2） |
 | 清理 | `python tools/clean_logs.py` | 旧日志清理（默认预览，`--apply` 才删） |
 | 打包 | `python build_exe.py` | 调用 `GUI.spec`，产物 `GUI.exe` 直接输出到项目根目录 |
@@ -960,7 +961,11 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | `miss` | 只存未命中 | **语义有坑，暂不建议用**：流程里有大量「点完看它还在不在」的反向探测，不匹配才是正常，这种档位会把正常情况也存下来 |
 | `all` | 每一次判定都存 | 排查时用这个 |
 
-开关优先级：`begin_shots(mode=...)` > 环境变量 `PAPER_SHOTS` > `state/gui.json` 的 `debug_shots` > `off`。
+开关优先级：`begin_shots(mode=...)` > `state/gui.json` 的 `debug_shots` > `off`。
+
+**不读环境变量是刻意的**：早先 `PAPER_SHOTS` 排在 `gui.json` 前面，导致「设置里选关闭、实际仍在存图」
+而且不给任何提示——用户没法知道某个 Shell 会话里还留着一个环境变量。现在界面显示什么就执行什么；
+`dev/` 脚本要临时开截图，传 `mode` 参数即可。
 
 产物与日志同目录同 stamp（`main._log_stream` 负责起停），清理日志时整月删除即可连带带走：
 
