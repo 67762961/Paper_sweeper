@@ -79,6 +79,25 @@ class SettingsDialog(MessageBoxBase):
         self.open_logs_button.clicked.connect(self.open_logs_dir)
         self.viewLayout.addWidget(self.open_logs_button)
 
+        # 调试截图档位
+        shot_row = QHBoxLayout()
+        shot_row.addWidget(BodyLabel("调试截图", self))
+        shot_row.addStretch()
+        self.shot_combo = ComboBox(self)
+        self.shot_combo.addItems([prefs.SHOT_MODE_LABELS[mode] for mode in prefs.VALID_SHOT_MODES])
+        self.shot_combo.setCurrentIndex(prefs.VALID_SHOT_MODES.index(current["debug_shots"]))
+        shot_row.addWidget(self.shot_combo)
+        self.viewLayout.addLayout(shot_row)
+
+        # 提示：开启后处置细写在 ARCHITECTURE.md §8.1，这里只留最必要的两句
+        self.shot_hint = CaptionLabel(
+            "开启后每次匹配判定都存一张图到日志同目录的 shots_* 下"
+            "（完整跑一次约几百 MB）；「只存未命中」不适合反向探测较多的流程。",
+            self,
+        )
+        self.shot_hint.setWordWrap(True)
+        self.viewLayout.addWidget(self.shot_hint)
+
         self.version_label = CaptionLabel(f"Paper Sweeper v{APP_VERSION}", self)
         self.viewLayout.addWidget(self.version_label)
 
@@ -97,4 +116,5 @@ class SettingsDialog(MessageBoxBase):
             "theme": THEME_ORDER[self.theme_combo.currentIndex()],
             "log_auto_scroll": self.auto_scroll_switch.isChecked(),
             "log_font_size": prefs.VALID_LOG_SIZES[self.font_combo.currentIndex()],
+            "debug_shots": prefs.VALID_SHOT_MODES[self.shot_combo.currentIndex()],
         }
