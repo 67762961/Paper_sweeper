@@ -657,6 +657,78 @@ def end_shots():
     _SHOT_MODE = "off"
 
 
+def _record_shot(Img, Origin, Model_path, Score, Threshold, Hit,
+                 Left_up=None, Right_down=None, search_range=None, Offset=None):
+    """匹配后调用的唯一截图出口。任何异常都不允许影响匹配结果。
+
+    Img          : 要存档的原始帧（不要传涂黑过/裁剪过的内部工作图）
+    Origin       : match_model / models_in_image / models_all / models_rows
+    Left_up/Right_down : 要画的框；为 None 时只存原图不画框
+    Offset       : 裁剪块时的 (X0, Y0)，写进 index.tsv 供对坐标
+    """
+    global _SHOT_MODE, _SHOT_SEQ, _SHOT_SAVED, _SHOT_BYTES, _SHOT_FAILS
+
+    if _SHOT_MODE == "off":
+        return
+    if _SHOT_MODE == "miss" and Hit:
+        return
+    if _SHOT_SAVED >= _SHOT_LIMIT:
+        return
+    # 排除名单：默认空（无例外）；机制保留，真被刷爆时再往里加模板名
+    if not _SHOT_SKIP_ALL and os.path.basename(Model_path or "") in _SHOT_SKIP_TEMPLATES:
+        return
+    try:
+        # ① 画框：与 Flag_show 的调试窗口完全一致
+        if Left_up is None:
+            Img_display = Img
+        else:
+            Img_display = _draw_boxes(Img, Left_up, Right_down, search_range,
+                                      Origin in ("match_model", "models_all"))
+
+        # ② 命名 + 写盘
+        _SHOT_SEQ += 1
+        Name = _shot_name(Origin, Model_path, Score, Hit)
+        Path = os.path.join(_SHOT_DIR, Name)
+        if not Img_write_ch(Path, Img_display):
+            _SHOT_FAILS += 1
+            if _SHOT_FAILS >= 3:
+                print("        WAIT- ----- 截图连续写盘失败，本次运行已停止保存截图")
+                _SHOT_MODE = "off"
+            return
+        _SHOT_SAVED += 1
+        try:
+            _SHOT_BYTES += os.path.getsize(Path)      # 供 end_shots() 打体积汇总
+        except OSError:
+            pass
+        _SHOT_FAILS = 0                               # 成功一次就清零，熔断只针对「连续」失败
+
+        # ③ 只写 index.tsv（图片明细的唯一权威清单）
+        #    不给每张图 print —— GUI 控制台不要出现截图明细，
+        #    「哪句 log 对应哪张图」靠 index.tsv 的序号 + 时间戳事后对齐
+        if _SHOT_INDEX is not None:
+            Height, Width = Img.shape[0:2]
+            _SHOT_INDEX.write("\t".join((
+                str(_SHOT_SEQ),
+                datetime.now().strftime("%H:%M:%S.%f")[:-3],
+                "hit" if Hit else "miss",
+                Origin,
+                os.path.splitext(os.path.basename(Model_path or ""))[0] or "-",
+                str(Score),
+                str(Threshold),
+                f"{Width}x{Height}",
+                f"{Offset[0]},{Offset[1]}" if Offset else "-",
+                Name,
+            )) + "\n")
+            _SHOT_INDEX.flush()
+    except TaskStopped:
+        raise                      # 中断必须一路抛到 main
+    except Exception as error:
+        _SHOT_FAILS += 1
+        print("        WAIT- ----- 截图保存异常:", error)
+        if _SHOT_FAILS >= 3:
+            _SHOT_MODE = "off"
+
+
 def _draw_boxes(Img, Left_up, Right_down, search_range=None, is_window_match=False):
     """
     在图像副本上画出匹配框（调试显示与截图保存共用）
