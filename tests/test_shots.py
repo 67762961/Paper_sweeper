@@ -29,14 +29,11 @@ _REAL_READ_SHOT_PREF = Lib._read_shot_pref
 def _reset_shot_state(monkeypatch):
     """每个用例前后都把截图状态清干净，避免用例之间互相影响。
 
-    除了模块全局量和环境变量，还必须**掐掉 state/gui.json 这一档偏好**：
-    `begin_shots()` 的优先级是 参数 > PAPER_SHOTS > gui.json > off，
-    只要这个仓库当前的 gui.json 里 debug_shots 是 all（用户在设置弹窗里点过），
-    所有「默认应为 off」的用例就会假失败。用例不能依赖「跑测试时工作目录里
-    碰巧没有 gui.json」这种外部条件。
+    还必须**掐掉 state/gui.json 这一档偏好**：`begin_shots()` 的优先级是
+    参数 > gui.json > off，只要这个仓库当前的 gui.json 里 debug_shots 是 all
+    （用户在设置弹窗里点过），所有「默认应为 off」的用例就会假失败。
+    用例不能依赖「跑测试时工作目录里碰巧没有 gui.json」这种外部条件。
     """
-    monkeypatch.delenv("PAPER_SHOTS", raising=False)
-    monkeypatch.delenv("PAPER_SHOTS_ALL", raising=False)
     # 把偏好读取固定成「没有配置」，与真实读盘解耦
     monkeypatch.setattr(Lib, "_read_shot_pref", lambda: None)
     Lib._SHOT_MODE = "off"
@@ -47,8 +44,6 @@ def _reset_shot_state(monkeypatch):
     Lib._SHOT_FAILS = 0
     Lib._SHOT_INDEX = None
     Lib._SHOT_LIMIT = 8000
-    Lib._SHOT_SKIP_TEMPLATES = ()
-    Lib._SHOT_SKIP_ALL = False
     yield
     if Lib._SHOT_INDEX is not None:
         Lib._SHOT_INDEX.close()
@@ -98,30 +93,28 @@ def test_off档调用record_shot不写盘(tmp_path):
     assert os.listdir(tmp_path) == []
 
 
-def test_环境变量可以开档(tmp_path, monkeypatch):
-    """begin_shots 不传 mode 时，PAPER_SHOTS 应生效"""
-    monkeypatch.setenv("PAPER_SHOTS", "all")
-    Lib.begin_shots(_log_path(tmp_path))
-    assert Lib._SHOT_MODE == "all"
-    assert os.path.isdir(Lib._SHOT_DIR)
-
-
-def test_显式参数优先于环境变量(tmp_path, monkeypatch):
-    monkeypatch.setenv("PAPER_SHOTS", "all")
+def test_显式参数优先于gui_json(tmp_path, monkeypatch):
+    """begin_shots(mode=...) 是单次运行的临时覆盖，要压过 gui.json"""
+    monkeypatch.setattr(Lib, "_read_shot_pref", lambda: "all")
     Lib.begin_shots(_log_path(tmp_path), mode="off")
     assert Lib._SHOT_MODE == "off"
 
 
-def test_环境变量优先于gui_json(tmp_path, monkeypatch):
-    """PAPER_SHOTS 要压过 state/gui.json 里的档位"""
-    monkeypatch.setattr(Lib, "_read_shot_pref", lambda: "miss")
+def test_不再读PAPER_SHOTS环境变量(tmp_path, monkeypatch):
+    """PAPER_SHOTS 已废弃：即使进程环境里有，也不能改变档位。
+
+    这是「设置里关着、实际却在存图」那次事故的回归防线——
+    环境变量曾排在 gui.json 前面，且不给任何提示，用户无从察觉。
+    """
     monkeypatch.setenv("PAPER_SHOTS", "all")
+    monkeypatch.setattr(Lib, "_read_shot_pref", lambda: "off")
     Lib.begin_shots(_log_path(tmp_path))
-    assert Lib._SHOT_MODE == "all"
+    assert Lib._SHOT_MODE == "off"
+    assert Lib._SHOT_DIR is None
 
 
 def test_gui_json可以开档(tmp_path, monkeypatch):
-    """没有环境变量、没有显式参数时，读 state/gui.json 的 debug_shots"""
+    """没有显式参数时，读 state/gui.json 的 debug_shots"""
     monkeypatch.setattr(Lib, "_read_shot_pref", lambda: "all")
     Lib.begin_shots(_log_path(tmp_path))
     assert Lib._SHOT_MODE == "all"
@@ -366,24 +359,12 @@ def test_普通异常不影响匹配结果(tmp_path, monkeypatch):
     assert Lib._SHOT_FAILS == 1
 
 
-def test_排除名单默认不排除任何东西(tmp_path):
-    """默认空名单：必然 miss 的探测也照存，不给自己开后门"""
+def test_必然miss的探测也照存(tmp_path):
+    """不给自己开后门：连「点完看它还在不在」这种必然 miss 的探测也留图"""
     _start(tmp_path, "all")
     Lib._record_shot(_frame(), "match_model", "./pic/common/拒绝协作.png", 0.900, 0.01, False,
                      Left_up=(10, 10), Right_down=(50, 50))
     assert Lib._SHOT_SAVED == 1
-
-
-def test_排除名单命中则跳过(tmp_path, monkeypatch):
-    _start(tmp_path, "all")
-    Lib._SHOT_SKIP_TEMPLATES = ("拒绝协作.png",)
-    Lib._record_shot(_frame(), "match_model", "./pic/common/拒绝协作.png", 0.900, 0.01, False,
-                     Left_up=(10, 10), Right_down=(50, 50))
-    assert Lib._SHOT_SAVED == 0
-    Lib._SHOT_SKIP_ALL = True
-    Lib._record_shot(_frame(), "match_model", "./pic/common/拒绝协作.png", 0.900, 0.01, False,
-                     Left_up=(10, 10), Right_down=(50, 50))
-    assert Lib._SHOT_SAVED == 1, "_SHOT_SKIP_ALL 应能整体绕过排除名单"
 
 
 # -------------------------------------------------------------- 与 log 的绑定

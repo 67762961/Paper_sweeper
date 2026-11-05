@@ -543,7 +543,7 @@ python -m pytest --lf                         # 只重跑上次失败的
    - 单任务运行日志：`logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log`
    - GUI 崩溃：`logs/app_crash.log`
    - 控制台匹配得分（`INFO- 0.0xx ...`）可辅助判断阈值是否过严/过松。
-   - 调试截图：在设置弹窗里把「调试截图」选成**全部保存**（或设环境变量 `PAPER_SHOTS=all`）跑一次，每次匹配判定都会存一张图到日志同目录的
+   - 调试截图：在设置弹窗里把「调试截图」选成**全部保存**跑一次，每次匹配判定都会存一张图到日志同目录的
      `shots_<stamp>/` 下，明细在同目录 `index.tsv`（图与日志的对齐表）；默认关闭，详见 `ARCHITECTURE.md` §8.1。
      完整跑一次约 2000～6000 张、几百 MB，排查完记得删。
    - 清理旧日志：`python tools/clean_logs.py`（默认只预览，`--apply` 才删除，默认保留 6 个月）。

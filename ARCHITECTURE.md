@@ -945,7 +945,7 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | 脚本 | 调用 `main.Full_operation()` | 无 GUI，输出到控制台与日志 |
 | 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log` |
 | 调试 | `dev/test.py` / `dev/test_main.py` | 单点验证模板/任务，已 gitignore（见 `dev/README.md`） |
-| 调试 | 设置弹窗选「调试截图」档位，或 `PAPER_SHOTS=all python GUI.py` | 见下方「调试截图」（也可以在 `dev/` 脚本里设同名环境变量） |
+| 调试 | 设置弹窗选「调试截图」档位 | 见下方「调试截图」（`dev/` 脚本可显式传 `Lib.begin_shots(path, mode="all")`） |
 | 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.2） |
 | 清理 | `python tools/clean_logs.py` | 旧日志清理（默认预览，`--apply` 才删） |
 | 打包 | `python build_exe.py` | 调用 `GUI.spec`，产物 `GUI.exe` 直接输出到项目根目录 |
@@ -961,7 +961,11 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | `miss` | 只存未命中 | **语义有坑，暂不建议用**：流程里有大量「点完看它还在不在」的反向探测，不匹配才是正常，这种档位会把正常情况也存下来 |
 | `all` | 每一次判定都存 | 排查时用这个 |
 
-开关优先级：`begin_shots(mode=...)` > 环境变量 `PAPER_SHOTS` > `state/gui.json` 的 `debug_shots` > `off`。
+开关优先级：`begin_shots(mode=...)` > `state/gui.json` 的 `debug_shots` > `off`。
+
+**不读环境变量是刻意的**：早先 `PAPER_SHOTS` 排在 `gui.json` 前面，导致「设置里选关闭、实际仍在存图」
+而且不给任何提示——用户没法知道某个 Shell 会话里还留着一个环境变量。现在界面显示什么就执行什么；
+`dev/` 脚本要临时开截图，传 `mode` 参数即可。
 
 产物与日志同目录同 stamp（`main._log_stream` 负责起停），清理日志时整月删除即可连带带走：
 
