@@ -21,12 +21,22 @@ DEFAULT_PREFS = {
     "after_run_close_emulator": False,   # 关闭受控模拟器窗口
     "after_run_sleep": False,            # 是否启用结束后的电源动作
     "after_run_power": "sleep",          # 启用时执行哪个：logoff / sleep / shutdown
+    # 调试截图档位：每次模板匹配判定是否留一张图（明细在 logs/<月>/<日>/shots_*/）
+    "debug_shots": "off",                # off / miss / all
 }
 
 VALID_THEMES = ("light", "dark", "auto")
 VALID_LOG_SIZES = (11, 12, 13, 14)
 # 电源动作的合法取值；「不执行」由 after_run_sleep 开关表达，不在这里
 VALID_POWER_ACTIONS = ("logoff", "sleep", "shutdown")
+# 调试截图档位。miss 档语义有坑（反向探测场景里「不匹配才是成功」），
+# 界面仍列出它，但在设置弹窗里标注；默认 off。
+VALID_SHOT_MODES = ("off", "miss", "all")
+SHOT_MODE_LABELS = {
+    "off": "关闭",
+    "miss": "只存未命中",
+    "all": "全部保存",
+}
 
 # 布尔类偏好：统一按「是 bool 才采纳，否则回落默认」处理
 BOOL_PREF_KEYS = ("log_auto_scroll", "after_run_close_emulator", "after_run_sleep")
@@ -58,6 +68,8 @@ def load_prefs(path=None):
             prefs[key] = data[key]
     if data.get("after_run_power") in VALID_POWER_ACTIONS:
         prefs["after_run_power"] = data["after_run_power"]
+    if data.get("debug_shots") in VALID_SHOT_MODES:
+        prefs["debug_shots"] = data["debug_shots"]
     try:
         size = int(data.get("log_font_size", DEFAULT_PREFS["log_font_size"]))
         if size in VALID_LOG_SIZES:
