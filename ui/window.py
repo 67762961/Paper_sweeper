@@ -216,14 +216,24 @@ class MainWindow(MSFluentWindow):
         self._notify_theme(mode)
 
     def open_settings(self):
-        """打开设置弹窗：主题、日志偏好与日志目录"""
+        """打开设置弹窗：主题、日志偏好、日志目录与调试截图档位"""
         dialog = SettingsDialog(self)
         if not dialog.exec():
             return
         values = dialog.values()
         merged = ui_prefs.load_prefs()
         merged.update(values)
-        ui_prefs.save_prefs(merged)
+        # 写盘失败必须显式提示：用户可能刚把「调试截图」改成全部保存，
+        # 静默失败会让人以为设置已生效，下次运行才发现一张图都没有
+        if not ui_prefs.save_prefs(merged):
+            InfoBar.error(
+                "保存失败",
+                "无法写入 state/gui.json，请检查目录是否可写",
+                parent=self,
+                duration=4000,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
+            return
         theme_manager.apply_theme(values["theme"])
         self.right_panel.apply_prefs(values)
         self._notify_theme(values["theme"])

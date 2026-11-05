@@ -53,7 +53,7 @@
 - 公共能力集中在 `Lib.py`：识别、点击、界面状态机、配置读写、队伍预设等；任务模块只编排业务，不重复实现底层匹配。
 - 界面跳转优先写状态机（`current_state` + `match case`），轮次上限约 30，异常路径统一 `Itface_Host` 回庭院。
 - 控制台日志使用固定前缀：`TASK-` / `STEP-` / `INFO-` / `WAIT-` / `SKIP-` / `TIME-` / `MOVE-` / `QUIT-` / `MAIN-` / `SHOT-`（`SHOT-` 只用于调试截图的收尾汇总与写盘告警，明细一律进 `index.tsv`，不刷控制台）。
-- 任务冷却写入 `./state/Last_times.yml`；静态配置写在 `./config/Setting.yml`；任务开关写 `./state/Gui_state.yml`；界面偏好（主题 / 日志自动滚动 / 日志字号）由 `ui/prefs.py` 写入 `./state/gui.json`。四者不要混用，配置目录默认不入库。
+- 任务冷却写入 `./state/Last_times.yml`；静态配置写在 `./config/Setting.yml`；任务开关写 `./state/Gui_state.yml`；界面偏好（主题 / 日志自动滚动 / 日志字号 / 调试截图档位）由 `ui/prefs.py` 写入 `./state/gui.json`。四者不要混用，配置目录默认不入库。
 - 模板图片按业务分子目录放在 `./pic/`：**目录名用英文**（`common` / `courtyard` / `signin` / `guild` / `breakthrough` / `digui` / `fengmo` / `hunt` / `thirty` / `team`），**文件名用中文**（如 `确定.png`、`寄养入口.png`）。完整清单见 `pic/README.md`。阈值与搜索逻辑写在任务代码中，不散落魔法值到无关模块。
 - 改动 `pic/` 下的图片，或改动任务代码里的模板路径后，**必须运行 `python tools/check_pics.py`** 确认无失效引用；新增图片也应跑一次，避免出现"引用了不存在的图"或"死图"。工具报"错误"必须修，"提示"（未被引用）需人工确认。新增/改名图片后，再运行 `python tools/gen_pic_readme.py` 刷新 `pic/README.md` 索引。
 - 点击优先在识别框中心 1/4～3/4 区域内随机落点；全局替代硬编码坐标仅保留极少数界面（如卷轴）。

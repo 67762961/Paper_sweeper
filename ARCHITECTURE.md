@@ -61,7 +61,7 @@ flowchart LR
 │   ├── theme.py                   设计 token：颜色/间距/圆角/字号
 │   ├── theme_manager.py           Fluent 主题初始化与深浅色切换
 │   ├── prefs.py                   界面偏好读写（state/gui.json）
-│   ├── settings_dialog.py         设置弹窗（主题 / 日志偏好 / 日志目录）
+│   ├── settings_dialog.py         设置弹窗（主题 / 日志偏好 / 日志目录 / 调试截图）
 │   ├── after_run_dialog.py        完整运行设置弹窗（关闭模拟器 / 电源动作）
 │   ├── thirty_settings.py         寮三十配置读写层（纯逻辑，不依赖 Qt）
 │   ├── thirty_dialog.py           寮三十设置弹窗（副本 / 次数 / 主副账号）
@@ -166,8 +166,8 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 | `ui/widgets.py` | `ToggleSwitch`（Fluent `SwitchButton` 包装）、`TaskRow`（Fluent `SimpleCardWidget`）、`CountdownDialog`（可取消的倒计时确认框） |
 | `ui/panels.py` | `LeftPanel`（任务列表）、`RightPanel`（Fluent `TextEdit` 日志 + 进度条 + 「关闭模拟器 / 中断运行 / 完整运行 / 设置齿轮」按钮组） |
 | `ui/theme_manager.py` | Fluent 主题初始化与深浅色切换（主题偏好存 `state/gui.json`） |
-| `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号 / 两个完成动作开关） |
-| `ui/settings_dialog.py` | 日志设置弹窗：主题、日志偏好与「打开日志目录」（日志区齿轮进入） |
+| `ui/prefs.py` | 界面偏好读写（`state/gui.json`：主题 / 日志自动滚动 / 日志字号 / 调试截图档位 / 两个完成动作开关） |
+| `ui/settings_dialog.py` | 日志设置弹窗：主题、日志偏好、「打开日志目录」与调试截图档位下拉（日志区齿轮进入） |
 | `ui/after_run_dialog.py` | 完整运行设置弹窗：只有「关闭模拟器」「让电脑睡眠」两个开关（按钮区齿轮进入） |
 | `ui/thirty_settings.py` | 寮三十配置的**纯逻辑**读写：常量、7 项归一化、非法值回落、账号校验、YAML 保真写回。不依赖 Qt，可被 pytest 直接测 |
 | `ui/thirty_dialog.py` | 「寮三十设置」弹窗：主副账号（单向约束，副账号自动跟随）+ 一周七天横排的副本/次数下拉（`thirty` 行齿轮进入） |
@@ -188,7 +188,8 @@ Tee 重定向 stdout → 控制台 + logs/<YYYY-MM>/<YYYY-MM-DD>/<日志前缀>_
 - 点「关闭模拟器」→ `Lib.close_emulators()` 关闭受控模拟器窗口（详见 §5.6），控制台输出 `closed/missing/stuck` 摘要并用 `InfoBar` 提示；
 - 结束后刷新行内「上次运行」时间与今日状态图标，并用 `InfoBar` 提示本次结果；
 - 顶栏右侧提供深浅色主题快捷切换按钮，右侧日志区提供「清空 / 自动滚动 / 设置」工具条；
-- 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号，并提供「打开日志目录」入口；
+- 设置弹窗可调整主题（浅色 / 深色 / 跟随系统）、日志自动滚动与字号、调试截图档位，并提供「打开日志目录」入口；
+  写盘失败时弹「保存失败」提示并**不**应用改动（不切主题、不同步日志区），避免界面与磁盘状态对不上；
 - 界面偏好写入 `state/gui.json`（`ui/prefs.py` 自管），任务参数与任务开关仍分别写在 `config/Setting.yml` / `state/Gui_state.yml`；
 - 深浅色主题各有独立配色：文字类控件用 Fluent 标签（浅色 / 深色两套文字色由库自动切换），
   自绘状态图标、日志行着色与轮廓按钮在切换后按当前主题重新取色；主强调色是比原 `#007BFF`
