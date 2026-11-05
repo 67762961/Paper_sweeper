@@ -198,7 +198,7 @@ def test_all档每次匹配都出一张(tmp_path):
 
 
 def test_不留每张图的log行(tmp_path, capsys):
-    """控制台不许出现逐张 SHOT- 行；收尾只有一行汇总"""
+    """控制台不许出现逐张 SHOT- 行；收尾只有汇总与指路两条"""
     frame = _frame()
     _start(tmp_path, "all")
     for _ in range(3):
@@ -208,9 +208,12 @@ def test_不留每张图的log行(tmp_path, capsys):
 
     out = capsys.readouterr().out
     assert "SHOT- #" not in out, "逐张明细行已取消，图片清单只落 index.tsv"
-    shot_lines = [line for line in out.splitlines() if "SHOT-" in line]
-    assert len(shot_lines) == 1, "控制台只应有一条汇总"
+    shot_lines = [line for line in out.splitlines() if line.startswith("SHOT-")]
+    assert len(shot_lines) == 2, f"收尾应只有汇总与指路两条，实际 {shot_lines}"
     assert "本次共保存 3 张" in shot_lines[0]
+    assert "图文对照已生成" in shot_lines[1]
+    # 两行都顶格，与 TASK- 同级
+    assert all(not line.startswith(" ") for line in shot_lines)
 
 
 def test_达到上限后停止(tmp_path, monkeypatch):
@@ -415,8 +418,8 @@ def test_一张图都没存时不生成index_md(tmp_path, capsys):
     assert "图文对照已生成" not in out
 
 
-def test_收尾打一行图文对照提示(tmp_path, capsys):
-    """控制台只多一行 INFO- 指路，明细全在文档里"""
+def test_收尾打两行SHOT提示(tmp_path, capsys):
+    """收尾只多两行 SHOT-：一行汇总、一行指路；路径另起缩进行"""
     _start(tmp_path, "all")
     Lib._record_shot(_frame(), "match_model", "./pic/common/确定.png", 0.300, 0.05, True,
                      Left_up=(10, 10), Right_down=(50, 50))
@@ -424,9 +427,10 @@ def test_收尾打一行图文对照提示(tmp_path, capsys):
 
     out = capsys.readouterr().out
     # 注意别用「图文对照」当过滤词：tmp_path 目录名本身就含这几个字
-    hint_lines = [line for line in out.splitlines() if "INFO- ----- 图文对照" in line]
-    assert len(hint_lines) == 1, f"只该有一行提示，实际 {hint_lines}"
-    assert "index.md" in hint_lines[0]
+    hint_lines = [line for line in out.splitlines() if line.startswith("SHOT- ----- 图文对照")]
+    assert len(hint_lines) == 1, f"只该有一行指路，实际 {hint_lines}"
+    assert "index.md" not in hint_lines[0], "路径另起一行缩进，不挤在标题里"
+    assert f"        -> {os.path.join(Lib._SHOT_DIR, 'index.md')}" in out
 
 
 def test_渲染失败不影响收尾(tmp_path, capsys, monkeypatch):

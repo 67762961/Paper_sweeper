@@ -544,13 +544,22 @@ python -m pytest --lf                         # 只重跑上次失败的
    - 单任务运行日志：`logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log`
    - GUI 崩溃：`logs/app_crash.log`
    - 控制台匹配得分（`INFO- 0.0xx ...`）可辅助判断阈值是否过严/过松。
-   - 调试截图：在设置弹窗里把「调试截图」选成**全部保存**跑一次，每次匹配判定都会存一张图到日志同目录的
-     `shots_<stamp>/` 下，明细在同目录 `index.tsv`（图与日志的对齐表）；默认关闭，详见 `ARCHITECTURE.md` §8.1。
+   - 调试截图：在设置弹窗里把「调试截图」选成**全部保存**跑一次，每次匹配判定都会存一张图；
+     开了截图时**这次的 `.log` 也放进 `shots_<stamp>/`**，一次排查的日志、图片、索引全在一个文件夹里
+     （日期目录下不再散着一堆 `.log`）。默认关闭，详见 `ARCHITECTURE.md` §8.1。
      完整跑一次约 2000～6000 张、几百 MB，排查完记得删。
    - 看图：跑完自动就在截图目录里生成 `index.md`——每张图配上它判定区间内的日志行，能直接看出
-     「这句 log 对应哪张图」，控制台只多一行 `INFO- ----- 图文对照已生成: ...`。事后想补渲染旧目录
-     或筛选，用 `python tools/render_shots.py`（`--miss-only` 只看未命中，`--by-template` 按模板归堆）；
-     详见 `ARCHITECTURE.md` §8.2。
+     「这句 log 对应哪张图」。控制台收尾只打两行（顶格与 `TASK-` 同级，路径另起一行缩进）：
+
+     ```
+     SHOT- ----- 本次共保存 8 张 / 约 3 MB
+             -> logs\2026-11\2026-11-05\shots_2026-11-05_21-38-53
+     SHOT- ----- 图文对照已生成
+             -> logs\2026-11\2026-11-05\shots_2026-11-05_21-38-53\index.md
+     ```
+
+     事后想补渲染旧目录或筛选，用 `python tools/render_shots.py`（`--miss-only` 只看未命中，
+     `--by-template` 按模板归堆）；详见 `ARCHITECTURE.md` §8.2。
    - 清理旧日志：`python tools/clean_logs.py`（默认只预览，`--apply` 才删除，默认保留 6 个月）。
 
 ---

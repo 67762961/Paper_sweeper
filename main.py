@@ -17,6 +17,7 @@ from Lib import (
     end_shots,
     read_config,
     reset_stop,
+    shot_enabled,
     stop_requested,
     request_stop,
     write_config,
@@ -304,21 +305,35 @@ def _log_stream(console_signal, log_prefix):
     这样一个月一个目录，单目录下的文件数量不会无限增长，
     清理旧日志时也能整月删除（见 tools/clean_logs.py）。
 
-    顺带在这里起停调试截图：截图目录与 .log 同 stamp 同目录，
-    收尾时 end_shots 只往控制台补一行汇总，图片明细全在磁盘上。
+    开了调试截图时，这次的 .log 直接放进它的截图目录里：
+        logs/2026-11/2026-11-05/shots_2026-11-05_21-38-53/
+            ├── console_output_2026-11-05_21-38-53.log
+            ├── index.tsv / index.md
+            └── 000001_hit_主界面_0.012.jpg ...
+    一次排查的东西全在一个文件夹里，日期目录下也不再散着一堆 .log。
     """
     now = datetime.datetime.now()
     log_dir = os.path.join("logs", now.strftime("%Y-%m"), now.strftime("%Y-%m-%d"))
     os.makedirs(log_dir, exist_ok=True)
 
     timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-    log_file_path = os.path.join(log_dir, f"{log_prefix}_{timestamp}.log")
+    # 开截图就把日志一起塞进 shots_<stamp>/，否则仍留在日期目录下
+    shot_dir = None
+    if shot_enabled():
+        shot_dir = os.path.join(log_dir, "shots_" + timestamp)
+        try:
+            os.makedirs(shot_dir, exist_ok=True)
+        except OSError:
+            # 建不出来就退回原布局：日志本身比截图重要，不能因为截图放不进去而不写日志
+            shot_dir = None
+    target_dir = shot_dir or log_dir
+    log_file_path = os.path.join(target_dir, f"{log_prefix}_{timestamp}.log")
 
     with open(log_file_path, "w", encoding="utf-8") as log_file:
         original_stdout = sys.stdout
         tee = Tee(original_stdout, log_file, text_signal=console_signal)
         sys.stdout = tee
-        begin_shots(log_file_path)
+        begin_shots(log_file_path, shot_dir=shot_dir)
         try:
             yield log_file_path
         finally:

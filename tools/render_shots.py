@@ -94,17 +94,24 @@ def parse_index(shot_dir):
 
 
 def find_log(shot_dir):
-    """由 shots_<stamp> 反推同目录的 <prefix>_<stamp>.log。
+    """由 shots_<stamp> 反推同 stamp 的 <prefix>_<stamp>.log。
 
     stamp 里带 `:` 之外的分隔符全是 `-`，不会与日志前缀冲突；
     同 stamp 理论上只有一份日志（_log_stream 的 timestamp 精确到秒）。
+
+    开截图时 _log_stream 会把 .log 直接放进截图目录（一次排查的东西放一处），
+    老目录的 .log 则仍与截图目录同级——两处都找，先看目录内。
     """
     name = os.path.basename(shot_dir.rstrip("\\/"))
     if not name.startswith(SHOT_PREFIX):
         return None
     stamp = name[len(SHOT_PREFIX):]
-    hits = sorted(glob.glob(os.path.join(os.path.dirname(shot_dir), "*_" + stamp + ".log")))
-    return hits[0] if hits else None
+    pattern = "*_" + stamp + ".log"
+    for folder in (shot_dir, os.path.dirname(shot_dir)):
+        hits = sorted(glob.glob(os.path.join(folder, pattern)))
+        if hits:
+            return hits[0]
+    return None
 
 
 def read_log(path):

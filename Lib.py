@@ -598,6 +598,15 @@ def _read_shot_pref():
         return None
 
 
+def shot_enabled(mode=None):
+    """本次运行是否会存截图。给 main._log_stream 提前判断日志该放哪用。
+
+    和 begin_shots 用的是同一条优先级（显式 mode 参数 > gui.json > off），
+    所以两处判断不会打架。
+    """
+    return (mode or _read_shot_pref() or "off").lower() in ("miss", "all")
+
+
 _SHOT_BAD_CHARS = re.compile(r'[\\/:*?"<>|]')
 
 
@@ -612,13 +621,18 @@ def _shot_name(Origin, Model_path, Score, Hit):
     return f"{_SHOT_SEQ:06d}_{'hit' if Hit else 'miss'}_{name}_{score}.jpg"
 
 
-def begin_shots(log_file_path, mode=None):
+def begin_shots(log_file_path, mode=None, shot_dir=None):
     """在 _log_stream 里调用：按当前档位准备截图目录与 index.tsv
 
     优先级：显式 mode 参数 > state/gui.json 的 debug_shots > off。
     设置弹窗写的就是 gui.json，所以界面上显示什么，这里就执行什么。
     不再读 PAPER_SHOTS 环境变量——它曾让「设置里关着、实际却在存图」，
     用户无从察觉那个变量还在进程环境里。
+
+    :param shot_dir: 截图目录。默认按 log 的 timestamp 推出 `shots_<stamp>`
+                     并与 .log 同级；_log_stream 开着截图时会把 .log 一起
+                     放进这个目录，所以那里会显式传进来（不传就会得到
+                     `shots_x/shots_x` 这种套娃路径）
     """
     global _SHOT_MODE, _SHOT_DIR, _SHOT_SEQ, _SHOT_SAVED, _SHOT_BYTES, _SHOT_FAILS, _SHOT_INDEX
 
@@ -631,7 +645,7 @@ def begin_shots(log_file_path, mode=None):
     # log 名形如 console_output_2026-11-04_22-15-03.log，末 19 位就是 %Y-%m-%d_%H-%M-%S
     stem = os.path.splitext(os.path.basename(log_file_path))[0]
     stamp = stem[-19:] if len(stem) >= 19 else stem
-    _SHOT_DIR = os.path.join(os.path.dirname(log_file_path), "shots_" + stamp)
+    _SHOT_DIR = shot_dir or os.path.join(os.path.dirname(log_file_path), "shots_" + stamp)
     try:
         os.makedirs(_SHOT_DIR, exist_ok=True)
         _SHOT_INDEX = open(os.path.join(_SHOT_DIR, "index.tsv"), "w", encoding="utf-8")
@@ -655,17 +669,22 @@ def _render_shot_index():
         text_lines = render_shots.render_run(_SHOT_DIR)
         path = render_shots.write_index(_SHOT_DIR, text_lines)
     except Exception as error:
-        print("        INFO- ----- 图文对照生成失败（不影响本次运行）:", error)
+        print("SHOT- ----- 图文对照生成失败（不影响本次运行）:", error)
         return None
-    print(f"        INFO- ----- 图文对照已生成: {path}")
+    print("SHOT- ----- 图文对照已生成")
+    print(f"        -> {path}")
     return path
 
 
 def end_shots():
-    """收尾：打一行汇总、关 index.tsv、自动生成 index.md
+    """收尾：打汇总、关 index.tsv、自动生成 index.md
 
-    控制台的截图信息固定两行：一行 `SHOT-` 汇总（G3），一行 `INFO-` 指向
-    刚生成的图文对照。逐张明细一律只进 index.tsv / index.md，不刷控制台。
+    控制台固定两行 `SHOT-`（与 `TASK-` 同级、顶格不缩进），路径单独一行缩进：
+        SHOT- ----- 本次共保存 8 张 / 约 3 MB
+                -> logs\\2026-11\\...\\shots_2026-11-05_21-38-53
+        SHOT- ----- 图文对照已生成
+                -> logs\\2026-11\\...\\shots_2026-11-05_21-38-53\\index.md
+    逐张明细一律只进 index.tsv / index.md，不刷控制台。
     """
     global _SHOT_MODE, _SHOT_INDEX
     if _SHOT_INDEX is not None:
@@ -675,10 +694,11 @@ def end_shots():
             pass
         _SHOT_INDEX = None
     if _SHOT_MODE != "off":
-        # 汇总一行：张数 + 体积 + 路径。体积靠累加每张写盘后的 os.path.getsize，
-        # 不额外扫目录（扫几千个文件要几百毫秒，收尾时没必要再付一次）
-        print(f"        SHOT- ----- 本次共保存 {_SHOT_SAVED} 张 / 约 {_SHOT_BYTES / 1048576:.0f} MB"
-              f" -> {_SHOT_DIR}")
+        # 汇总行：张数 + 体积，路径单独一行缩进（一行塞俩太长，日志里会折行）
+        # 体积靠累加每张写盘后的 os.path.getsize，不额外扫目录
+        #（扫几千个文件要几百毫秒，收尾时没必要再付一次）
+        print(f"SHOT- ----- 本次共保存 {_SHOT_SAVED} 张 / 约 {_SHOT_BYTES / 1048576:.0f} MB")
+        print(f"        -> {_SHOT_DIR}")
         # 开截图本来就是为了排查，跑完直接把图文对照摆好，省得再手敲命令。
         # 一张都没存下来就不生成，免得留下一份「没有可渲染的记录」的空文档。
         if _SHOT_SAVED:

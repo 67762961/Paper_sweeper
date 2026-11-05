@@ -110,8 +110,8 @@ def _write_shot_pref(mode):
         handle.write('{"debug_shots": "%s"}' % mode)
 
 
-def test_log_stream_创建截图目录(tmp_path, monkeypatch):
-    """开了截图档位时，截图目录与 .log 同 stamp 同目录；没开就一个目录都不建"""
+def test_log_stream_日志放进截图目录(tmp_path, monkeypatch):
+    """开了截图档位时，这次 .log 直接进 shots_<stamp>/，日期目录下不再散着 .log"""
     import Lib
 
     monkeypatch.chdir(tmp_path)
@@ -121,14 +121,19 @@ def test_log_stream_创建截图目录(tmp_path, monkeypatch):
     with main._log_stream(None, "console_output") as log_path:
         print("x")
 
-    shot_dir = os.path.join(os.path.dirname(log_path),
-                            "shots_" + os.path.splitext(os.path.basename(log_path))[0][-19:])
-    assert os.path.isdir(shot_dir), "截图目录应与 .log 同目录同 stamp"
+    shot_dir = os.path.dirname(log_path)
+    assert os.path.basename(shot_dir) == "shots_" + os.path.splitext(
+        os.path.basename(log_path))[0][-19:], "日志应放在同 stamp 的截图目录里"
     assert os.path.exists(os.path.join(shot_dir, "index.tsv"))
+    # 日期目录下只剩这个 shots_*，不再有裸 .log
+    siblings = os.listdir(os.path.dirname(shot_dir))
+    assert not [n for n in siblings if n.endswith(".log")], "日期目录下不该再散落 .log"
+    # begin_shots 收到显式 shot_dir，不该套娃出 shots_x/shots_x
+    assert not os.path.isdir(os.path.join(shot_dir, os.path.basename(shot_dir)))
 
 
-def test_log_stream_收尾只多一行汇总(tmp_path, monkeypatch):
-    """截图明细不进控制台：整场只在收尾多一行 SHOT- 汇总"""
+def test_log_stream_收尾只多两行SHOT(tmp_path, monkeypatch):
+    """截图明细不进控制台：整场只在收尾多两行 SHOT-（汇总 + 指路）"""
     import Lib
 
     monkeypatch.chdir(tmp_path)
@@ -142,9 +147,10 @@ def test_log_stream_收尾只多一行汇总(tmp_path, monkeypatch):
                              "./pic/common/确定.png", "0.300", 0.05, True, (1, 1), (10, 10))
 
     content = open(log_path, encoding="utf-8").read()
-    shot_lines = [l for l in content.splitlines() if "SHOT-" in l]
-    assert len(shot_lines) == 1, f"5 张图只该有 1 行汇总，实际 {shot_lines}"
-    assert "SHOT- -----" in shot_lines[0]
+    shot_lines = [l for l in content.splitlines() if l.startswith("SHOT-")]
+    assert len(shot_lines) == 2, f"5 张图只该有 2 行收尾，实际 {shot_lines}"
+    assert "SHOT- ----- 本次共保存 5 张" in shot_lines[0]
+    assert "SHOT- ----- 图文对照已生成" in shot_lines[1]
     assert "SHOT- #" not in content, "逐张明细行不该出现在日志里"
 
 
