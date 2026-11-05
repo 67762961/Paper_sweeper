@@ -153,9 +153,11 @@ def test_保存档位不冲掉完成动作(dialog):
 # ------------------------------------------------------------ 界面提示
 
 
-def test_有容量与语义提示(dialog):
-    """只存未命中的坑必须在界面上说清楚，不能只写在文档里"""
+def test_三个档位各有一句说明(dialog):
+    """只存未命中的坑必须在界面上说清楚，三个档位各说一句「会怎么样」"""
     text = dialog.shot_hint.text()
 
-    assert "shots_" in text
+    assert "关闭" in text
+    assert "只存未命中" in text
+    assert "全部保存" in text
     assert "未命中" in text
