@@ -839,6 +839,10 @@ def Match_model(Img, Img_model_path, Threshold, Flag_show, search_range=None, is
     else:
         return1 = [Left_up, Right_down]
 
+    # 调试截图：每次匹配判定留一张图（默认档位下 _record_shot 首行即返回）
+    _record_shot(Img, "match_model", Img_model_path, return2, Threshold, return1 is not None,
+                 Left_up, Right_down, search_range, (x1, y1) if search_range is not None else None)
+
     return return1, return2
 
 
@@ -928,6 +932,7 @@ def Match_models_in_image(Img, models, Threshold):
     Img = np.uint8(Img)
 
     Results = []
+    Best = None          # (score, name, box)：未命中时也要知道「最像的那张差多少」
     for name, Model_path in models:
         Img_model = _read_template_cached(Model_path)
         Model_height, Model_width = Img_model.shape[0:2]
@@ -938,14 +943,30 @@ def Match_models_in_image(Img, models, Threshold):
 
         Result = cv2.matchTemplate(Img, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED)
         min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Result)
-        if min_val > Threshold:
-            continue
 
         Left_up = (min_loc[0], min_loc[1])
         Right_down = (min_loc[0] + Model_width, min_loc[1] + Model_height)
+        if Best is None or min_val < Best[0]:
+            Best = (float(min_val), name, [Left_up, Right_down])
+
+        if min_val > Threshold:
+            continue
+
         Results.append((name, [Left_up, Right_down], f"{min_val:.3f}"))
 
     Results.sort(key=lambda item: float(item[2]))
+
+    # 调试截图：一次调用留一张图。命中与否按「有没有至少一个命中」判定；
+    # 未命中时也记下最像那张的分数，否则「为什么没认出来」无从判断
+    if Results:
+        _name, _box, _score = Results[0]
+        _record_shot(Img, "models_in_image", _name, _score, Threshold, True,
+                     _box[0], _box[1])
+    elif Best is not None:
+        _record_shot(Img, "models_in_image", Best[1], f"{Best[0]:.3f}", Threshold, False)
+    else:
+        _record_shot(Img, "models_in_image", "-", "-", Threshold, False)
+
     return Results
 
 
@@ -971,14 +992,21 @@ def Match_models_in_image_all(Img, Model_path, Threshold, max_matches=10):
     Img_model = _read_template_cached(Model_path)
     Model_height, Model_width = Img_model.shape[0:2]
     if Model_height > Img_work.shape[0] or Model_width > Img_work.shape[1]:
+        # 模板比帧还大属于配置错误，但这也是一次「判定为未命中」，照 G1 留一张图
+        _record_shot(Img, "models_all", Model_path, "1.000", Threshold, False)
         return []
 
     Positions = []
+    Last_score = None      # 循环结束那一轮的分数：未命中时它就是「最像的那次差多少」
+    Hit_score = None       # 第一个命中的分数（最像的那个位置）
     for _ in range(max_matches):
         Result = cv2.matchTemplate(Img_work, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED)
         min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Result)
+        Last_score = float(min_val)
         if min_val > Threshold:
             break
+        if Hit_score is None:
+            Hit_score = float(min_val)
 
         Left_up = (min_loc[0], min_loc[1])
         Right_down = (min_loc[0] + Model_width, min_loc[1] + Model_height)
@@ -988,6 +1016,15 @@ def Match_models_in_image_all(Img, Model_path, Threshold, max_matches=10):
         cv2.rectangle(Img_work, Left_up, Right_down, (0, 0, 0), -1)
 
     Positions.sort(key=lambda box: box[0][1])
+
+    # 调试截图：传原始 Img，不能传涂黑过的 Img_work（那会看不出当时屏幕什么样）
+    if Positions:
+        _record_shot(Img, "models_all", Model_path, f"{Hit_score:.3f}", Threshold, True,
+                     Positions[0][0], Positions[0][1])
+    else:
+        Last = "1.000" if Last_score is None else f"{Last_score:.3f}"
+        _record_shot(Img, "models_all", Model_path, Last, Threshold, False)
+
     return Positions
 
 
@@ -1031,10 +1068,13 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
 
     # 2) 各取若干峰（非极大抑制只压分数图，不重跑匹配）
     Peaks = []
+    Best = None        # (score, name)：未命中时记下最像的那张差多少
     for Item in Maps:
         Work = Item["map"].copy()
         for _ in range(max_matches):
             min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Work)
+            if Best is None or min_val < Best[0]:
+                Best = (float(min_val), Item["name"])
             if min_val > Threshold:
                 break
             Peaks.append({
@@ -1057,6 +1097,13 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
             )
 
     if not Peaks:
+        # 全部模板都没过阈值：这是一次判定为未命中的匹配，照 G1 留一张图。
+        # 记最像那张的分数，否则「为什么没认出来」只能靠猜
+        if Best is not None:
+            _record_shot(Img, "models_rows", Best[1], f"{Best[0]:.3f}", Threshold, False)
+        else:
+            _record_shot(Img, "models_rows", Models[0][1] if Models else None, "-",
+                         Threshold, False)
         return []
 
     # 3) 按纵向中心聚成行
@@ -1087,6 +1134,19 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
         ))
 
     Results.sort(key=lambda item: item[1][0][1])
+
+    # 调试截图：一次调用可能有多个命中行，_draw_boxes 只认一个框，
+    # 所以这里自己在副本上把所有框画完，再以 Left_up=None 交给 _record_shot。
+    # Img_work 是原图别名，直接画会污染调用方的图，必须先 copy。
+    if _SHOT_MODE != "off":
+        Img_shot = np.uint8(Img).copy()
+        for _name, _box, _score in Results:
+            cv2.rectangle(Img_shot, _box[0], _box[1], (0, 0, 255), 2)
+        _record_shot(Img_shot, "models_rows",
+                     Results[0][0] if Results else (Models[0][0] if Models else None),
+                     Results[0][2] if Results else "1.000",
+                     Threshold, bool(Results), Left_up=None)
+
     return Results
 
 

@@ -14,6 +14,7 @@
 
 import os
 
+import cv2
 import numpy as np
 import pytest
 
@@ -341,3 +342,159 @@ def test_目录建不出来时自关(tmp_path, monkeypatch):
     monkeypatch.setattr(Lib.os, "makedirs", lambda *a, **k: (_ for _ in ()).throw(OSError("没权限")))
     Lib.begin_shots(_log_path(tmp_path), mode="all")
     assert Lib._SHOT_MODE == "off"
+
+
+# ------------------------------------------------- 四个匹配原语的钩子真的挂着
+
+
+@pytest.fixture()
+def scene_and_template(tmp_path):
+    """造一张场景图，外加两个模板：
+
+    - `确定.png` 是场景里的原样裁片，得分 0.000，必定命中；
+    - `接近.png` 由裁片压暗 40 得到，得分约 0.072，在阈值 0.05 下是**差一点点的未命中**——
+      这正是用户最想复盘的那种「为什么没认出来」。
+    """
+    rng = np.random.default_rng(3)
+    scene = rng.integers(0, 60, size=(240, 320, 3), dtype=np.uint8)
+    cv2.rectangle(scene, (40, 50), (90, 90), (200, 180, 120), -1)
+    patch = scene[50:90, 40:90].copy()
+
+    hit_path = tmp_path / "确定.png"
+    ok, buf = cv2.imencode(".png", patch)
+    assert ok
+    hit_path.write_bytes(buf.tobytes())
+
+    dimmed = np.clip(patch.astype(int) - 40, 0, 255).astype(np.uint8)
+    miss_path = tmp_path / "接近.png"
+    ok, buf = cv2.imencode(".png", dimmed)
+    assert ok
+    miss_path.write_bytes(buf.tobytes())
+
+    Lib.clear_template_cache()
+    return scene, str(hit_path), str(miss_path)
+
+
+def test_钩子_match_model_命中与未命中各一张(tmp_path, scene_and_template):
+    scene, hit, miss = scene_and_template
+    _start(tmp_path, "all")
+
+    Lib.Match_model(scene, hit, 0.05, False)
+    Lib.Match_model(scene, miss, 0.05, False)
+
+    rows = open(os.path.join(Lib._SHOT_DIR, "index.tsv"), encoding="utf-8").read().splitlines()[1:]
+    assert len(rows) == 2, "两次判定必须两张图"
+    assert [r.split("\t")[2] for r in rows] == ["hit", "miss"]
+    assert all(r.split("\t")[3] == "match_model" for r in rows)
+    assert all(r.split("\t")[6] == "0.05" for r in rows)
+    assert float(rows[1].split("\t")[5]) > 0.05, "未命中那张的得分必须真高过阈值"
+
+
+def test_钩子_models_in_image_未命中记最像的分数(tmp_path, scene_and_template):
+    """未命中时也要知道「最像的那张差多少」，否则不知道为什么没认出来"""
+    scene, _hit, miss = scene_and_template
+    _start(tmp_path, "all")
+
+    assert Lib.Match_models_in_image(scene, [("确定", miss)], 0.05) == []
+
+    cols = open(os.path.join(Lib._SHOT_DIR, "index.tsv"), encoding="utf-8").read().splitlines()[1].split("\t")
+    assert cols[2] == "miss"
+    assert cols[3] == "models_in_image"
+    assert cols[4] == "确定"
+    assert 0.05 < float(cols[5]) < 1.0, "应记下最像那张的真实分数，而不是兜底值"
+
+
+def test_钩子_models_all_未命中记最像的分数(tmp_path, scene_and_template):
+    scene, _hit, miss = scene_and_template
+    _start(tmp_path, "all")
+
+    assert Lib.Match_models_in_image_all(scene, miss, 0.05) == []
+
+    cols = open(os.path.join(Lib._SHOT_DIR, "index.tsv"), encoding="utf-8").read().splitlines()[1].split("\t")
+    assert cols[2] == "miss"
+    assert cols[3] == "models_all"
+    assert 0.05 < float(cols[5]) < 1.0
+
+
+def test_钩子_models_rows_未命中记最像的分数(tmp_path, scene_and_template):
+    scene, _hit, miss = scene_and_template
+    _start(tmp_path, "all")
+
+    assert Lib.Match_models_rows(scene, [("确定", miss)], 0.05) == []
+
+    cols = open(os.path.join(Lib._SHOT_DIR, "index.tsv"), encoding="utf-8").read().splitlines()[1].split("\t")
+    assert cols[2] == "miss"
+    assert cols[3] == "models_rows"
+    assert 0.05 < float(cols[5]) < 1.0
+
+
+def test_钩子_命中时记的是命中那次的分数(tmp_path, scene_and_template):
+    """命中时不能糊一个 0.000 上去，要记真正的相似度"""
+    scene, _hit, near = scene_and_template
+    _start(tmp_path, "all")
+
+    # 用一个偏松的阈值把它变成命中：约 0.072 的那张在 0.2 下算命中
+    assert Lib.Match_models_in_image(scene, [("接近", near)], 0.2) != []
+
+    cols = open(os.path.join(Lib._SHOT_DIR, "index.tsv"), encoding="utf-8").read().splitlines()[1].split("\t")
+    assert cols[2] == "hit"
+    assert 0.05 < float(cols[5]) < 0.2, "命中的分数应是真实相似度"
+
+
+def test_钩子_一次调用一张图(tmp_path, scene_and_template):
+    """一次原语调用 = 一张图，不是「一张模板一张图」"""
+    scene, hit, _miss = scene_and_template
+    _start(tmp_path, "all")
+
+    Lib.Match_models_in_image(scene, [("A", hit), ("B", hit)], 0.05)
+    assert Lib._SHOT_SAVED == 1, "models_in_image 一次调用只出一张"
+
+
+def test_钩子_models_rows_把所有命中行画在一起(tmp_path, scene_and_template):
+    """一帧多行时，所有行都要出现在同一张图上"""
+    scene, hit, _miss = scene_and_template
+    # 同一张卡再复制一份到下面一行
+    scene = scene.copy()
+    scene[150:190, 40:90] = scene[50:90, 40:90]
+    _start(tmp_path, "all")
+
+    results = Lib.Match_models_rows(scene, [("确定", hit)], 0.05)
+    assert len(results) >= 2, "同一帧应能找出两个位置"
+
+    jpg = [n for n in os.listdir(Lib._SHOT_DIR) if n.endswith(".jpg")][0]
+    shot = Lib.Img_read_ch(os.path.join(Lib._SHOT_DIR, jpg))
+    # 两处都画了红框 ⇒ 上下两个 y 区间都应出现纯红像素
+    red = ((shot[:, :, 2] > 200) & (shot[:, :, 0] < 60) & (shot[:, :, 1] < 60))
+    ys = np.where(red.any(axis=1))[0]
+    assert len(ys) > 0
+    assert ys.min() < 120 and ys.max() > 120, "上下两行的框都要画上"
+
+
+def test_钩子_models_all_存的是没涂黑的原始帧(tmp_path, scene_and_template):
+    """models_all 内部把已匹配区涂黑，存档必须用原始 Img，否则看不出当时屏幕什么样"""
+    scene, hit, _miss = scene_and_template
+    scene = scene.copy()
+    scene[150:190, 40:90] = scene[50:90, 40:90]
+    _start(tmp_path, "all")
+
+    Lib.Match_models_in_image_all(scene, hit, 0.05)
+    jpg = [n for n in os.listdir(Lib._SHOT_DIR) if n.endswith(".jpg")][0]
+    shot = Lib.Img_read_ch(os.path.join(Lib._SHOT_DIR, jpg))
+
+    # 涂黑块是 (0,0,0) 的实心矩形，原始帧里那块亮色不该消失
+    assert shot[70, 65].max() > 100, "命中区域不该是黑的"
+    assert shot[170, 65].max() > 100, "第二个命中区域同样不该被涂黑"
+
+
+def test_钩子_关闭时一次都不写(tmp_path, scene_and_template):
+    scene, hit, _miss = scene_and_template
+    before = sorted(os.listdir(tmp_path))
+    Lib.begin_shots(_log_path(tmp_path))  # off
+    Lib.Match_model(scene, hit, 0.05, False)
+    Lib.Match_models_in_image(scene, [("确定", hit)], 0.05)
+    Lib.Match_models_in_image_all(scene, hit, 0.05)
+    Lib.Match_models_rows(scene, [("确定", hit)], 0.05)
+
+    assert Lib._SHOT_SAVED == 0
+    assert sorted(os.listdir(tmp_path)) == before, "off 档不许落下任何截图目录或文件"
+
