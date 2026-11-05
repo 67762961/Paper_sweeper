@@ -564,6 +564,39 @@ def Img_read_ch(file_path):
     return img
 
 
+def _draw_boxes(Img, Left_up, Right_down, search_range=None, is_window_match=False):
+    """
+    在图像副本上画出匹配框（调试显示与截图保存共用）
+    :param Img: 原始图像（三通道 BGR）
+    :param Left_up: 匹配区域左上角
+    :param Right_down: 匹配区域右下角
+    :param search_range: 搜索区域，格式为[Left_up, Right_down]，指定时用蓝框标定
+    :param is_window_match: 是否为窗口匹配，为真时用绿框标定点击区域
+    :return: 画好框的图像副本（不修改传入的原图）
+    """
+    # 深拷贝原始图像以避免修改
+    Img_display = Img.copy()
+
+    # 如果指定了搜索区域，用蓝框标定
+    if search_range is not None:
+        cv2.rectangle(Img_display, search_range[0], search_range[1], (255, 0, 0), 2)
+
+    # 用红框标定匹配区域
+    cv2.rectangle(Img_display, Left_up, Right_down, (0, 0, 255), 2)
+
+    # 计算点击区域（与Click函数中的计算一致）
+    Width = Right_down[0] - Left_up[0]
+    Height = Right_down[1] - Left_up[1]
+    click_Left_up = (int(Left_up[0] + Width / 4), int(Left_up[1] + Height / 4))
+    click_Right_down = (int(Left_up[0] + 3 * Width / 4), int(Left_up[1] + 3 * Height / 4))
+
+    # 如果是窗口匹配，显示点击区域
+    if is_window_match:
+        cv2.rectangle(Img_display, click_Left_up, click_Right_down, (0, 255, 0), 2)
+
+    return Img_display
+
+
 def Match_model(Img, Img_model_path, Threshold, Flag_show, search_range=None, is_window_match=False):
     """
     内部模板匹配函数
@@ -622,25 +655,8 @@ def Match_model(Img, Img_model_path, Threshold, Flag_show, search_range=None, is
 
     # 显示结果
     if Flag_show:
-        # 深拷贝原始图像以避免修改
-        Img_display = Img.copy()
-
-        # 如果指定了搜索区域，用蓝框标定
-        if search_range is not None:
-            cv2.rectangle(Img_display, search_range[0], search_range[1], (255, 0, 0), 2)
-
-        # 用红框标定匹配区域
-        cv2.rectangle(Img_display, Left_up, Right_down, (0, 0, 255), 2)
-
-        # 计算点击区域（与Click函数中的计算一致）
-        Width = Right_down[0] - Left_up[0]
-        Height = Right_down[1] - Left_up[1]
-        click_Left_up = (int(Left_up[0] + Width / 4), int(Left_up[1] + Height / 4))
-        click_Right_down = (int(Left_up[0] + 3 * Width / 4), int(Left_up[1] + 3 * Height / 4))
-
-        # 如果是窗口匹配，显示点击区域
-        if is_window_match:
-            cv2.rectangle(Img_display, click_Left_up, click_Right_down, (0, 255, 0), 2)
+        # 画框逻辑与截图保存共用
+        Img_display = _draw_boxes(Img, Left_up, Right_down, search_range, is_window_match)
 
         window_title = "Window Match" if is_window_match else "Screen Match"
         if search_range is not None:
