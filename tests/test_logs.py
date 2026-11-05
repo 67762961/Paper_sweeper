@@ -11,6 +11,7 @@ import importlib.util
 import os
 import sys
 
+import numpy as np
 import pytest
 
 import main
@@ -21,6 +22,22 @@ if TOOLS_DIR not in sys.path:
     sys.path.insert(0, TOOLS_DIR)
 
 import clean_logs  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _reset_shot_state():
+    """截图是模块级全局状态，用例之间必须清干净，句柄也要关掉"""
+    import Lib
+
+    Lib._SHOT_MODE = "off"
+    Lib._SHOT_DIR = None
+    Lib._SHOT_SAVED = 0
+    Lib._SHOT_INDEX = None
+    yield
+    if Lib._SHOT_INDEX is not None:
+        Lib._SHOT_INDEX.close()
+        Lib._SHOT_INDEX = None
+    Lib._SHOT_MODE = "off"
 
 
 # ------------------------------------------------------- 日志目录分层
@@ -77,6 +94,61 @@ def test_log_stream_restores_stdout_on_error(tmp_path, monkeypatch):
             raise RuntimeError("boom")
 
     assert sys.stdout is original
+
+
+# ------------------------------------------------------- 截图与日志同进退
+
+
+def test_log_stream_创建截图目录(tmp_path, monkeypatch):
+    """开了截图档位时，截图目录与 .log 同 stamp 同目录；没开就一个目录都不建"""
+    import Lib
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PAPER_SHOTS", "all")
+    Lib._SHOT_MODE = "off"
+
+    with main._log_stream(None, "console_output") as log_path:
+        print("x")
+
+    shot_dir = os.path.join(os.path.dirname(log_path),
+                            "shots_" + os.path.splitext(os.path.basename(log_path))[0][-19:])
+    assert os.path.isdir(shot_dir), "截图目录应与 .log 同目录同 stamp"
+    assert os.path.exists(os.path.join(shot_dir, "index.tsv"))
+
+
+def test_log_stream_收尾只多一行汇总(tmp_path, monkeypatch):
+    """截图明细不进控制台：整场只在收尾多一行 SHOT- 汇总"""
+    import Lib
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PAPER_SHOTS", "all")
+    Lib._SHOT_MODE = "off"
+
+    with main._log_stream(None, "console_output") as log_path:
+        print("TASK- ----- 干正事")
+        for _ in range(5):
+            Lib._record_shot(np.zeros((20, 30, 3), dtype=np.uint8), "match_model",
+                             "./pic/common/确定.png", "0.300", 0.05, True, (1, 1), (10, 10))
+
+    content = open(log_path, encoding="utf-8").read()
+    shot_lines = [l for l in content.splitlines() if "SHOT-" in l]
+    assert len(shot_lines) == 1, f"5 张图只该有 1 行汇总，实际 {shot_lines}"
+    assert "SHOT- -----" in shot_lines[0]
+    assert "SHOT- #" not in content, "逐张明细行不该出现在日志里"
+
+
+def test_log_stream_关闭时不建截图目录(tmp_path, monkeypatch):
+    import Lib
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PAPER_SHOTS", "off")
+    Lib._SHOT_MODE = "off"
+
+    with main._log_stream(None, "single_digui") as log_path:
+        print("x")
+
+    siblings = os.listdir(os.path.dirname(log_path))
+    assert not any(name.startswith("shots_") for name in siblings)
 
 
 # --------------------------------------------------------- 清理工具

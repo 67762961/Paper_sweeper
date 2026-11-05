@@ -892,6 +892,7 @@ for step in range(30):
 | `TIME-` | 上次/本次任务时间 |
 | `MOVE-` / `QUIT-` | 滚轮、Esc 等操作；`QUIT-` 也用于「收到中断指令」 |
 | `MAIN-` | 完整流程 / 单任务运行起止；被中断时结束行改为「被中断 |
+| `SHOT-` | 调试截图：只在收尾打一行汇总，以及写盘失败/熔断时告警（见 §8 产物树） |
 
 GUI 崩溃日志：`logs/app_crash.log`（`logging` + `sys.excepthook`）。
 
@@ -923,6 +924,9 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 <workspace>/
 ├── logs/<YYYY-MM>/<YYYY-MM-DD>/console_output_<timestamp>.log   完整运行日志
 ├── logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_<timestamp>.log     单任务运行日志
+├── logs/<YYYY-MM>/<YYYY-MM-DD>/shots_<timestamp>/               调试截图（开启时才有）
+│   ├── 000001_miss_太鼓_0.312.jpg                                  每次匹配判定一张
+│   └── index.tsv                                                   图 ↔ 日志的对齐表
 ├── logs/app_crash.log                                          未捕获异常
 ├── state/Last_times.yml                                       任务冷却状态（本地）
 ├── state/Gui_state.yml                                        任务开关（本地）
@@ -940,11 +944,45 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | 脚本 | 调用 `main.Full_operation()` | 无 GUI，输出到控制台与日志 |
 | 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log` |
 | 调试 | `dev/test.py` / `dev/test_main.py` | 单点验证模板/任务，已 gitignore（见 `dev/README.md`） |
-| 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.1） |
+| 调试 | 设置弹窗选「调试截图」档位，或 `PAPER_SHOTS=all python GUI.py` | 见下方「调试截图」（也可以在 `dev/` 脚本里设同名环境变量） |
+| 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.2） |
 | 清理 | `python tools/clean_logs.py` | 旧日志清理（默认预览，`--apply` 才删） |
 | 打包 | `python build_exe.py` | 调用 `GUI.spec`，产物 `GUI.exe` 直接输出到项目根目录 |
 
-### 8.1 模板图引用检查（`tools/check_pics.py`）
+### 8.1 调试截图（排查识别问题用）
+
+每一次模板匹配判定都留一张图，用来回看「当时屏幕长什么样、得分多少」。
+默认**关闭**（`off`），热路径第一行就返回，平时零开销。
+
+| 档位 | 存什么 | 用在哪 |
+| ---- | ---- | ---- |
+| `off` | 不存 | 默认 |
+| `miss` | 只存未命中 | **语义有坑，暂不建议用**：流程里有大量「点完看它还在不在」的反向探测，不匹配才是正常，这种档位会把正常情况也存下来 |
+| `all` | 每一次判定都存 | 排查时用这个 |
+
+开关优先级：`begin_shots(mode=...)` > 环境变量 `PAPER_SHOTS` > `state/gui.json` 的 `debug_shots` > `off`。
+
+产物与日志同目录同 stamp（`main._log_stream` 负责起停），清理日志时整月删除即可连带带走：
+
+```
+logs/2026-11/2026-11-05/
+├── console_output_2026-11-05_10-48-54.log
+└── shots_2026-11-05_10-48-54/
+    ├── 000001_hit_确定_0.000.jpg
+    ├── 000042_miss_太鼓_0.312.jpg     # 文件名自带 hit/miss 与得分，可直接按名筛
+    └── index.tsv                      # 10 列：序号/时间/结果/来源/模板/得分/阈值/尺寸/裁剪偏移/文件
+```
+
+**控制台不出现截图明细**：几千张图只在收尾打一行 `SHOT- ----- 本次共保存 N 张 / 约 M MB -> 路径`，
+明细全在 `index.tsv` 里。图文对照的渲染器 `tools/render_shots.py` 尚未提供，计划在后续 PR 补上。
+
+日志行本身不带时间戳，所以图与日志的对应关系靠 `index.tsv` 的**序号 + 毫秒时间戳**事后切分：
+第 N 张图发生在第 N-1 张之后、第 N+1 张之前，落在这段区间里的日志行就归它。
+
+上线量级参考：一次完整运行约 2000~6000 次判定，`all` 档约 640 MB（单张 JPEG 约 160 KB），
+大于 8000 张会停止保存（`_SHOT_LIMIT`）；连续写盘失败 3 次自动关闭本次截图，不影响任务本身。
+
+### 8.2 模板图引用检查（`tools/check_pics.py`）
 
 改动 `pic/` 或任务代码里的模板路径后运行，可自动发现三类问题：
 

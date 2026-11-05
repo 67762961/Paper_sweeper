@@ -12,7 +12,9 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from Lib import (
     Find_windows,
     TaskStopped,
+    begin_shots,
     check_stop,
+    end_shots,
     read_config,
     reset_stop,
     stop_requested,
@@ -301,6 +303,9 @@ def _log_stream(console_signal, log_prefix):
 
     这样一个月一个目录，单目录下的文件数量不会无限增长，
     清理旧日志时也能整月删除（见 tools/clean_logs.py）。
+
+    顺带在这里起停调试截图：截图目录与 .log 同 stamp 同目录，
+    收尾时 end_shots 只往控制台补一行汇总，图片明细全在磁盘上。
     """
     now = datetime.datetime.now()
     log_dir = os.path.join("logs", now.strftime("%Y-%m"), now.strftime("%Y-%m-%d"))
@@ -313,10 +318,13 @@ def _log_stream(console_signal, log_prefix):
         original_stdout = sys.stdout
         tee = Tee(original_stdout, log_file, text_signal=console_signal)
         sys.stdout = tee
+        begin_shots(log_file_path)
         try:
             yield log_file_path
         finally:
-            # 先无条件恢复 stdout，避免后续 print 写入已关闭的日志文件；
+            # 先停截图再恢复 stdout：end_shots 的汇总行要落进这次的 .log
+            end_shots()
+            # 再无条件恢复 stdout，避免后续 print 写入已关闭的日志文件；
             # 冲刷只做尽力而为，控制台流在打包版（console=False）下可能为 None
             sys.stdout = original_stdout
             try:

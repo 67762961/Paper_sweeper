@@ -971,8 +971,9 @@ def test_row_type_crops_around_row(monkeypatch):
     """复核只裁这一行附近，并且把裁切偏移加回去再比纵向中心"""
     seen = {}
 
-    def fake_rows(Img, Models, Threshold, max_matches=8):
+    def fake_rows(Img, Models, Threshold, max_matches=8, origin_offset=None):
         seen["shape"] = Img.shape
+        seen["offset"] = origin_offset
         # 裁切块里的坐标是相对的：这一行在裁切块里 y 约 12（原图 40，裁切从 28 开始）
         return [("六星太鼓", [[0, 12], [100, 42]], "0.010")]
 
@@ -984,6 +985,8 @@ def test_row_type_crops_around_row(monkeypatch):
 
     assert got == "六星太鼓"
     assert seen["shape"][0] == (70 - 40) + 2 * Task.JIEJIE_RECHECK_MARGIN, "纵向按外扩裁切"
+    margin = Task.JIEJIE_RECHECK_MARGIN
+    assert seen["offset"] == (max(0, 10 - margin), max(0, 40 - margin)), "要把裁切偏移传下去"
 
 
 def test_row_type_returns_none_when_no_match(monkeypatch):

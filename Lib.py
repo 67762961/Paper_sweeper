@@ -564,6 +564,204 @@ def Img_read_ch(file_path):
     return img
 
 
+# ---- 调试截图（默认全关，热路径第一行 early return）----
+_SHOT_MODE = "off"          # off / miss / all
+_SHOT_DIR = None            # logs/<月>/<日>/shots_<stamp>
+_SHOT_SEQ = 0               # 产出序号，等于「第几次匹配判定」
+_SHOT_SAVED = 0
+_SHOT_BYTES = 0             # 累计写盘字节，供 end_shots() 打汇总
+_SHOT_FAILS = 0             # 连续写盘失败计数，达 3 熔断
+_SHOT_INDEX = None          # index.tsv 文件句柄
+_SHOT_LIMIT = 8000          # 单次运行张数上限（轮询场景会顶到数千）
+# 排除机制保留但默认置空：不给「必然 miss 的探测」开后门，真出现某模板刷爆再往里加名字
+_SHOT_SKIP_TEMPLATES = ()
+_SHOT_SKIP_ALL = False      # 由 begin_shots() 按环境变量刷新，不写成模块级常量
+
+
+def Img_write_ch(file_path, Img, quality=80):
+    """中文路径写图：cv2.imwrite 遇中文路径静默返回 False，必须走 imencode + tofile"""
+    try:
+        Ok, Buffer = cv2.imencode(".jpg", Img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        if not Ok:
+            return False
+        Buffer.tofile(file_path)
+        return True
+    except Exception as error:
+        print("        WAIT- ----- 截图写盘失败:", file_path, error)
+        return False
+
+
+def _read_shot_pref():
+    """读 state/gui.json 的 debug_shots。直接用 json 读，不 import ui.prefs——
+    Lib 是底层，不能反向依赖界面层（ui/__init__.py 写明了单向依赖）"""
+    try:
+        with open(paths.PREFS, "r", encoding="utf-8") as Handle:
+            return json.load(Handle).get("debug_shots")
+    except Exception:
+        return None
+
+
+_SHOT_BAD_CHARS = re.compile(r'[\\/:*?"<>|]')
+
+
+def _shot_name(Origin, Model_path, Score, Hit):
+    """000123_miss_确定_0.312.jpg。模板名走中文，必须先把 Windows 非法字符换掉"""
+    name = os.path.splitext(os.path.basename(Model_path or ""))[0] or Origin
+    name = _SHOT_BAD_CHARS.sub("_", name)[:40]
+    try:
+        score = "{0:.3f}".format(float(Score))
+    except (TypeError, ValueError):
+        score = str(Score)
+    return f"{_SHOT_SEQ:06d}_{'hit' if Hit else 'miss'}_{name}_{score}.jpg"
+
+
+def begin_shots(log_file_path, mode=None):
+    """在 _log_stream 里调用：按当前档位准备截图目录与 index.tsv"""
+    global _SHOT_MODE, _SHOT_DIR, _SHOT_SEQ, _SHOT_SAVED, _SHOT_BYTES, _SHOT_FAILS, _SHOT_INDEX
+    global _SHOT_SKIP_ALL
+
+    _SHOT_MODE = (mode or os.environ.get("PAPER_SHOTS") or _read_shot_pref() or "off").lower()
+    _SHOT_SKIP_ALL = bool(os.environ.get("PAPER_SHOTS_ALL"))
+    _SHOT_SEQ = _SHOT_SAVED = _SHOT_BYTES = _SHOT_FAILS = 0
+    if _SHOT_MODE not in ("miss", "all"):
+        _SHOT_MODE = "off"
+        return
+    # 目录名沿用 log 的 timestamp，保证一一对应
+    # log 名形如 console_output_2026-11-04_22-15-03.log，末 19 位就是 %Y-%m-%d_%H-%M-%S
+    stem = os.path.splitext(os.path.basename(log_file_path))[0]
+    stamp = stem[-19:] if len(stem) >= 19 else stem
+    _SHOT_DIR = os.path.join(os.path.dirname(log_file_path), "shots_" + stamp)
+    try:
+        os.makedirs(_SHOT_DIR, exist_ok=True)
+        _SHOT_INDEX = open(os.path.join(_SHOT_DIR, "index.tsv"), "w", encoding="utf-8")
+        _SHOT_INDEX.write("序号\t时间\t结果\t来源\t模板\t得分\t阈值\t尺寸\t裁剪偏移\t文件\n")
+    except OSError as error:
+        print("        WAIT- ----- 无法创建截图目录，已关闭截图:", error)
+        _SHOT_MODE = "off"
+
+
+def end_shots():
+    """收尾：打一行汇总并关 index.tsv（G3：控制台只出现这一行截图信息）"""
+    global _SHOT_MODE, _SHOT_INDEX
+    if _SHOT_INDEX is not None:
+        try:
+            _SHOT_INDEX.close()
+        except Exception:
+            pass
+        _SHOT_INDEX = None
+    if _SHOT_MODE != "off":
+        # 汇总一行：张数 + 体积 + 路径。体积靠累加每张写盘后的 os.path.getsize，
+        # 不额外扫目录（扫几千个文件要几百毫秒，收尾时没必要再付一次）
+        print(f"        SHOT- ----- 本次共保存 {_SHOT_SAVED} 张 / 约 {_SHOT_BYTES / 1048576:.0f} MB"
+              f" -> {_SHOT_DIR}")
+    _SHOT_MODE = "off"
+
+
+def _record_shot(Img, Origin, Model_path, Score, Threshold, Hit,
+                 Left_up=None, Right_down=None, search_range=None, Offset=None):
+    """匹配后调用的唯一截图出口。任何异常都不允许影响匹配结果。
+
+    Img          : 要存档的原始帧（不要传涂黑过/裁剪过的内部工作图）
+    Origin       : match_model / models_in_image / models_all / models_rows
+    Left_up/Right_down : 要画的框；为 None 时只存原图不画框
+    Offset       : 裁剪块时的 (X0, Y0)，写进 index.tsv 供对坐标
+    """
+    global _SHOT_MODE, _SHOT_SEQ, _SHOT_SAVED, _SHOT_BYTES, _SHOT_FAILS
+
+    if _SHOT_MODE == "off":
+        return
+    if _SHOT_MODE == "miss" and Hit:
+        return
+    if _SHOT_SAVED >= _SHOT_LIMIT:
+        return
+    # 排除名单：默认空（无例外）；机制保留，真被刷爆时再往里加模板名
+    if not _SHOT_SKIP_ALL and os.path.basename(Model_path or "") in _SHOT_SKIP_TEMPLATES:
+        return
+    try:
+        # ① 画框：与 Flag_show 的调试窗口完全一致
+        if Left_up is None:
+            Img_display = Img
+        else:
+            Img_display = _draw_boxes(Img, Left_up, Right_down, search_range,
+                                      Origin in ("match_model", "models_all"))
+
+        # ② 命名 + 写盘
+        _SHOT_SEQ += 1
+        Name = _shot_name(Origin, Model_path, Score, Hit)
+        Path = os.path.join(_SHOT_DIR, Name)
+        if not Img_write_ch(Path, Img_display):
+            _SHOT_FAILS += 1
+            if _SHOT_FAILS >= 3:
+                print("        WAIT- ----- 截图连续写盘失败，本次运行已停止保存截图")
+                _SHOT_MODE = "off"
+            return
+        _SHOT_SAVED += 1
+        try:
+            _SHOT_BYTES += os.path.getsize(Path)      # 供 end_shots() 打体积汇总
+        except OSError:
+            pass
+        _SHOT_FAILS = 0                               # 成功一次就清零，熔断只针对「连续」失败
+
+        # ③ 只写 index.tsv（图片明细的唯一权威清单）
+        #    不给每张图 print —— GUI 控制台不要出现截图明细，
+        #    「哪句 log 对应哪张图」靠 index.tsv 的序号 + 时间戳事后对齐
+        if _SHOT_INDEX is not None:
+            Height, Width = Img.shape[0:2]
+            _SHOT_INDEX.write("\t".join((
+                str(_SHOT_SEQ),
+                datetime.now().strftime("%H:%M:%S.%f")[:-3],
+                "hit" if Hit else "miss",
+                Origin,
+                os.path.splitext(os.path.basename(Model_path or ""))[0] or "-",
+                str(Score),
+                str(Threshold),
+                f"{Width}x{Height}",
+                f"{Offset[0]},{Offset[1]}" if Offset else "-",
+                Name,
+            )) + "\n")
+            _SHOT_INDEX.flush()
+    except TaskStopped:
+        raise                      # 中断必须一路抛到 main
+    except Exception as error:
+        _SHOT_FAILS += 1
+        print("        WAIT- ----- 截图保存异常:", error)
+        if _SHOT_FAILS >= 3:
+            _SHOT_MODE = "off"
+
+
+def _draw_boxes(Img, Left_up, Right_down, search_range=None, is_window_match=False):
+    """
+    在图像副本上画出匹配框（调试显示与截图保存共用）
+    :param Img: 原始图像（三通道 BGR）
+    :param Left_up: 匹配区域左上角
+    :param Right_down: 匹配区域右下角
+    :param search_range: 搜索区域，格式为[Left_up, Right_down]，指定时用蓝框标定
+    :param is_window_match: 是否为窗口匹配，为真时用绿框标定点击区域
+    :return: 画好框的图像副本（不修改传入的原图）
+    """
+    # 深拷贝原始图像以避免修改
+    Img_display = Img.copy()
+
+    # 如果指定了搜索区域，用蓝框标定
+    if search_range is not None:
+        cv2.rectangle(Img_display, search_range[0], search_range[1], (255, 0, 0), 2)
+
+    # 用红框标定匹配区域
+    cv2.rectangle(Img_display, Left_up, Right_down, (0, 0, 255), 2)
+
+    # 计算点击区域（与Click函数中的计算一致）
+    Width = Right_down[0] - Left_up[0]
+    Height = Right_down[1] - Left_up[1]
+    click_Left_up = (int(Left_up[0] + Width / 4), int(Left_up[1] + Height / 4))
+    click_Right_down = (int(Left_up[0] + 3 * Width / 4), int(Left_up[1] + 3 * Height / 4))
+
+    # 如果是窗口匹配，显示点击区域
+    if is_window_match:
+        cv2.rectangle(Img_display, click_Left_up, click_Right_down, (0, 255, 0), 2)
+
+    return Img_display
+
+
 def Match_model(Img, Img_model_path, Threshold, Flag_show, search_range=None, is_window_match=False):
     """
     内部模板匹配函数
@@ -622,25 +820,8 @@ def Match_model(Img, Img_model_path, Threshold, Flag_show, search_range=None, is
 
     # 显示结果
     if Flag_show:
-        # 深拷贝原始图像以避免修改
-        Img_display = Img.copy()
-
-        # 如果指定了搜索区域，用蓝框标定
-        if search_range is not None:
-            cv2.rectangle(Img_display, search_range[0], search_range[1], (255, 0, 0), 2)
-
-        # 用红框标定匹配区域
-        cv2.rectangle(Img_display, Left_up, Right_down, (0, 0, 255), 2)
-
-        # 计算点击区域（与Click函数中的计算一致）
-        Width = Right_down[0] - Left_up[0]
-        Height = Right_down[1] - Left_up[1]
-        click_Left_up = (int(Left_up[0] + Width / 4), int(Left_up[1] + Height / 4))
-        click_Right_down = (int(Left_up[0] + 3 * Width / 4), int(Left_up[1] + 3 * Height / 4))
-
-        # 如果是窗口匹配，显示点击区域
-        if is_window_match:
-            cv2.rectangle(Img_display, click_Left_up, click_Right_down, (0, 255, 0), 2)
+        # 画框逻辑与截图保存共用
+        Img_display = _draw_boxes(Img, Left_up, Right_down, search_range, is_window_match)
 
         window_title = "Window Match" if is_window_match else "Screen Match"
         if search_range is not None:
@@ -657,6 +838,10 @@ def Match_model(Img, Img_model_path, Threshold, Flag_show, search_range=None, is
         return1 = None
     else:
         return1 = [Left_up, Right_down]
+
+    # 调试截图：每次匹配判定留一张图（默认档位下 _record_shot 首行即返回）
+    _record_shot(Img, "match_model", Img_model_path, return2, Threshold, return1 is not None,
+                 Left_up, Right_down, search_range, (x1, y1) if search_range is not None else None)
 
     return return1, return2
 
@@ -747,6 +932,7 @@ def Match_models_in_image(Img, models, Threshold):
     Img = np.uint8(Img)
 
     Results = []
+    Best = None          # (score, name, box)：未命中时也要知道「最像的那张差多少」
     for name, Model_path in models:
         Img_model = _read_template_cached(Model_path)
         Model_height, Model_width = Img_model.shape[0:2]
@@ -757,14 +943,30 @@ def Match_models_in_image(Img, models, Threshold):
 
         Result = cv2.matchTemplate(Img, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED)
         min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Result)
-        if min_val > Threshold:
-            continue
 
         Left_up = (min_loc[0], min_loc[1])
         Right_down = (min_loc[0] + Model_width, min_loc[1] + Model_height)
+        if Best is None or min_val < Best[0]:
+            Best = (float(min_val), name, [Left_up, Right_down])
+
+        if min_val > Threshold:
+            continue
+
         Results.append((name, [Left_up, Right_down], f"{min_val:.3f}"))
 
     Results.sort(key=lambda item: float(item[2]))
+
+    # 调试截图：一次调用留一张图。命中与否按「有没有至少一个命中」判定；
+    # 未命中时也记下最像那张的分数，否则「为什么没认出来」无从判断
+    if Results:
+        _name, _box, _score = Results[0]
+        _record_shot(Img, "models_in_image", _name, _score, Threshold, True,
+                     _box[0], _box[1])
+    elif Best is not None:
+        _record_shot(Img, "models_in_image", Best[1], f"{Best[0]:.3f}", Threshold, False)
+    else:
+        _record_shot(Img, "models_in_image", "-", "-", Threshold, False)
+
     return Results
 
 
@@ -790,14 +992,21 @@ def Match_models_in_image_all(Img, Model_path, Threshold, max_matches=10):
     Img_model = _read_template_cached(Model_path)
     Model_height, Model_width = Img_model.shape[0:2]
     if Model_height > Img_work.shape[0] or Model_width > Img_work.shape[1]:
+        # 模板比帧还大属于配置错误，但这也是一次「判定为未命中」，照 G1 留一张图
+        _record_shot(Img, "models_all", Model_path, "1.000", Threshold, False)
         return []
 
     Positions = []
+    Last_score = None      # 循环结束那一轮的分数：未命中时它就是「最像的那次差多少」
+    Hit_score = None       # 第一个命中的分数（最像的那个位置）
     for _ in range(max_matches):
         Result = cv2.matchTemplate(Img_work, np.uint8(Img_model), cv2.TM_SQDIFF_NORMED)
         min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Result)
+        Last_score = float(min_val)
         if min_val > Threshold:
             break
+        if Hit_score is None:
+            Hit_score = float(min_val)
 
         Left_up = (min_loc[0], min_loc[1])
         Right_down = (min_loc[0] + Model_width, min_loc[1] + Model_height)
@@ -807,10 +1016,19 @@ def Match_models_in_image_all(Img, Model_path, Threshold, max_matches=10):
         cv2.rectangle(Img_work, Left_up, Right_down, (0, 0, 0), -1)
 
     Positions.sort(key=lambda box: box[0][1])
+
+    # 调试截图：传原始 Img，不能传涂黑过的 Img_work（那会看不出当时屏幕什么样）
+    if Positions:
+        _record_shot(Img, "models_all", Model_path, f"{Hit_score:.3f}", Threshold, True,
+                     Positions[0][0], Positions[0][1])
+    else:
+        Last = "1.000" if Last_score is None else f"{Last_score:.3f}"
+        _record_shot(Img, "models_all", Model_path, Last, Threshold, False)
+
     return Positions
 
 
-def Match_models_rows(Img, Models, Threshold, max_matches=8):
+def Match_models_rows(Img, Models, Threshold, max_matches=8, origin_offset=None):
     """在一帧上找多个不同模板，并按「行」裁决：一行只出一个类型
 
     与 Match_models_in_image_all 的区别是**行内竞争**。那个原语是
@@ -828,6 +1046,8 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
     :param Models:      [(名字, 模板路径), ...]
     :param Threshold:   行内胜出者的分数上限，超过则该行不算命中
     :param max_matches: 每张模板最多取几个峰
+    :param origin_offset: 这张 Img 来自整屏的哪个位置 (x, y)，只用于调试截图
+                        记下裁剪偏移；不传表示 Img 就是整屏
     :return:            [(名字, [左上, 右下], 得分字符串), ...]，按纵向排序
     """
     check_stop()
@@ -850,10 +1070,13 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
 
     # 2) 各取若干峰（非极大抑制只压分数图，不重跑匹配）
     Peaks = []
+    Best = None        # (score, name)：未命中时记下最像的那张差多少
     for Item in Maps:
         Work = Item["map"].copy()
         for _ in range(max_matches):
             min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(Work)
+            if Best is None or min_val < Best[0]:
+                Best = (float(min_val), Item["name"])
             if min_val > Threshold:
                 break
             Peaks.append({
@@ -876,6 +1099,14 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
             )
 
     if not Peaks:
+        # 全部模板都没过阈值：这是一次判定为未命中的匹配，照 G1 留一张图。
+        # 记最像那张的分数，否则「为什么没认出来」只能靠猜
+        if Best is not None:
+            _record_shot(Img, "models_rows", Best[1], f"{Best[0]:.3f}", Threshold, False,
+                         Offset=origin_offset)
+        else:
+            _record_shot(Img, "models_rows", Models[0][1] if Models else None, "-",
+                         Threshold, False, Offset=origin_offset)
         return []
 
     # 3) 按纵向中心聚成行
@@ -906,6 +1137,19 @@ def Match_models_rows(Img, Models, Threshold, max_matches=8):
         ))
 
     Results.sort(key=lambda item: item[1][0][1])
+
+    # 调试截图：一次调用可能有多个命中行，_draw_boxes 只认一个框，
+    # 所以这里自己在副本上把所有框画完，再以 Left_up=None 交给 _record_shot。
+    # Img_work 是原图别名，直接画会污染调用方的图，必须先 copy。
+    if _SHOT_MODE != "off":
+        Img_shot = np.uint8(Img).copy()
+        for _name, _box, _score in Results:
+            cv2.rectangle(Img_shot, _box[0], _box[1], (0, 0, 255), 2)
+        _record_shot(Img_shot, "models_rows",
+                     Results[0][0] if Results else (Models[0][0] if Models else None),
+                     Results[0][2] if Results else "1.000",
+                     Threshold, bool(Results), Left_up=None, Offset=origin_offset)
+
     return Results
 
 
