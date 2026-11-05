@@ -946,7 +946,7 @@ MAIN- ===== 完整运行被中断 已完成 2 项 ==============================
 | 脚本 | 调用 `main.Single_operation("<key>")` | 单个任务，日志写到 `logs/<YYYY-MM>/<YYYY-MM-DD>/single_<key>_*.log` |
 | 调试 | `dev/test.py` / `dev/test_main.py` | 单点验证模板/任务，已 gitignore（见 `dev/README.md`） |
 | 调试 | 设置弹窗选「调试截图」档位 | 见下方「调试截图」（`dev/` 脚本可显式传 `Lib.begin_shots(path, mode="all")`） |
-| 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.2） |
+| 检查 | `python tools/check_pics.py` | 模板图引用检查（见 §8.3） |
 | 清理 | `python tools/clean_logs.py` | 旧日志清理（默认预览，`--apply` 才删） |
 | 打包 | `python build_exe.py` | 调用 `GUI.spec`，产物 `GUI.exe` 直接输出到项目根目录 |
 
@@ -979,7 +979,7 @@ logs/2026-11/2026-11-05/
 ```
 
 **控制台不出现截图明细**：几千张图只在收尾打一行 `SHOT- ----- 本次共保存 N 张 / 约 M MB -> 路径`，
-明细全在 `index.tsv` 里。图文对照的渲染器 `tools/render_shots.py` 尚未提供，计划在后续 PR 补上。
+明细全在 `index.tsv` 里。要看图文对照，用 §8.2 的 `tools/render_shots.py`。
 
 日志行本身不带时间戳，所以图与日志的对应关系靠 `index.tsv` 的**序号 + 毫秒时间戳**事后切分：
 第 N 张图发生在第 N-1 张之后、第 N+1 张之前，落在这段区间里的日志行就归它。
@@ -987,7 +987,55 @@ logs/2026-11/2026-11-05/
 上线量级参考：一次完整运行约 2000~6000 次判定，`all` 档约 640 MB（单张 JPEG 约 160 KB），
 大于 8000 张会停止保存（`_SHOT_LIMIT`）；连续写盘失败 3 次自动关闭本次截图，不影响任务本身。
 
-### 8.2 模板图引用检查（`tools/check_pics.py`）
+### 8.2 查看截图（`tools/render_shots.py`）
+
+`index.tsv` 是给程序读的，人看要的是「这一张图对应日志里的哪一句」。这个渲染器把一个
+`shots_*` 目录渲染成同目录下的 `index.md`：每帧一张图 + 落在它判定区间内的日志行。
+
+```powershell
+python tools/render_shots.py                    # 渲染最近一次（logs 下最新那个 shots_*）
+python tools/render_shots.py --all              # 全部渲染
+python tools/render_shots.py --log logs/2026-11/2026-11-05/shots_2026-11-05_10-48-54
+python tools/render_shots.py --log logs/2026-11/2026-11-05/console_output_2026-11-05_10-48-54.log
+python tools/render_shots.py --miss-only        # 只看未命中
+python tools/render_shots.py --by-template      # 按模板归堆，看同一个模板在各场景的表现
+python tools/render_shots.py --no-fold          # 连拍不折叠，全部展开
+```
+
+`--log` 既可以给截图目录，也可以给 `.log`（按文件名末 19 位时间戳反推截图目录）。
+
+输出结构：
+
+```
+# 调试截图 · 2026-11-05_10-48-54
+- 总张数 / 命中率 / 体积 / 跨度 / 日志行数 / 未对齐帧数
+- 按模板统计：次数 / 命中 / 未命中 / 最好 / 最差
+
+## #0001 hit · 主界面 · 0.012（阈值 0.05）· 20:18:14.033
+![](000001_hit_主界面_0.012.jpg)
+*来源 match_model · 尺寸 1930x1165*
+
+    INFO- 0.012 检测到进入庭院          <- 这一段就是这张图的判定区间
+
+## #0002 miss · 体力小纸人 · 0.226（阈值 0.07）· 20:18:14.214
+...
+```
+
+**区间怎么切**：`.log` 的行不带时间戳（见 §7.4），所以靠 `index.tsv` 的顺序——第 N 帧的判定
+发生在前一帧之后、后一帧之前，落在这段里的日志行归它。对齐用得分（`0.xxx` 三位小数）匹配，
+**只往后扫、不回头**，两帧同分时第二帧落到后一处。
+
+**对齐不到就如实标注**：命中之后是否打印得分由调用方决定，有些判定日志里没有对应行，这类帧
+标成「未对齐」并只显示图片，**不编造上下文**。汇总里会写清有几张。
+
+**连拍折叠**：轮询场景会出现几十张几乎一样的帧。同模板 + 同结果的连续段达到 4 张时，只展开
+第一张，其余折进 `<details>`（`--no-fold` 关掉）。折叠只合并「同模板同结果」，不同模板交替
+出现时一段都不折。
+
+`index.md` 用 LF 行尾写盘（markdown 不跟仓库的 CRLF）；它落在 `logs/` 下，随日志一起被
+`tools/clean_logs.py` 整月清理带走，不入库。
+
+### 8.3 模板图引用检查（`tools/check_pics.py`）
 
 改动 `pic/` 或任务代码里的模板路径后运行，可自动发现三类问题：
 
